@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>High Noon Hollow</title>
+<link rel="stylesheet" href="/client/css/style.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>%F0%9F%A4%A0</text></svg>" />
+<script type="importmap">
+{ "imports": { "three": "/vendor/three.module.js" } }
+</script>
+</head>
+<body>
+
+<canvas id="view"></canvas>
+
+<!-- ===================== HUD ===================== -->
+<div id="hud" class="hidden">
+  <div id="crosshair"><span class="ch t"></span><span class="ch r"></span><span class="ch b"></span><span class="ch l"></span><span class="ch dot"></span></div>
+  <div id="hitmarker"></div>
+  <div id="damageDirs"></div>
+  <div id="vignette"></div>
+  <div id="dustOverlay"></div>
+
+  <div id="topbar">
+    <div id="phaseLabel">PREPARATION</div>
+    <div id="timer">0:00</div>
+    <div id="objective">Find a gun. Work out who you are dealing with.</div>
+  </div>
+
+  <div id="feed"></div>
+
+  <div id="bottomLeft">
+    <div id="chatLog"></div>
+    <div id="healthWrap">
+      <div id="healthBar"><i id="healthFill"></i><i id="armourFill"></i></div>
+      <div id="healthNum">100</div>
+    </div>
+  </div>
+
+  <div id="bottomRight">
+    <div id="abilityWrap" title="Q">
+      <svg id="cdRing" viewBox="0 0 48 48"><circle class="bg" cx="24" cy="24" r="20"/><circle class="fg" cx="24" cy="24" r="20"/></svg>
+      <div id="abilityName">ABILITY</div>
+      <div id="abilityKey">Q</div>
+    </div>
+    <div id="ammoWrap">
+      <div id="weaponName">REVOLVER</div>
+      <div id="ammo"><b id="mag">6</b><span id="reserve">/ 30</span></div>
+      <div id="dynCount" class="hidden">DYNAMITE x0 <em>G</em></div>
+    </div>
+  </div>
+
+  <div id="interactPrompt" class="hidden"><b>E</b> <span>pick up</span></div>
+  <div id="statusStrip"></div>
+  <div id="reloadBar" class="hidden"><i></i></div>
+</div>
+
+<!-- ===================== ROLE CARD ===================== -->
+<div id="roleCard" class="overlay hidden">
+  <div class="card">
+    <div class="cardTop">
+      <div class="cardLabel">YOUR HAND — TELL NO ONE</div>
+      <h1 id="roleName">OUTLAW</h1>
+      <div id="roleFaction">Outlaws</div>
+    </div>
+    <p id="roleBlurb"></p>
+    <div class="objBox"><span>OBJECTIVE</span><p id="roleObjective"></p></div>
+    <div class="intelBox"><span>WHAT YOU KNOW</span><p id="roleIntel"></p></div>
+    <div class="charBox">
+      <span>YOU ARE PLAYING</span>
+      <p id="roleCharacter"></p>
+      <em id="roleAbility"></em>
+    </div>
+    <div class="cardHint">Hold <b>H</b> in game to look at this again · click or press <b>Space</b> to take the reins</div>
+  </div>
+</div>
+
+<!-- ===================== SCOREBOARD ===================== -->
+<div id="scoreboard" class="overlay hidden">
+  <div class="panel">
+    <h2>PERDITION FLATS</h2>
+    <div class="sbNote">Roles are only revealed when somebody dies. Everything else is your problem.</div>
+    <table id="sbTable"><thead><tr><th>Gunhand</th><th>Status</th><th>Known role</th><th>Kills</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<!-- ===================== VOICE WHEEL ===================== -->
+<div id="voiceWheel" class="overlay hidden"><div id="voiceInner"></div></div>
+
+<!-- ===================== RESULTS ===================== -->
+<div id="results" class="overlay hidden">
+  <div class="panel wide">
+    <h1 id="resultTitle">THE LAW HOLDS</h1>
+    <p id="resultBlurb"></p>
+    <table id="resultTable"><thead><tr><th>Gunhand</th><th>Role</th><th>Character</th><th>Kills</th><th>Damage</th><th></th></tr></thead><tbody></tbody></table>
+    <div class="row">
+      <button id="playAgain" class="primary">RIDE AGAIN</button>
+      <span id="resultCountdown" class="muted"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MENU / LOBBY ===================== -->
+<div id="menu" class="overlay">
+  <div class="menuInner">
+    <header>
+      <h1>HIGH&nbsp;NOON<br/><em>HOLLOW</em></h1>
+      <p class="tag">Eight strangers. One hidden star. Nobody rides out clean.</p>
+    </header>
+
+    <div class="menuGrid">
+      <section class="mCol">
+        <label class="fieldLabel">NAME ON THE HEADSTONE</label>
+        <input id="nameInput" maxlength="16" placeholder="Stranger" />
+
+        <label class="fieldLabel">TABLE SIZE</label>
+        <div class="botRow">
+          <button id="botMinus">−</button>
+          <div><b id="botCount">6</b> <span>gunhands</span><em id="botBreak"></em></div>
+          <button id="botPlus">+</button>
+        </div>
+
+        <label class="fieldLabel">IN THE LOBBY</label>
+        <ul id="lobbyList"></ul>
+
+        <button id="startBtn" class="primary big">DEAL THE ROLES</button>
+        <div id="menuStatus" class="muted">connecting…</div>
+      </section>
+
+      <section class="mCol wide">
+        <label class="fieldLabel">PICK YOUR GUNHAND</label>
+        <div id="charGrid"></div>
+
+        <div class="rules">
+          <h3>HOW A ROUND GOES</h3>
+          <ul>
+            <li><b>Roles are secret.</b> Sheriff, Deputies, Outlaws, one Renegade. Nobody is told who anybody is.</li>
+            <li><b>You get one thread to pull.</b> A Deputy learns two names, one of which is the Sheriff. An Outlaw recognises a single accomplice.</li>
+            <li><b>Kills only name the killer if somebody watched it happen.</b> Everything else is a rumour and a location.</li>
+            <li><b>The dead reveal their role.</b> Every body is evidence — for whoever is still standing.</li>
+            <li><b>The Sheriff may pin on the star</b> for real armour and a permanent target. Or stay a stranger.</li>
+          </ul>
+          <h3>CONTROLS</h3>
+          <div class="keys">
+            <span><b>WASD</b> move</span><span><b>Shift</b> sprint</span><span><b>Ctrl</b> crouch</span>
+            <span><b>Space</b> jump</span><span><b>LMB</b> fire</span><span><b>RMB</b> aim (rifle)</span>
+            <span><b>R</b> reload</span><span><b>1 2 3</b> guns</span><span><b>G</b> dynamite</span>
+            <span><b>E</b> pick up</span><span><b>Q</b> ability</span><span><b>F</b> call out</span>
+            <span><b>V</b> shout</span><span><b>T</b> chat</span><span><b>Tab</b> table</span>
+            <span><b>H</b> your hand</span><span><b>B</b> pin the star</span><span><b>Esc</b> free mouse</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div id="chatInputWrap" class="hidden"><span>SAY</span><input id="chatInput" maxlength="140" /></div>
+<div id="deadBanner" class="hidden"><b>YOU ARE DEAD</b><span>Spectating. The round is still going.</span></div>
+<div id="loading">saddling up…</div>
+
+<script type="module" src="/client/js/main.js"></script>
+</body>
+</html>

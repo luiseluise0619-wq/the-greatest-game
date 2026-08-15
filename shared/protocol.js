@@ -1,0 +1,47 @@
+// Wire protocol. Plain JSON both ways - readable in devtools, easy to extend.
+
+// client -> server
+export const C = {
+  JOIN: 'join',
+  READY: 'ready',
+  INPUT: 'input',
+  SHOOT: 'shoot',
+  RELOAD: 'reload',
+  SWAP: 'swap',
+  PICKUP: 'pickup',
+  ABILITY: 'ability',
+  THROW: 'throw',
+  CHAT: 'chat',
+  ACCUSE: 'accuse',
+  VOICE: 'voice',
+  BADGE: 'badge',
+  ADD_BOT: 'addBot',
+  START: 'start',
+  RESTART: 'restart',
+  SETTINGS: 'settings',
+};
+
+// server -> client
+export const S = {
+  WELCOME: 'welcome',
+  LOBBY: 'lobby',
+  PHASE: 'phase',
+  ROLE: 'role',
+  SNAPSHOT: 'snap',
+  SELF: 'self',
+  SHOT: 'shot',
+  HIT: 'hit',
+  DAMAGE: 'damage',
+  KILL: 'kill',
+  FEED: 'feed',
+  CHAT: 'chat',
+  ABILITY: 'ability',
+  EXPLOSION: 'explosion',
+  LOOT: 'loot',
+  PICKED: 'picked',
+  FOOTPRINTS: 'prints',
+  BADGE: 'badge',
+  RESULTS: 'results',
+  ERROR: 'error',
+  SOUND: 'sound',
+};

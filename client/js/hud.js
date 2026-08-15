@@ -1,0 +1,359 @@
+// All DOM: HUD, feed, chat, role card, scoreboard, results, lobby.
+// Deliberately sparse in game - health, ammo, cooldown, one objective line.
+// Roles are never on screen unless somebody has died or you asked to see yours.
+
+import { CHARACTERS, CHARACTER_ORDER, ROLES, VOICE_LINES, WEAPONS, PHASE } from '../../shared/constants.js';
+
+const $ = (id) => document.getElementById(id);
+
+const PHASE_LABEL = {
+  [PHASE.PREP]: 'PREPARATION',
+  [PHASE.COMBAT]: 'THE ROUND',
+  [PHASE.ENDGAME]: 'DUST STORM',
+  [PHASE.RESULTS]: 'AFTERMATH',
+  [PHASE.LOBBY]: 'LOBBY',
+};
+
+export class HUD {
+  constructor(game) {
+    this.game = game;
+    this.knownRoles = new Map();     // id -> role, learned only from bodies
+    this.roster = new Map();         // id -> {name, bot, alive, kills}
+    this.selfRole = null;
+    this.feedLines = [];
+    this.chatLines = [];
+    this.buildCharacterGrid();
+    this.buildVoiceWheel();
+  }
+
+  // ------------------------------------------------------------------ menu
+  buildCharacterGrid() {
+    const grid = $('charGrid');
+    grid.innerHTML = '';
+    for (const id of CHARACTER_ORDER) {
+      const c = CHARACTERS[id];
+      const el = document.createElement('div');
+      el.className = 'charCard' + (id === this.game.character ? ' sel' : '');
+      el.dataset.id = id;
+      el.innerHTML = `
+        <div class="swatch" style="background:linear-gradient(90deg,${c.coat},${c.accent})"></div>
+        <h4>${c.role.toUpperCase()}</h4>
+        <div class="who">${c.name}</div>
+        <div class="ab">${c.ability}</div>
+        <p>${c.desc}</p>`;
+      el.onclick = () => {
+        this.game.character = id;
+        for (const n of grid.children) n.classList.toggle('sel', n.dataset.id === id);
+      };
+      grid.appendChild(el);
+    }
+  }
+
+  buildVoiceWheel() {
+    const inner = $('voiceInner');
+    inner.innerHTML = '';
+    VOICE_LINES.forEach((line, i) => {
+      const a = (i / VOICE_LINES.length) * Math.PI * 2 - Math.PI / 2;
+      const el = document.createElement('div');
+      el.className = 'voiceOpt';
+      el.style.left = `${210 + Math.cos(a) * 150}px`;
+      el.style.top = `${210 + Math.sin(a) * 150}px`;
+      el.innerHTML = `<b>${i + 1}</b>${line.text}`;
+      inner.appendChild(el);
+    });
+  }
+
+  setLobby(msg) {
+    const ul = $('lobbyList');
+    ul.innerHTML = '';
+    for (const p of msg.players) {
+      const li = document.createElement('li');
+      const c = CHARACTERS[p.character];
+      li.innerHTML = `<b>${escapeHtml(p.name)}</b><span>${c ? c.role : ''}${p.bot ? ' · bot' : ''}</span>`;
+      ul.appendChild(li);
+    }
+    if (!msg.players.length) ul.innerHTML = '<li><span>nobody yet</span></li>';
+    $('botCount').textContent = msg.botTarget;
+    const humans = msg.players.filter((p) => !p.bot).length;
+    const bots = Math.max(0, msg.botTarget - humans);
+    $('botBreak').textContent = `${humans} human · ${bots} bot${bots === 1 ? '' : 's'}`;
+  }
+
+  setStatus(text) { $('menuStatus').textContent = text; }
+
+  showMenu(show) {
+    $('menu').classList.toggle('hidden', !show);
+    $('hud').classList.toggle('hidden', show);
+  }
+
+  // ------------------------------------------------------------- role card
+  showRoleCard(msg) {
+    this.newMatch();
+    this.selfRole = msg;
+    const c = CHARACTERS[msg.character];
+    $('roleName').textContent = msg.roleName.toUpperCase();
+    $('roleName').style.color = msg.color;
+    $('roleFaction').textContent = msg.faction === 'law' ? 'THE LAW' : msg.faction === 'outlaw' ? 'THE GANG' : 'NOBODY BUT YOU';
+    $('roleBlurb').textContent = msg.blurb;
+    $('roleObjective').textContent = msg.objective;
+    $('roleIntel').textContent = msg.intel || 'Nothing. You are working blind.';
+    $('roleCharacter').textContent = `${c.role} — ${c.name}`;
+    $('roleAbility').textContent = `${c.ability}: ${c.desc}`;
+    $('roleCard').classList.remove('hidden');
+    this.setObjective(msg.objective);
+  }
+
+  peekRole(show) {
+    if (!this.selfRole) return;
+    $('roleCard').classList.toggle('hidden', !show);
+  }
+
+  setObjective(text) { $('objective').textContent = text; }
+
+  // ------------------------------------------------------------- hud state
+  setPhase(msg) {
+    $('phaseLabel').textContent = PHASE_LABEL[msg.phase] || msg.phase.toUpperCase();
+    if (msg.phase === PHASE.PREP) {
+      this.setObjective('Guns are holstered. Find weapons, find people, decide who you like.');
+    } else if (this.selfRole) {
+      this.setObjective(this.selfRole.objective);
+    }
+  }
+
+  setTimer(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    $('timer').textContent = `${m}:${String(s).padStart(2, '0')}`;
+    $('timer').classList.toggle('urgent', seconds <= 30);
+  }
+
+  setSelf(s) {
+    const pct = Math.max(0, Math.min(1, s.hp / s.maxHp));
+    $('healthFill').style.transform = `scaleX(${pct})`;
+    $('healthNum').textContent = s.hp;
+    $('healthWrap').classList.toggle('low', pct < 0.34);
+    $('armourFill').style.width = `${Math.min(100, (s.armour / 45) * 100)}%`;
+    $('armourFill').style.display = s.armour > 0 ? 'block' : 'none';
+
+    const w = WEAPONS[s.weapon];
+    $('weaponName').textContent = w ? w.short : '';
+    $('mag').textContent = s.mag;
+    $('reserve').textContent = `/ ${s.reserve}`;
+    $('ammo').classList.toggle('empty', s.mag === 0);
+    $('dynCount').classList.toggle('hidden', s.dyn <= 0);
+    $('dynCount').innerHTML = `DYNAMITE x${s.dyn} <em>G</em>`;
+
+    const c = CHARACTERS[this.game.character];
+    const cdPct = s.cd > 0 ? 1 - s.cd / (s.cdMax || 1) : 1;
+    $('cdRing').querySelector('.fg').style.strokeDashoffset = String(126 * (1 - cdPct));
+    $('abilityName').textContent = c.ability.toUpperCase();
+    $('abilityWrap').classList.toggle('ready', s.cd <= 0);
+    $('abilityWrap').classList.toggle('active', s.active > 0);
+
+    const bar = $('reloadBar');
+    if (s.reloading > 0) {
+      bar.classList.remove('hidden');
+      bar.firstElementChild.style.width = `${Math.max(0, Math.min(100, (1 - s.reloading / (w?.reloadTime || 2)) * 100))}%`;
+    } else bar.classList.add('hidden');
+
+    const chips = [];
+    if (s.badge) chips.push(['THE STAR IS ON', 'badge']);
+    for (const b of s.buffs || []) {
+      if (b === 'speedMult') chips.push(['FLEET FOOTED', '']);
+      else if (b === 'damageMult') chips.push(['HOT STREAK', '']);
+      else if (b === 'spreadMult') chips.push(['CALLED SHOT', '']);
+      else if (b === 'fireRateMult') chips.push(['HAIR TRIGGER', '']);
+      else if (b === 'dust') chips.push(['DUST DEVIL', '']);
+      else if (b === 'resist') chips.push(['IRON PLATE', '']);
+    }
+    $('statusStrip').innerHTML = chips.map(([t, cls]) => `<div class="statusChip ${cls}">${t}</div>`).join('');
+    $('dustOverlay').style.opacity = (s.buffs || []).includes('dust') ? '1' : '0';
+  }
+
+  setDead(dead) {
+    $('deadBanner').classList.toggle('hidden', !dead);
+    $('crosshair').classList.toggle('hide', dead);
+  }
+
+  setCrosshairSpread(px) {
+    $('crosshair').style.setProperty('--spread', `${px}px`);
+  }
+
+  hitmarker(kill) {
+    const el = $('hitmarker');
+    el.classList.remove('show');
+    el.classList.toggle('kill', !!kill);
+    void el.offsetWidth;
+    el.classList.add('show');
+  }
+
+  flashDamage(hp, maxHp) {
+    $('vignette').style.opacity = String(Math.min(0.95, 1 - hp / maxHp + 0.15));
+    clearTimeout(this._vig);
+    this._vig = setTimeout(() => {
+      $('vignette').style.opacity = String(Math.max(0, (1 - hp / maxHp) * 0.55));
+    }, 260);
+  }
+
+  damageArrow(angleDeg) {
+    const el = document.createElement('div');
+    el.className = 'dmgArrow';
+    el.style.transform = `rotate(${angleDeg}deg)`;
+    $('damageDirs').appendChild(el);
+    setTimeout(() => el.remove(), 1200);
+  }
+
+  interact(item) {
+    const el = $('interactPrompt');
+    if (!item) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    el.querySelector('span').textContent = LOOT_LABEL[item.type] || item.type;
+  }
+
+  // ------------------------------------------------------------------ feed
+  addFeed(html, tone = '') {
+    const el = document.createElement('div');
+    el.className = `feedLine ${tone}`;
+    el.innerHTML = html;
+    $('feed').appendChild(el);
+    this.feedLines.push(el);
+    while (this.feedLines.length > 7) this.feedLines.shift().remove();
+    setTimeout(() => el.classList.add('fade'), 11000);
+    setTimeout(() => { el.remove(); this.feedLines = this.feedLines.filter((x) => x !== el); }, 12000);
+  }
+
+  /**
+   * The kill feed is the single most important information channel in the game,
+   * so it says exactly as much as the server decided this player is entitled to
+   * and not one word more.
+   */
+  killFeed(msg) {
+    this.knownRoles.set(msg.victim, msg.victimRole);
+    const r = ROLES[msg.victimRole];
+    const roleTag = `<span class="rle" style="color:${r.color}">${r.name}</span>`;
+    let line;
+    if (msg.youDied) {
+      line = msg.killerName
+        ? `<b>${escapeHtml(msg.killerName)}</b> put you down in ${msg.place}.`
+        : `You died in ${msg.place}.`;
+    } else if (msg.youKilled) {
+      line = `You killed <b>${escapeHtml(msg.victimName)}</b> — they were the ${roleTag}.`;
+    } else if (msg.witnessed && msg.killerName) {
+      line = `You watch <b>${escapeHtml(msg.killerName)}</b> kill <b>${escapeHtml(msg.victimName)}</b> — the ${roleTag}.`;
+    } else if (msg.cause === 'storm') {
+      line = `<b>${escapeHtml(msg.victimName)}</b> choked out in the storm — the ${roleTag}.`;
+    } else if (msg.cause === 'left') {
+      line = `<b>${escapeHtml(msg.victimName)}</b> rode out of town — the ${roleTag}.`;
+    } else {
+      line = `A shot in ${msg.place}. <b>${escapeHtml(msg.victimName)}</b> is dead — the ${roleTag}. Nobody saw who.`;
+    }
+    this.addFeed(line, 'kill');
+    const p = this.roster.get(msg.victim);
+    if (p) p.alive = false;
+  }
+
+  addChat(msg) {
+    const el = document.createElement('div');
+    el.className = 'chatLine' + (msg.voice ? ' voice' : '') + (msg.dead ? ' dead' : '');
+    el.innerHTML = `<b>${escapeHtml(msg.from)}${msg.dead ? ' (dead)' : ''}:</b> ${escapeHtml(msg.text)}`;
+    $('chatLog').appendChild(el);
+    this.chatLines.push(el);
+    while (this.chatLines.length > 9) this.chatLines.shift().remove();
+    setTimeout(() => el.classList.add('fade'), 16000);
+    setTimeout(() => { el.remove(); this.chatLines = this.chatLines.filter((x) => x !== el); }, 17500);
+  }
+
+  // ------------------------------------------------------------ scoreboard
+  updateRoster(players) {
+    for (const p of players) {
+      const cur = this.roster.get(p.id) || {};
+      this.roster.set(p.id, {
+        name: p.n ?? cur.name,
+        alive: !(p.st & 32),
+        character: p.ch ?? cur.character,
+      });
+    }
+  }
+
+  toggleScoreboard(show) {
+    $('scoreboard').classList.toggle('hidden', !show);
+    if (!show) return;
+    const tb = $('sbTable').querySelector('tbody');
+    tb.innerHTML = '';
+    const rows = [...this.roster.entries()];
+    rows.sort((a, b) => Number(b[1].alive) - Number(a[1].alive) || a[1].name.localeCompare(b[1].name));
+    for (const [id, p] of rows) {
+      const isSelf = id === this.game.selfId;
+      const known = isSelf ? this.selfRole?.role : this.knownRoles.get(id);
+      const role = known ? ROLES[known] : null;
+      const tr = document.createElement('tr');
+      tr.className = (p.alive ? '' : 'dead ') + (isSelf ? 'you' : '');
+      tr.innerHTML = `
+        <td>${escapeHtml(p.name || '?')}${isSelf ? ' <span class="muted">(you)</span>' : ''}</td>
+        <td>${p.alive ? 'standing' : 'dead'}</td>
+        ${role
+          ? `<td class="role" style="color:${role.color}">${role.name}${isSelf ? ' (yours)' : ''}</td>`
+          : '<td class="unknown">unknown</td>'}
+        <td>${p.alive ? '—' : ''}</td>`;
+      tb.appendChild(tr);
+    }
+  }
+
+  // --------------------------------------------------------------- results
+  showResults(msg) {
+    $('resultTitle').textContent = msg.title;
+    $('resultTitle').className = msg.winner;
+    $('resultBlurb').textContent = msg.blurb;
+    const tb = $('resultTable').querySelector('tbody');
+    tb.innerHTML = '';
+    for (const r of msg.rows) {
+      const tr = document.createElement('tr');
+      tr.className = (r.alive ? '' : 'dead ') + (r.id === this.game.selfId ? 'you' : '');
+      tr.innerHTML = `
+        <td>${escapeHtml(r.name)}${r.bot ? ' <span class="muted">bot</span>' : ''}</td>
+        <td class="role" style="color:${r.color}">${r.roleName}</td>
+        <td>${r.characterName || ''}</td>
+        <td>${r.kills}</td>
+        <td>${r.damage}</td>
+        <td>${r.won ? '<span class="wonTag">WON</span>' : '<span class="lostTag">lost</span>'}</td>`;
+      tb.appendChild(tr);
+    }
+    $('results').classList.remove('hidden');
+  }
+
+  hideResults() {
+    $('results').classList.add('hidden');
+  }
+
+  /** New hand dealt: forget everything we learned about the last round. */
+  newMatch() {
+    this.knownRoles.clear();
+    this.roster.clear();
+  }
+
+  setResultCountdown(s) {
+    $('resultCountdown').textContent = s > 0 ? `next round in ${s}s` : '';
+  }
+
+  showVoiceWheel(show) { $('voiceWheel').classList.toggle('hidden', !show); }
+
+  chatInput(show) {
+    $('chatInputWrap').classList.toggle('hidden', !show);
+    if (show) { $('chatInput').value = ''; $('chatInput').focus(); }
+    else $('chatInput').blur();
+  }
+}
+
+const LOOT_LABEL = {
+  shotgun: 'take the coach gun',
+  rifle: 'take the lever rifle',
+  ammo: 'take ammunition',
+  whiskey: 'drink (+35 health)',
+  dynamite: 'take a stick of dynamite',
+};
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
