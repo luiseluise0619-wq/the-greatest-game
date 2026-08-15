@@ -759,3 +759,4 @@ function escapeHtml(s) {
 const game = new Game();
 game.start();
 window.game = game;
+window.PV = PlayerView;   // handy for inspecting characters from the console

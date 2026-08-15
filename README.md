@@ -99,8 +99,29 @@ Six, one active ability each. All original.
 | **Gambler** — Odette "Aces" Fontaine | Draw a Card | One random boon: speed, armour, full ammo, a damage streak, a dust cloud — or a bust |
 | **Tracker** — Nahele Cross | Read the Dust | Reveals the last 12s of *everyone's* footprints for 8s |
 
-Every character has a distinct hat profile and coat colour, because the whole
-social layer collapses if you cannot tell eight strangers apart at 40 metres.
+### How the characters are built
+
+There are no model files in this repo, so the gunhands are assembled at runtime
+from capsules and surfaces of revolution — but they are properly **jointed**:
+hip, knee, ankle, shoulder, elbow and neck each pivot, so limbs bend through a
+walk cycle instead of swinging as rigid blocks. Coats are flared lathes that sway,
+hat brims curve and lift at the rim, boots have heels and spurs.
+
+Each character then gets its own costume, which is the identification system
+rather than decoration: the Gunslinger's long duster and bandolier, the Sawbones'
+bowler, apron and spectacles, the Lookout's short jacket and feathered flat cap,
+the Duelist's tall-crowned hat and frock coat, the Gambler's crimson coat and
+flat brim, the Tracker's wide low hat and fur collar. Build, coat length and hat
+profile all differ, because the whole social layer collapses if you cannot tell
+eight strangers apart at 40 metres.
+
+Poses read at distance too: gunhands stand at **low ready** and only bring the
+gun up when they are actually shooting — so someone who has raised their piece
+across the street is worth noticing.
+
+If you would rather drop in real rigged models, `client/js/players.js` is the
+only file that needs to change: swap the constructor's geometry for a loaded
+glTF and keep the same joint names in `update()`.
 
 ---
 
