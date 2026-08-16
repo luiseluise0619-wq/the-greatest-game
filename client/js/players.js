@@ -1,16 +1,17 @@
 // Remote gunhands.
 //
-// These are built at runtime out of capsules and surfaces of revolution rather
-// than imported models - the project ships no art assets - but they are properly
-// jointed: hip, knee, ankle, shoulder, elbow, neck. Limbs bend instead of
-// pivoting as rigid blocks, coats flare, hat brims curve.
+// Two rigs, one pose. `computePose()` works out where every joint should be for
+// this frame; it is then applied either to the procedural gunhand built below
+// (capsules and surfaces of revolution, since the project ships no art) or to a
+// glTF model you dropped into client/models/ - see charmodels.js.
 //
-// Silhouette does the heavy lifting: every character has a different hat
-// profile, coat length and build, because the whole social layer collapses if
-// you cannot tell eight strangers apart across Main Street.
+// Silhouette does the heavy lifting either way: every character has a different
+// hat profile, coat length and build, because the whole social layer collapses
+// if you cannot tell eight strangers apart across Main Street.
 
 import * as THREE from 'three';
 import { CHARACTERS } from '../../shared/constants.js';
+import { makeModelRig, playState, applyPoseToBones } from './charmodels.js';
 
 // ---------------------------------------------------------------------------
 // Skeleton proportions, in metres, for a 1.8m gunhand standing at y=0.
@@ -32,7 +33,7 @@ const LOOK = {
   medic: {
     build: 0.94, coat: 'apron', coatLen: 0.46, coatFlare: 1.1,
     hat: { brim: 0.165, crown: 0.205, dent: 0.15, round: true },   // bowler
-    extras: ['satchel', 'specs'],
+    extras: ['satchel', 'specs', 'apron'],
   },
   scout: {
     build: 0.95, coat: 'jacket', coatLen: 0.24, coatFlare: 1.2,
@@ -65,14 +66,10 @@ function cached(key, make) {
   if (!g) { g = make(); geoCache.set(key, g); }
   return g;
 }
-const capsule = (r, len, key) =>
-  cached(`cap${key}`, () => new THREE.CapsuleGeometry(r, len, 4, 10));
-const sphere = (r, key) =>
-  cached(`sph${key}`, () => new THREE.SphereGeometry(r, 12, 9));
-
-function latheGeo(key, pts, seg = 18) {
-  return cached(key, () => new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x, y)), seg));
-}
+const capsule = (r, len, key) => cached(`cap${key}`, () => new THREE.CapsuleGeometry(r, len, 4, 10));
+const sphere = (r, key) => cached(`sph${key}`, () => new THREE.SphereGeometry(r, 12, 9));
+const latheGeo = (key, pts, seg = 18) =>
+  cached(key, () => new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x, y)), seg));
 
 /** A hat: curved brim with an upturned edge, dented crown. */
 function buildHat(cfg, hatMat, accentMat) {
@@ -89,7 +86,6 @@ function buildHat(cfg, hatMat, accentMat) {
   crown.castShadow = true;
   g.add(crown);
 
-  // Brim drawn as a thin shell that lifts at the rim.
   const brimPts = [
     [cr * 0.99, 0.014], [br * 0.62, -0.008], [br * 0.9, 0.006], [br, 0.038],
     [br * 0.985, 0.05], [br * 0.88, 0.028], [br * 0.6, 0.014], [cr * 0.99, 0.036],
@@ -113,11 +109,8 @@ function buildCoat(look, mat) {
   const len = look.coatLen, flare = look.coatFlare;
   const top = 0.20 * look.build;
   const pts = [
-    [top, 0],
-    [top * 1.03, -len * 0.28],
-    [top * flare * 0.82, -len * 0.62],
-    [top * flare, -len * 0.94],
-    [top * flare * 0.99, -len],
+    [top, 0], [top * 1.03, -len * 0.28], [top * flare * 0.82, -len * 0.62],
+    [top * flare, -len * 0.94], [top * flare * 0.99, -len],
   ];
   const m = new THREE.Mesh(latheGeo(`coat${len}${flare}${top}`, pts, 20), mat);
   m.material.side = THREE.DoubleSide;
@@ -144,6 +137,22 @@ function nameSprite(name) {
   return spr;
 }
 
+function gunMesh() {
+  const g = new THREE.Group();
+  const steel = new THREE.MeshStandardMaterial({ color: 0x413a33, roughness: 0.55, metalness: 0.45 });
+  const barrel = new THREE.Mesh(cached('gunbar', () => new THREE.CylinderGeometry(0.019, 0.019, 0.34, 8)), steel);
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.z = -0.14;
+  barrel.castShadow = true;
+  const stock = new THREE.Mesh(
+    cached('gunstock', () => new THREE.BoxGeometry(0.05, 0.085, 0.13)),
+    new THREE.MeshStandardMaterial({ color: 0x6b4526, roughness: 0.9 }),
+  );
+  stock.position.set(0, -0.03, 0.06);
+  g.add(barrel, stock);
+  return g;
+}
+
 // ---------------------------------------------------------------------------
 export class PlayerView {
   constructor(scene, id, name, character) {
@@ -155,12 +164,59 @@ export class PlayerView {
     this.deadAt = 0;
     this.walkPhase = Math.random() * 6;
     this.aimBlend = 0;
+    this.crouchBlend = 0;
+    this.mats = [];
 
     const ch = CHARACTERS[character] || CHARACTERS.gunslinger;
     const look = LOOK[character] || LOOK.gunslinger;
     this.look = look;
-    const b = look.build;
 
+    this.root = new THREE.Group();
+    this.body = new THREE.Group();
+    this.root.add(this.body);
+
+    // A configured glTF model wins; otherwise we build the gunhand ourselves.
+    this.modelRig = makeModelRig(character);
+    if (this.modelRig) this._useModelRig();
+    else this._buildProcedural(ch, look);
+
+    this._attachCommon(name);
+    scene.add(this.root);
+  }
+
+  // -------------------------------------------------------------- model rig
+  _useModelRig() {
+    const rig = this.modelRig;
+    this.body.add(rig.root);
+
+    // Per-instance materials so one player's dust cloud does not fade everyone
+    // sharing that model.
+    const seen = new Map();
+    rig.model.traverse((o) => {
+      if (!o.material) return;
+      const swap = (m) => {
+        let c = seen.get(m);
+        if (!c) { c = m.clone(); seen.set(m, c); }
+        return c;
+      };
+      o.material = Array.isArray(o.material) ? o.material.map(swap) : swap(o.material);
+    });
+    this.mats = [...seen.values()];
+    this.ownMaterials = true;
+
+    this.gun = null;
+    if (rig.gunAttach) {
+      this.gun = gunMesh();
+      rig.gunAttach.add(this.gun);
+    }
+    this.muzzle = new THREE.PointLight(0xffcc77, 0, 9, 2);
+    (rig.gunAttach || this.body).add(this.muzzle);
+    if (!rig.gunAttach) this.muzzle.position.set(0.3, 1.2, -0.4);
+  }
+
+  // ------------------------------------------------------------- procedural
+  _buildProcedural(ch, look) {
+    const b = look.build;
     const coatC = new THREE.Color(ch.coat);
     const M = (color, rough = 0.92) =>
       new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0.02 });
@@ -174,10 +230,7 @@ export class PlayerView {
     const skinMat = M(0xc19570, 0.95);
     const steelMat = new THREE.MeshStandardMaterial({ color: 0x6b6157, roughness: 0.5, metalness: 0.6 });
     this.mats = [coatMat, hatMat, accentMat, shirtMat, pantsMat, leatherMat, skinMat, steelMat];
-
-    this.root = new THREE.Group();
-    this.body = new THREE.Group();
-    this.root.add(this.body);
+    this.ownMaterials = true;
 
     const mesh = (geo, mat, y = 0, x = 0, z = 0) => {
       const m = new THREE.Mesh(geo, mat);
@@ -199,10 +252,8 @@ export class PlayerView {
 
       const ankleG = new THREE.Group();
       ankleG.position.y = -S.shin;
-      // Boot: shaft + sole + heel + toe, which is most of what reads as "cowboy".
       ankleG.add(mesh(capsule(0.078 * b, 0.11, `bt${b}`), leatherMat, 0.06));
-      const sole = mesh(cached('sole', () => new THREE.BoxGeometry(0.115, 0.05, 0.30)), leatherMat, -0.01, 0, -0.05);
-      ankleG.add(sole);
+      ankleG.add(mesh(cached('sole', () => new THREE.BoxGeometry(0.115, 0.05, 0.30)), leatherMat, -0.01, 0, -0.05));
       ankleG.add(mesh(cached('heel', () => new THREE.BoxGeometry(0.1, 0.055, 0.08)), leatherMat, -0.045, 0, 0.07));
       ankleG.add(mesh(cached('spur', () => new THREE.TorusGeometry(0.045, 0.008, 4, 10)), steelMat, -0.02, 0, 0.115));
 
@@ -212,22 +263,17 @@ export class PlayerView {
       this.legs.push({ hip: hipG, knee: kneeG, ankle: ankleG, side });
     }
 
-    // ---- Spine: everything above the waist pivots here.
+    // ---- Spine
     this.spine = new THREE.Group();
     this.spine.position.y = S.waist;
     this.body.add(this.spine);
-
-    const torso = mesh(capsule(0.185 * b, 0.30, `to${b}`), shirtMat, 0.30);
-    this.spine.add(torso);
-    const chest = mesh(capsule(0.20 * b, 0.14, `ch${b}`), coatMat, 0.40);
-    this.spine.add(chest);
+    this.spine.add(mesh(capsule(0.185 * b, 0.30, `to${b}`), shirtMat, 0.30));
+    this.spine.add(mesh(capsule(0.20 * b, 0.14, `ch${b}`), coatMat, 0.40));
 
     this.coat = buildCoat(look, coatMat);
     this.coat.position.y = 0.11;
     this.spine.add(this.coat);
-
-    const belt = mesh(cached(`belt${b}`, () => new THREE.CylinderGeometry(0.196 * b, 0.196 * b, 0.06, 16)), accentMat, 0.10);
-    this.spine.add(belt);
+    this.spine.add(mesh(cached(`belt${b}`, () => new THREE.CylinderGeometry(0.196 * b, 0.196 * b, 0.06, 16)), accentMat, 0.10));
 
     // ---- Arms: shoulder -> elbow -> hand.
     this.arms = {};
@@ -249,7 +295,7 @@ export class PlayerView {
       this.arms[side < 0 ? 'l' : 'r'] = { shoulder: sh, elbow: el, hand };
     }
 
-    // ---- Neck + head.
+    // ---- Neck + head
     this.neck = new THREE.Group();
     this.neck.position.y = S.neck - S.waist;
     this.spine.add(this.neck);
@@ -262,9 +308,9 @@ export class PlayerView {
     const nose = mesh(cached('nose', () => new THREE.ConeGeometry(0.021, 0.055, 6)), skinMat, 0.128, 0, -0.108);
     nose.rotation.set(-Math.PI / 2, 0, 0);
     this.neck.add(nose);
-    for (const sx of [-1, 1]) {
-      this.neck.add(mesh(sphere(0.017, 'eye'), M(0x2c2119, 0.6), 0.168, sx * 0.045, -0.094));
-    }
+    const eyeMat = M(0x2c2119, 0.6);
+    this.mats.push(eyeMat);
+    for (const sx of [-1, 1]) this.neck.add(mesh(sphere(0.017, 'eye'), eyeMat, 0.168, sx * 0.045, -0.094));
 
     this.hat = buildHat(look.hat, hatMat, accentMat);
     this.hat.position.y = 0.212;
@@ -274,8 +320,7 @@ export class PlayerView {
     // ---- Costume extras: cheap, and they carry a lot of identification.
     const ex = new Set(look.extras);
     if (ex.has('scarf') || ex.has('cravat')) {
-      const scarf = mesh(cached('scarf', () => new THREE.CylinderGeometry(0.088, 0.105, 0.10, 12)), accentMat, 0.505);
-      this.spine.add(scarf);
+      this.spine.add(mesh(cached('scarf', () => new THREE.CylinderGeometry(0.088, 0.105, 0.10, 12)), accentMat, 0.505));
       if (ex.has('cravat')) this.spine.add(mesh(cached('crav', () => new THREE.BoxGeometry(0.06, 0.14, 0.03)), accentMat, 0.44, 0, -0.14));
     }
     if (ex.has('vest')) {
@@ -285,24 +330,23 @@ export class PlayerView {
     }
     if (ex.has('gunbelt')) {
       this.spine.add(mesh(cached('holster', () => new THREE.BoxGeometry(0.075, 0.19, 0.10)), leatherMat, 0.0, 0.185 * b, 0.03));
-      const bando = mesh(cached('bandolier', () => new THREE.TorusGeometry(0.19, 0.022, 5, 14)), leatherMat, 0.31, 0, 0);
+      const bando = mesh(cached('bandolier', () => new THREE.TorusGeometry(0.19, 0.022, 5, 14)), leatherMat, 0.31);
       bando.rotation.set(Math.PI / 2, 0, 0.6);
       this.spine.add(bando);
     }
     if (ex.has('satchel')) {
-      const bag = mesh(cached('satchel', () => new THREE.BoxGeometry(0.20, 0.17, 0.10)), leatherMat, 0.12, side1(b), 0.16);
-      this.spine.add(bag);
-      const strap = mesh(cached('strap', () => new THREE.TorusGeometry(0.185, 0.015, 5, 14)), leatherMat, 0.33, 0, 0);
+      this.spine.add(mesh(cached('satchel', () => new THREE.BoxGeometry(0.20, 0.17, 0.10)), leatherMat, 0.12, 0.2 * b, 0.16));
+      const strap = mesh(cached('strap', () => new THREE.TorusGeometry(0.185, 0.015, 5, 14)), leatherMat, 0.33);
       strap.rotation.set(Math.PI / 2, 0, -0.55);
       this.spine.add(strap);
     }
     if (ex.has('apron')) {
-      const ap = mesh(cached('apron', () => new THREE.BoxGeometry(0.30, 0.42, 0.03)), shirtMat, 0.18, 0, -0.18);
-      this.spine.add(ap);
+      this.spine.add(mesh(cached('apron', () => new THREE.BoxGeometry(0.30, 0.42, 0.03)), shirtMat, 0.18, 0, -0.18));
     }
     if (ex.has('specs')) {
-      this.neck.add(mesh(cached('specs', () => new THREE.TorusGeometry(0.028, 0.005, 4, 10)), steelMat, 0.168, -0.045, -0.1));
-      this.neck.add(mesh(cached('specs2', () => new THREE.TorusGeometry(0.028, 0.005, 4, 10)), steelMat, 0.168, 0.045, -0.1));
+      for (const sx of [-1, 1]) {
+        this.neck.add(mesh(cached('specs', () => new THREE.TorusGeometry(0.028, 0.005, 4, 10)), steelMat, 0.168, sx * 0.045, -0.1));
+      }
     }
     if (ex.has('feather')) {
       const f = mesh(cached('feather', () => new THREE.ConeGeometry(0.018, 0.19, 4)), accentMat, 0.30, 0.09, 0.05);
@@ -310,48 +354,57 @@ export class PlayerView {
       this.neck.add(f);
     }
     if (ex.has('hair')) {
-      const hair = mesh(sphere(0.105, 'hair'), M(0x2b2018, 0.95), 0.115, 0, 0.035);
+      const hairMat = M(0x2b2018, 0.95);
+      this.mats.push(hairMat);
+      const hair = mesh(sphere(0.105, 'hair'), hairMat, 0.115, 0, 0.035);
       hair.scale.set(1.0, 0.95, 1.05);
       this.neck.add(hair);
-      const tail = mesh(capsule(0.036, 0.16, 'tail'), M(0x2b2018, 0.95), 0.0, 0, 0.11);
+      const tail = mesh(capsule(0.036, 0.16, 'tail'), hairMat, 0, 0, 0.11);
       tail.rotation.x = -0.25;
       this.neck.add(tail);
     }
     if (ex.has('stubble')) {
-      const st = mesh(cached('stub', () => new THREE.BoxGeometry(0.12, 0.045, 0.115)), M(0x4a3a2c, 0.98), 0.068, 0, -0.03);
-      this.neck.add(st);
+      const stubMat = M(0x4a3a2c, 0.98);
+      this.mats.push(stubMat);
+      this.neck.add(mesh(cached('stub', () => new THREE.BoxGeometry(0.12, 0.045, 0.115)), stubMat, 0.068, 0, -0.03));
     }
     if (look.coat === 'fur') {
-      const collar = mesh(cached('fur', () => new THREE.TorusGeometry(0.155, 0.055, 6, 16)), M(0x6b5a44, 0.99), 0.475);
+      const furMat = M(0x6b5a44, 0.99);
+      this.mats.push(furMat);
+      const collar = mesh(cached('fur', () => new THREE.TorusGeometry(0.155, 0.055, 6, 16)), furMat, 0.475);
       collar.rotation.x = Math.PI / 2;
       this.spine.add(collar);
     }
 
     // ---- Weapon in the right hand.
-    this.gun = new THREE.Group();
-    const gunMat = new THREE.MeshStandardMaterial({ color: 0x413a33, roughness: 0.55, metalness: 0.45 });
-    this.gunBarrel = mesh(cached('gunbar', () => new THREE.CylinderGeometry(0.019, 0.019, 0.34, 8)), gunMat, 0, 0, -0.14);
-    this.gunBarrel.rotation.x = Math.PI / 2;
-    this.gun.add(this.gunBarrel);
-    this.gun.add(mesh(cached('gunstock', () => new THREE.BoxGeometry(0.05, 0.085, 0.13)), M(0x6b4526, 0.9), -0.03, 0, 0.06));
+    this.gun = gunMesh();
     this.gun.position.set(0, -0.03, -0.05);
     this.arms.r.hand.add(this.gun);
-
     this.muzzle = new THREE.PointLight(0xffcc77, 0, 9, 2);
     this.muzzle.position.set(0, 0, -0.32);
     this.gun.add(this.muzzle);
+  }
 
-    // ---- Sheriff's star: invisible until they pin it on, then everyone sees it.
+  // ------------------------------------------------------------ shared bits
+  _attachCommon(name) {
+    // Sheriff's star: invisible until they pin it on, then everyone sees it.
     this.star = new THREE.Mesh(
       cached('star', () => new THREE.CylinderGeometry(0.055, 0.055, 0.014, 5)),
       new THREE.MeshStandardMaterial({ color: 0xf0cf6a, roughness: 0.3, metalness: 0.8, emissive: 0x3a2c08 }),
     );
     this.star.rotation.set(Math.PI / 2, 0, 0);
-    this.star.position.set(-0.10, 0.40, -0.175);
     this.star.visible = false;
-    this.spine.add(this.star);
+    if (this.modelRig?.starAttach) {
+      this.modelRig.starAttach.add(this.star);
+    } else if (this.spine) {
+      this.star.position.set(-0.10, 0.40, -0.175);
+      this.spine.add(this.star);
+    } else {
+      this.star.position.set(-0.10, 1.34, -0.175);
+      this.body.add(this.star);
+    }
 
-    // ---- Scout reveal outline (this one is meant to draw through walls).
+    // Scout reveal outline (this one is meant to draw through walls).
     this.outline = new THREE.Mesh(
       cached('outline', () => new THREE.CapsuleGeometry(0.42, 1.0, 4, 10)),
       new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.3, depthTest: false, side: THREE.BackSide }),
@@ -364,13 +417,125 @@ export class PlayerView {
     this.tag = nameSprite(name);
     this.tag.position.y = 2.15;
     this.root.add(this.tag);
-
-    scene.add(this.root);
   }
 
   push(state, time) {
     this.buffer.push({ ...state, t: time });
     if (this.buffer.length > 24) this.buffer.shift();
+  }
+
+  // ----------------------------------------------------------------- pose
+  /**
+   * Where every joint should be this frame. Rig-independent, so the same maths
+   * drives the procedural gunhand and a bone-mapped glTF model.
+   */
+  computePose(f, dt) {
+    const { crouch, moving, sprint, firing, pitch, renderTime, dying } = f;
+
+    this.crouchBlend = lerp(this.crouchBlend, crouch ? 1 : 0, Math.min(1, dt * 11));
+    const cb = this.crouchBlend;
+
+    const cadence = sprint ? 10.5 : 6.6;
+    this.walkPhase += dt * cadence * (moving ? 1 : 0);
+    const stride = moving ? (sprint ? 0.72 : 0.46) * (1 - cb * 0.55) : 0;
+    const idle = Math.sin(renderTime * 1.5 + this.id) * 0.02;
+
+    // Low ready when idle, gun up when actually shooting. Anyone who has raised
+    // their piece at you is worth noticing across the street.
+    this.aimBlend = lerp(this.aimBlend, firing ? 1 : (sprint && moving ? 0 : 0.22), Math.min(1, dt * 8));
+    const ab = this.aimBlend;
+    const swingA = Math.sin(this.walkPhase) * stride * 0.55;
+
+    const leg = (phaseOffset) => {
+      const p = this.walkPhase + phaseOffset;
+      const swing = Math.sin(p) * stride;
+      const knee = Math.max(0, -Math.sin(p + 0.9)) * stride * 1.5 + cb * 1.55;
+      return { hip: swing + cb * 0.95, knee, ankle: -knee * 0.35 - swing * 0.25 - cb * 0.5, drop: cb * 0.33 };
+    };
+
+    const bob = moving ? Math.abs(Math.sin(this.walkPhase)) * (sprint ? 0.035 : 0.018) : idle;
+
+    const pose = {
+      crouch: cb,
+      dying: dying || 0,
+      rootY: -cb * 0.42 + bob,
+      spine: {
+        x: (sprint && moving ? 0.22 : 0.04) + cb * 0.28,
+        z: moving ? Math.sin(this.walkPhase) * 0.045 : 0,
+      },
+      neck: { x: 0 },
+      legL: leg(0),
+      legR: leg(Math.PI),
+      armR: {
+        shoulder: lerp(-swingA - 0.02, -1.42 - pitch * 0.85, ab),
+        elbow: lerp(-0.42, -0.22, ab),
+        z: lerp(0.10, -0.10, ab),
+      },
+      armL: {
+        shoulder: lerp(swingA - 0.02, -1.18 - pitch * 0.8, ab),
+        elbow: lerp(-0.42, -0.66, ab),
+        z: lerp(-0.10, 0.36, ab),
+      },
+      coatSway: moving ? Math.sin(this.walkPhase * 2) * 0.03 : 0,
+    };
+    pose.neck.x = -pitch * 0.55 - pose.spine.x * 0.6;
+
+    if (pose.dying > 0) {
+      const e = pose.dying;
+      pose.spine.x = lerp(pose.spine.x, -Math.PI / 2, e);
+      pose.spine.z = lerp(pose.spine.z, 0.25, e);
+      pose.rootY = lerp(pose.rootY, -0.72, e);
+      for (const l of [pose.legL, pose.legR]) {
+        l.hip = lerp(l.hip, -1.3, e);
+        l.knee = lerp(l.knee, 0.9, e);
+        l.ankle = lerp(l.ankle, 0, e);
+        l.drop = lerp(l.drop, 0.78, e);
+      }
+      pose.armL.shoulder = lerp(pose.armL.shoulder, 0.6, e);
+      pose.armL.z = lerp(pose.armL.z, -0.8, e);
+      pose.armR.shoulder = lerp(pose.armR.shoulder, 0.4, e);
+      pose.armR.z = lerp(pose.armR.z, 0.9, e);
+    }
+    return pose;
+  }
+
+  applyProcedural(pose) {
+    for (const l of [{ g: this.legs[0], p: pose.legL }, { g: this.legs[1], p: pose.legR }]) {
+      l.g.hip.rotation.x = l.p.hip;
+      l.g.knee.rotation.x = l.p.knee;
+      l.g.ankle.rotation.x = l.p.ankle;
+      l.g.hip.position.y = S.hip - l.p.drop;
+    }
+    this.spine.position.y = S.waist + pose.rootY;
+    this.spine.rotation.set(pose.spine.x, 0, pose.spine.z);
+    this.neck.rotation.x = pose.neck.x;
+    this.arms.r.shoulder.rotation.set(pose.armR.shoulder, 0, pose.armR.z);
+    this.arms.r.elbow.rotation.x = pose.armR.elbow;
+    this.arms.l.shoulder.rotation.set(pose.armL.shoulder, 0, pose.armL.z);
+    this.arms.l.elbow.rotation.x = pose.armL.elbow;
+    this.coat.rotation.x = -pose.spine.x * 0.5 + pose.coatSway;
+  }
+
+  applyModel(pose, dt, f) {
+    const rig = this.modelRig;
+    if (rig.mixer) {
+      const state = f.dying ? 'death'
+        : f.moving ? (f.sprint ? 'run' : 'walk')
+        : (f.firing && rig.actions.aim) ? 'aim' : 'idle';
+      playState(rig, state);
+      rig.mixer.update(dt);
+    } else if (rig.bones) {
+      applyPoseToBones(rig, pose);
+    }
+    // Root height comes from the pose so crouch and the death collapse read
+    // correctly - but a bone map already moved the hips, so do not double it.
+    if (!rig.bones?.root && (!rig.mixer || !rig.actions.death || !f.dying)) {
+      rig.root.position.y = pose.rootY * (rig.mixer ? 0.4 : 1);
+    }
+    if (rig.mixer && f.dying && !rig.actions.death) {
+      rig.root.rotation.x = -Math.PI / 2 * pose.dying;
+      rig.root.position.y = -0.72 * pose.dying;
+    }
   }
 
   /** Renders ~100ms in the past and interpolates: smooth without feeling floaty. */
@@ -400,97 +565,37 @@ export class PlayerView {
     this.star.visible = !!(c.st & 16);
 
     this.root.position.set(x, y, z);
-
-    if (!this.alive) {
-      // Bodies stay where they fell. Every corpse is a piece of evidence.
-      if (wasAlive) this.deadAt = renderTime;
-      const f = Math.min(1, (renderTime - this.deadAt) / 0.5);
-      const e = 1 - (1 - f) * (1 - f);
-      this.body.rotation.set(0, yaw, 0);
-      this.body.position.y = 0;
-      this.spine.rotation.set(-Math.PI / 2 * e, 0, 0.25 * e);
-      this.spine.position.y = S.waist - 0.72 * e;
-      for (const leg of this.legs) {
-        leg.hip.rotation.x = -1.3 * e;
-        leg.knee.rotation.x = 0.9 * e;
-        leg.hip.position.y = S.hip - 0.78 * e;
-      }
-      this.arms.l.shoulder.rotation.set(0.6 * e, 0, -0.8 * e);
-      this.arms.r.shoulder.rotation.set(0.4 * e, 0, 0.9 * e);
-      this.tag.visible = false;
-      this.outline.visible = false;
-      this.muzzle.intensity = 0;
-      return;
-    }
-
     this.body.rotation.set(0, yaw, 0);
 
-    // ---- Crouch
-    const crouchAmt = crouch ? 1 : 0;
-    this.crouchBlend = lerp(this.crouchBlend ?? 0, crouchAmt, Math.min(1, dt * 11));
-    const cb = this.crouchBlend;
+    if (!this.alive && wasAlive) this.deadAt = renderTime;
+    // Bodies stay where they fell. Every corpse is a piece of evidence.
+    const dyingRaw = this.alive ? 0 : Math.min(1, (renderTime - this.deadAt) / 0.5);
+    const dying = dyingRaw > 0 ? 1 - (1 - dyingRaw) * (1 - dyingRaw) : 0;
 
-    // ---- Walk cycle. Knees only bend one way, which is what separates a walk
-    // from a puppet on strings.
-    const cadence = sprint ? 10.5 : 6.6;
-    this.walkPhase += dt * cadence * (moving ? 1 : 0);
-    const stride = moving ? (sprint ? 0.72 : 0.46) * (1 - cb * 0.55) : 0;
-    const idle = Math.sin(renderTime * 1.5 + this.id) * 0.02;
+    const flags = { crouch, moving: moving && this.alive, sprint, firing: firing && this.alive, pitch, renderTime, dying };
+    const pose = this.computePose(flags, dt);
+    if (this.modelRig) this.applyModel(pose, dt, flags);
+    else this.applyProcedural(pose);
 
-    for (const leg of this.legs) {
-      const p = this.walkPhase + (leg.side < 0 ? 0 : Math.PI);
-      const swing = Math.sin(p) * stride;
-      leg.hip.rotation.x = swing + cb * 0.95;
-      leg.knee.rotation.x = Math.max(0, -Math.sin(p + 0.9)) * stride * 1.5 + cb * 1.55;
-      leg.ankle.rotation.x = -leg.knee.rotation.x * 0.35 - swing * 0.25 - cb * 0.5;
-      leg.hip.position.y = S.hip - cb * 0.33;
+    if (this.muzzle) {
+      this.muzzle.intensity = (firing && this.alive) ? 5 : Math.max(0, this.muzzle.intensity - dt * 30);
     }
-
-    // Body bob and lean.
-    const bob = moving ? Math.abs(Math.sin(this.walkPhase)) * (sprint ? 0.035 : 0.018) : idle;
-    this.spine.position.y = S.waist - cb * 0.42 + bob;
-    this.spine.rotation.x = (sprint && moving ? 0.22 : 0.04) + cb * 0.28;
-    this.spine.rotation.z = moving ? Math.sin(this.walkPhase) * 0.045 : 0;
-    this.spine.rotation.y = 0;
-
-    // Head tracks where they are looking.
-    this.neck.rotation.x = -pitch * 0.55 - this.spine.rotation.x * 0.6;
-
-    // ---- Arms. Aiming raises the gun arm toward the look direction; otherwise
-    // the arms swing against the legs.
-    // Low ready when idle, gun up when they are actually shooting. Anyone who
-    // has raised their piece at you is worth noticing across the street.
-    const aimTarget = firing ? 1 : (sprint && moving ? 0 : 0.22);
-    this.aimBlend = lerp(this.aimBlend, aimTarget, Math.min(1, dt * 8));
-    const ab = this.aimBlend;
-    const swingA = Math.sin(this.walkPhase) * stride * 0.55;
-
-    const r = this.arms.r;
-    r.shoulder.rotation.x = lerp(-swingA - 0.02, -1.42 - pitch * 0.85, ab);
-    r.shoulder.rotation.z = lerp(0.10, -0.10, ab);
-    r.elbow.rotation.x = lerp(-0.42, -0.22, ab);
-
-    const l = this.arms.l;
-    // Two-handed grip when actually aiming, swinging free otherwise.
-    l.shoulder.rotation.x = lerp(swingA - 0.02, -1.18 - pitch * 0.8, ab);
-    l.shoulder.rotation.z = lerp(-0.10, 0.36, ab);
-    l.elbow.rotation.x = lerp(-0.42, -0.66, ab);
-
-    // Coat sways a little when they move.
-    this.coat.rotation.x = -this.spine.rotation.x * 0.5 + (moving ? Math.sin(this.walkPhase * 2) * 0.03 : 0);
-
-    this.muzzle.intensity = firing ? 5 : Math.max(0, this.muzzle.intensity - dt * 30);
 
     for (const m of this.mats) {
       if (m.transparent !== dusty) { m.transparent = dusty; m.needsUpdate = true; }
       m.opacity = dusty ? 0.42 : 1;
     }
 
+    if (!this.alive) {
+      this.tag.visible = false;
+      this.outline.visible = false;
+      return;
+    }
     if (camera) {
       const d = camera.position.distanceTo(this.root.position);
       this.tag.visible = d < 34;
       this.tag.material.opacity = Math.max(0, Math.min(1, (34 - d) / 10));
-      this.tag.position.y = 2.15 - cb * 0.42;
+      this.tag.position.y = 2.15 - pose.crouch * 0.42;
     }
   }
 
@@ -498,17 +603,15 @@ export class PlayerView {
 
   dispose(scene) {
     scene.remove(this.root);
-    this.root.traverse((o) => {
-      if (o.material) {
-        if (o.material.map) o.material.map.dispose();
-        o.material.dispose();
-      }
-    });
+    if (this.tag?.material?.map) this.tag.material.map.dispose();
+    this.tag?.material?.dispose();
+    this.outline?.material?.dispose();
+    this.star?.material?.dispose();
+    if (this.ownMaterials) for (const m of this.mats) m.dispose();
     // Geometry is shared across every gunhand, so it is deliberately not disposed.
   }
 }
 
-function side1(b) { return 0.2 * b; }
 function lerp(a, b, t) { return a + (b - a) * t; }
 function shortAngle(a, b) {
   let d = b - a;

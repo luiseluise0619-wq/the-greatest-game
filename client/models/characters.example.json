@@ -1,0 +1,42 @@
+{
+  "$comment": "Copy to characters.json and edit. Keys not listed here stay procedural. See README.md in this folder.",
+
+  "gunslinger": {
+    "url": "/client/models/gunslinger.glb",
+    "scale": 1.0,
+    "offset": [0, 0, 0],
+    "rotationY": 0,
+    "clips": {
+      "idle": "Idle",
+      "walk": "Walk",
+      "run": "Run",
+      "aim": "Aim",
+      "death": "Death"
+    },
+    "gunBone": "mixamorigRightHand",
+    "starBone": "mixamorigSpine2"
+  },
+
+  "tracker": {
+    "url": "/client/models/tracker.glb",
+    "scale": 0.01,
+    "offset": [0, 0, 0],
+    "rotationY": 180,
+    "bones": {
+      "root": "mixamorigHips",
+      "spine": "mixamorigSpine",
+      "neck": "mixamorigNeck",
+      "hipL": "mixamorigLeftUpLeg",
+      "kneeL": "mixamorigLeftLeg",
+      "ankleL": "mixamorigLeftFoot",
+      "hipR": "mixamorigRightUpLeg",
+      "kneeR": "mixamorigRightLeg",
+      "ankleR": "mixamorigRightFoot",
+      "shoulderL": "mixamorigLeftArm",
+      "elbowL": "mixamorigLeftForeArm",
+      "shoulderR": "mixamorigRightArm",
+      "elbowR": "mixamorigRightForeArm"
+    },
+    "gunBone": "mixamorigRightHand"
+  }
+}

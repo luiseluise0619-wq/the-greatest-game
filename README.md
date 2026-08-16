@@ -119,9 +119,30 @@ Poses read at distance too: gunhands stand at **low ready** and only bring the
 gun up when they are actually shooting — so someone who has raised their piece
 across the street is worth noticing.
 
-If you would rather drop in real rigged models, `client/js/players.js` is the
-only file that needs to change: swap the constructor's geometry for a loaded
-glTF and keep the same joint names in `update()`.
+### Using your own glTF models
+
+If you have rigged `.glb` characters, you do not need to touch any code. Drop
+them in `client/models/`, name them in `client/models/characters.json`, reload.
+Full schema in `client/models/README.md`.
+
+Two levels of support, so almost any rigged model works:
+
+- **The model carries animation clips** — name them (`idle`, `walk`, `run`,
+  `aim`, `death`) and an `AnimationMixer` drives them with crossfades.
+- **It has no clips but has named bones** — map the bone names and the game
+  drives that skeleton with the *same pose it computes for the procedural
+  gunhand*, so you get the walk cycle, crouch, low-ready and death collapse for
+  free.
+
+Per-character, per-model, and failure-tolerant: anything not listed, or that
+fails to load, silently keeps the procedural gunhand, so you can convert one
+character at a time. Optional `gunBone` / `starBone` attach the revolver and the
+Sheriff's star to your rig.
+
+Whatever rig you use, the game keeps ownership of everything that carries
+information — name tags, the Sheriff's star, the Lookout's reveal outline, the
+dust-cloud fade — so a custom model can never quietly break the deduction
+layer.
 
 ---
 

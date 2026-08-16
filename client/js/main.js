@@ -17,6 +17,7 @@ import { Effects } from './effects.js';
 import { ViewModel } from './viewmodel.js';
 import { GameAudio } from './audio.js';
 import { HUD } from './hud.js';
+import { initCharacterModels } from './charmodels.js';
 
 const $ = (id) => document.getElementById(id);
 const INTERP_DELAY = 0.1;
@@ -755,6 +756,11 @@ function escapeHtml(s) {
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
 }
+
+// Preload any configured glTF characters first, so the very first gunhand you
+// see is already the model you asked for rather than the procedural stand-in.
+// Resolves immediately when client/models/characters.json is absent.
+await initCharacterModels();
 
 const game = new Game();
 game.start();

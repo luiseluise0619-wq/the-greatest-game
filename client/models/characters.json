@@ -1,0 +1,3 @@
+{
+  "$comment": "Empty by default: every character uses the procedural gunhand. Add entries here to use your own .glb models - see README.md in this folder for the schema, and characters.example.json for a filled-in example."
+}

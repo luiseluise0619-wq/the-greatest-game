@@ -15,6 +15,11 @@ const PORT = process.env.PORT ? Number(process.env.PORT) : 8080;
 const HOST = process.env.HOST || '0.0.0.0';
 
 const MIME = {
+  '.glb': 'model/gltf-binary',
+  '.gltf': 'model/gltf+json',
+  '.bin': 'application/octet-stream',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
@@ -33,6 +38,13 @@ function resolveRequest(urlPath) {
   // three.js is served straight out of node_modules so there is no build step.
   if (urlPath === '/vendor/three.module.js') {
     return path.join(ROOT, 'node_modules', 'three', 'build', 'three.module.js');
+  }
+  // The addon tree (GLTFLoader, SkeletonUtils, ...) is served under one prefix so
+  // its own relative imports keep resolving.
+  if (urlPath.startsWith('/vendor/jsm/')) {
+    const rel = path.normalize(urlPath.slice('/vendor/jsm/'.length)).replace(/^(\.\.[/\\])+/, '');
+    const full = path.join(ROOT, 'node_modules', 'three', 'examples', 'jsm', rel);
+    return full.startsWith(path.join(ROOT, 'node_modules', 'three', 'examples', 'jsm')) ? full : null;
   }
   const clean = path.normalize(decodeURIComponent(urlPath)).replace(/^(\.\.[/\\])+/, '');
   const rel = clean.replace(/^[/\\]+/, '');
