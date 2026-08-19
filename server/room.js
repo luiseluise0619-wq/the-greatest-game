@@ -39,7 +39,10 @@ export function chestOf(p) {
 let nextId = 1;
 
 export class Room {
-  constructor() {
+  constructor(opts = {}) {
+    this.code = opts.code || 'LOCAL';
+    this.isPublic = opts.isPublic !== false;
+    this.emptySince = now();
     this.clients = new Set();
     this.players = new Map();
     this.phase = PHASE.LOBBY;
@@ -58,16 +61,39 @@ export class Room {
   // -------------------------------------------------------------------------
   // Connections
   // -------------------------------------------------------------------------
-  addConnection(ws) {
-    const client = { ws, playerId: null };
+  addConnection(client) {
+    client.room = this;
+    client.playerId = client.playerId ?? null;
     this.clients.add(client);
-    this.send(client, { t: S.WELCOME, map: MAP.name, phase: this.phase, maxPlayers: MAX_PLAYERS });
+    this.emptySince = 0;
+    this.send(client, this.welcomeMsg());
     return client;
+  }
+
+  welcomeMsg(selfId = null) {
+    return {
+      t: S.WELCOME,
+      selfId,
+      map: MAP.name,
+      phase: this.phase,
+      maxPlayers: MAX_PLAYERS,
+      code: this.code,
+      isPublic: this.isPublic,
+      humans: this.humanCount(),
+    };
+  }
+
+  humanCount() {
+    let n = 0;
+    for (const p of this.players.values()) if (!p.bot && p.connected) n++;
+    return n;
   }
 
   removeConnection(client) {
     if (!this.clients.has(client)) return;
     this.clients.delete(client);
+    client.room = null;
+    if (!this.clients.size) this.emptySince = now();
     const p = this.players.get(client.playerId);
     if (p) {
       if (this.phase === PHASE.LOBBY || this.phase === PHASE.RESULTS) {
@@ -191,7 +217,7 @@ export class Room {
     });
     client.playerId = p.id;
     this.players.set(p.id, p);
-    this.send(client, { t: S.WELCOME, selfId: p.id, map: MAP.name, phase: this.phase, maxPlayers: MAX_PLAYERS });
+    this.send(client, this.welcomeMsg(p.id));
     this.sendPhaseTo(client);
 
     // A human joining mid-match takes over the quietest bot so they play now,
@@ -206,7 +232,7 @@ export class Room {
         bot.name = p.name;
         bot.character = p.character;
         client.playerId = bot.id;
-        this.send(client, { t: S.WELCOME, selfId: bot.id, map: MAP.name, phase: this.phase, maxPlayers: MAX_PLAYERS });
+        this.send(client, this.welcomeMsg(bot.id));
         this.sendRole(bot);
         this.sendPhaseTo(client);
         this.pushLobby();
@@ -974,10 +1000,7 @@ export class Room {
   // -------------------------------------------------------------------------
   // Simulation
   // -------------------------------------------------------------------------
-  start() {
-    this.lastTime = now();
-    this.timer = setInterval(() => this.step(), TICK_MS);
-  }
+  resetClock() { this.lastTime = now(); }
 
   step() {
     const t = now();

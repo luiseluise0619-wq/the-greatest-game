@@ -114,6 +114,17 @@
         <label class="fieldLabel">NAME ON THE HEADSTONE</label>
         <input id="nameInput" maxlength="16" placeholder="Stranger" />
 
+        <label class="fieldLabel">THIS TOWN</label>
+        <div class="roomBox">
+          <div class="roomId"><b id="roomCode">····</b><span id="roomKind">finding a town…</span></div>
+          <button id="copyLink" class="ghost">COPY INVITE LINK</button>
+        </div>
+        <div class="roomJoin">
+          <input id="joinCode" maxlength="4" placeholder="CODE" autocomplete="off" spellcheck="false" />
+          <button id="joinBtn">JOIN</button>
+          <button id="newRoom" title="Open a private town only your code can reach">NEW</button>
+        </div>
+
         <label class="fieldLabel">TABLE SIZE</label>
         <div class="botRow">
           <button id="botMinus">−</button>

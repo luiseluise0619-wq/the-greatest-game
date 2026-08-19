@@ -52,12 +52,19 @@ class Game {
     this.wantFire = false;
     this.ads = false;
 
+    // #ABCD in the URL means "put me in that town". Anything else is quick play.
+    this.joinIntent = parseRoomFromUrl();
+    this.roomCode = null;
+
     this.hud = new HUD(this);
     this.audio = new GameAudio();
-    this.initThree();
-    this.initInput();
     this.initMenu();
-    this.connect();
+    this.connect();          // socket first: the lobby should answer immediately
+    this.initThree();        // then the expensive part
+    this.initInput();
+
+    this.modelsReady = false;
+    modelsLoading.then(() => { this.modelsReady = true; });
   }
 
   // ---------------------------------------------------------------- three
@@ -77,7 +84,7 @@ class Game {
     this.camera.rotation.order = 'YXZ';
     this.scene.add(this.camera);
 
-    this.world = buildWorld(this.scene);
+    this.world = null;              // built lazily - see ensureWorld()
     this.effects = new Effects(this.scene);
 
     // The viewmodel lives in its own scene so it can never clip into a wall.
@@ -121,6 +128,24 @@ class Game {
     setTimeout(() => $('loading').remove(), 600);
   }
 
+  /**
+   * Build the town. Deferred out of startup so the lobby is interactive in
+   * milliseconds; warmed in the background once connected, and guaranteed
+   * before a round begins.
+   */
+  ensureWorld() {
+    if (this.world) return;
+    this.world = buildWorld(this.scene);
+  }
+
+  warmWorld() {
+    if (this.world || this.worldWarming) return;
+    this.worldWarming = true;
+    const build = () => this.ensureWorld();
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(build, { timeout: 2500 });
+    else setTimeout(build, 400);
+  }
+
   // ----------------------------------------------------------------- menu
   initMenu() {
     $('startBtn').onclick = () => {
@@ -131,6 +156,16 @@ class Game {
         character: this.character,
       });
     };
+    $('copyLink').onclick = () => this.copyInvite();
+    $('newRoom').onclick = () => this.switchRoom({ create: true });
+    $('joinBtn').onclick = () => {
+      const code = $('joinCode').value.trim().toUpperCase();
+      if (code.length !== 4) { this.hud.setStatus('a town code is four characters'); return; }
+      $('joinCode').value = '';
+      this.switchRoom({ room: code });
+    };
+    $('joinCode').onkeydown = (e) => { if (e.key === 'Enter') $('joinBtn').click(); };
+
     $('botPlus').onclick = () => this.send({ t: C.ADD_BOT });
     $('botMinus').onclick = () => this.send({ t: C.ADD_BOT, remove: true });
     $('playAgain').onclick = () => {
@@ -142,15 +177,44 @@ class Game {
     $('roleCard').onclick = () => this.dismissRoleCard();
   }
 
+  async copyInvite() {
+    if (!this.roomCode) return;
+    const link = `${location.origin}${location.pathname}#${this.roomCode}`;
+    const btn = $('copyLink');
+    try {
+      await navigator.clipboard.writeText(link);
+      btn.textContent = 'LINK COPIED';
+    } catch {
+      // Clipboard is blocked on insecure origins; show the link so it can be
+      // selected by hand rather than failing silently.
+      btn.textContent = link;
+    }
+    btn.classList.add('done');
+    clearTimeout(this._copyT);
+    this._copyT = setTimeout(() => {
+      btn.textContent = 'COPY INVITE LINK';
+      btn.classList.remove('done');
+    }, 2200);
+  }
+
   // -------------------------------------------------------------- network
   connect() {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     this.ws = new WebSocket(`${proto}://${location.host}`);
     this.ws.onopen = () => {
       this.hud.setStatus('connected — pick a gunhand and deal the roles');
-      this.send({ t: C.JOIN, name: $('nameInput').value.trim() || undefined, character: this.character });
+      this.warmWorld();
+      this.send({
+        t: C.JOIN,
+        name: $('nameInput').value.trim() || undefined,
+        character: this.character,
+        ...this.joinIntent,
+      });
     };
-    this.ws.onclose = () => this.hud.setStatus('connection lost — refresh to ride again');
+    this.ws.onclose = () => {
+      if (this.switching) return;               // we closed it on purpose
+      this.hud.setStatus('connection lost — refresh to ride again');
+    };
     this.ws.onerror = () => this.hud.setStatus('connection error');
     this.ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
@@ -162,10 +226,38 @@ class Game {
     if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(msg));
   }
 
+  /**
+   * Move to another town. A socket belongs to exactly one room for its lifetime,
+   * so switching means reconnecting - which also gives us a clean slate.
+   */
+  switchRoom(intent) {
+    if (this.inGame) { this.hud.setStatus('finish this round before changing towns'); return; }
+    this.joinIntent = intent;
+    this.roomCode = null;
+    this.selfId = null;
+    this.switching = true;
+    if (this.ws) { try { this.ws.close(); } catch { /* already gone */ } }
+    this.hud.setStatus('riding over…');
+    setTimeout(() => { this.switching = false; this.connect(); }, 120);
+  }
+
+  setRoom(msg) {
+    this.roomCode = msg.code || null;
+    if (this.roomCode) {
+      // Keep the address bar shareable: copy it and you have an invite.
+      if (location.hash.slice(1).toUpperCase() !== this.roomCode) {
+        history.replaceState(null, '', `#${this.roomCode}`);
+      }
+      this.joinIntent = { room: this.roomCode };
+    }
+    this.hud.setRoom(msg);
+  }
+
   onMessage(msg) {
     switch (msg.t) {
       case S.WELCOME:
         if (msg.selfId) this.selfId = msg.selfId;
+        this.setRoom(msg);
         break;
       case S.LOBBY: this.hud.setLobby(msg); break;
 
@@ -254,7 +346,15 @@ class Game {
 
       case S.RESULTS: this.hud.showResults(msg); break;
       case S.SOUND: if (msg.sound === 'bell') this.audio.bell(); break;
-      case S.ERROR: this.hud.setStatus(msg.msg); break;
+      case S.ERROR:
+        this.hud.setStatus(msg.msg);
+        if (msg.fatal) {
+          // Bad code: drop back to quick play rather than leaving them stranded.
+          history.replaceState(null, '', location.pathname);
+          this.joinIntent = {};
+          this.hud.setRoom({ code: null });
+        }
+        break;
     }
   }
 
@@ -270,6 +370,9 @@ class Game {
       if (p.id === this.selfId) continue;
       let v = this.views.get(p.id);
       if (!v) {
+        // Hold off until any configured glTF models have loaded, so nobody gets
+        // built as a procedural stand-in and then never upgraded.
+        if (!this.modelsReady) continue;
         v = new PlayerView(this.scene, p.id, p.n, p.ch);
         this.views.set(p.id, v);
       }
@@ -355,6 +458,7 @@ class Game {
 
   // ----------------------------------------------------------- game state
   enterGame() {
+    this.ensureWorld();
     this.inGame = true;
     this.hud.showMenu(false);
     this.hud.hideResults();
@@ -713,7 +817,7 @@ class Game {
       for (const [, v] of this.views) v.update(renderTime, dt, this.camera);
 
       this.effects.update(dt, t);
-      animateWorld(this.world, dt, t, this.camera);
+      if (this.world) animateWorld(this.world, dt, t, this.camera);
 
       this.viewmodel.update(dt, {
         moving: this.self.moving,
@@ -750,6 +854,14 @@ class Game {
   }
 }
 
+function parseRoomFromUrl() {
+  const hash = (location.hash || '').replace('#', '').trim().toUpperCase();
+  if (/^[A-Z0-9]{4}$/.test(hash)) return { room: hash };
+  const q = new URLSearchParams(location.search).get('r');
+  if (q && /^[A-Za-z0-9]{4}$/.test(q)) return { room: q.toUpperCase() };
+  return {};
+}
+
 function r2(v) { return Math.round(v * 100) / 100; }
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => (
@@ -757,10 +869,9 @@ function escapeHtml(s) {
   ));
 }
 
-// Preload any configured glTF characters first, so the very first gunhand you
-// see is already the model you asked for rather than the procedural stand-in.
-// Resolves immediately when client/models/characters.json is absent.
-await initCharacterModels();
+// Kick off character-model loading immediately, but do not block the socket on
+// it. Resolves right away when client/models/characters.json names nothing.
+const modelsLoading = initCharacterModels();
 
 const game = new Game();
 game.start();

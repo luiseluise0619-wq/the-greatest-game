@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { Room } from './room.js';
+import { RoomManager } from './rooms.js';
 import { TIMING } from '../shared/constants.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -70,8 +70,18 @@ for (const key of ['prep', 'combat', 'endgame', 'results']) {
   if (env && Number.isFinite(Number(env))) TIMING[key] = Number(env);
 }
 
+const manager = new RoomManager();
+
 const server = http.createServer((req, res) => {
   const urlPath = (req.url || '/').split('?')[0];
+
+  // Deploy platforms poll this; it doubles as a live population readout.
+  if (urlPath === '/healthz') {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ ok: true, uptime: Math.round(process.uptime()), ...manager.stats() }));
+    return;
+  }
+
   const file = resolveRequest(urlPath);
   if (!file) { res.writeHead(404); res.end('not found'); return; }
   fs.readFile(file, (err, data) => {
@@ -85,25 +95,25 @@ const server = http.createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({ server });
-const room = new Room();
 
-wss.on('connection', (ws, req) => {
-  const client = room.addConnection(ws);
+wss.on('connection', (ws) => {
+  // A socket is roomless until its join message says which town it wants.
+  const client = { ws, room: null, playerId: null };
   ws.on('message', (raw) => {
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch { return; }
     if (!msg || typeof msg.t !== 'string') return;
     try {
-      room.handleMessage(client, msg);
+      manager.handleMessage(client, msg);
     } catch (err) {
       console.error('[room] message error', msg.t, err);
     }
   });
-  ws.on('close', () => room.removeConnection(client));
-  ws.on('error', () => room.removeConnection(client));
+  ws.on('close', () => manager.dropClient(client));
+  ws.on('error', () => manager.dropClient(client));
 });
 
-room.start();
+manager.start();
 
 server.listen(PORT, HOST, () => {
   console.log('');
@@ -112,6 +122,7 @@ server.listen(PORT, HOST, () => {
   console.log(`  Play:      http://localhost:${PORT}`);
   console.log('  LAN play:  share your machine\'s IP on the same port');
   console.log('  Bots fill any empty slots - press START in the lobby.');
+  console.log('  Rooms:     share the 4-letter code, or the link with #CODE');
   console.log('');
 });
 

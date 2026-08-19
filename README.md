@@ -20,6 +20,20 @@ model and sound in the game is generated procedurally at runtime.
 
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
+## Playing with other people
+
+Opening the page drops you into a **public town** with a four-letter code. Share
+the URL — it carries the code as `#ABCD` — and whoever opens it lands in your
+lobby. **NEW** opens a private town only the code can reach, **JOIN** takes you
+to somebody else's, and quick play always fills the busiest waiting lobby rather
+than scattering four people across four empty towns.
+
+Bots fill whatever seats are left, so a round works with one human or eight.
+
+To put it in front of people who are not on your network, see **[DEPLOY.md](DEPLOY.md)**
+— one container, one command, and `GET /healthz` reports live room and player
+counts.
+
 ---
 
 ## The round

@@ -228,6 +228,24 @@ input {
 }
 input:focus { border-color: var(--gold); }
 
+.roomBox { background: rgba(12,9,6,.55); border: 1px solid rgba(200,180,140,.24); padding: 12px 14px; }
+.roomId { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.roomId b {
+  font-size: 30px; letter-spacing: .30em; color: var(--gold); line-height: 1.1;
+  text-shadow: 0 2px 8px rgba(0,0,0,.6);
+}
+.roomId span { font-size: 10px; letter-spacing: .16em; color: rgba(232,217,189,.45); text-align: right; }
+button.ghost {
+  width: 100%; margin-top: 10px; font-size: 10.5px; letter-spacing: .18em; padding: 7px;
+  background: transparent; border-color: rgba(200,180,140,.28);
+}
+button.ghost.done { color: var(--good); border-color: rgba(143,191,106,.6); }
+.roomJoin { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; margin-top: 8px; }
+.roomJoin input {
+  text-transform: uppercase; letter-spacing: .28em; text-align: center; padding: 7px 6px; font-size: 14px;
+}
+.roomJoin button { padding: 7px 11px; font-size: 11px; letter-spacing: .14em; }
+
 .botRow { display: flex; align-items: center; gap: 12px; }
 .botRow div { flex: 1; text-align: center; }
 .botRow b { font-size: 22px; }

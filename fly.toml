@@ -1,0 +1,30 @@
+# fly.io deployment. `fly launch --no-deploy` once, then `fly deploy`.
+app = "high-noon-hollow"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Rooms live in memory in one process, so never scale past a single machine
+  # and never scale to zero - a cold lobby that takes ten seconds to answer
+  # reads as a broken game.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

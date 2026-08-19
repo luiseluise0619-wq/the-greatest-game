@@ -81,6 +81,15 @@ export class HUD {
 
   setStatus(text) { $('menuStatus').textContent = text; }
 
+  setRoom(msg) {
+    $('roomCode').textContent = msg.code || '····';
+    const kind = !msg.code ? 'finding a town…'
+      : msg.isPublic ? 'public · strangers can drop in'
+      : 'private · code only';
+    $('roomKind').textContent = kind;
+    $('copyLink').disabled = !msg.code;
+  }
+
   showMenu(show) {
     $('menu').classList.toggle('hidden', !show);
     $('hud').classList.toggle('hidden', show);
