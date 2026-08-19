@@ -378,9 +378,9 @@ class Game {
       }
       v.push(p, now);
     }
-    for (const [id, v] of this.views) {
-      if (!seen.has(id)) { v.dispose(this.scene); this.views.delete(id); }
-    }
+    // Anyone missing from the snapshot is simply out of sight - keep the view
+    // (their corpse may still be evidence) and stop drawing it.
+    for (const [id, v] of this.views) v.setVisible(seen.has(id));
 
     const revealed = new Set(msg.reveal || []);
     for (const [id, v] of this.views) v.setRevealed(revealed.has(id));
@@ -425,10 +425,15 @@ class Game {
       this.effects.tracer(origin, ray);
       this.effects.impact(ray, false);
     }
-    if (msg.id !== this.selfId) {
-      const v = this.views.get(msg.id);
+    // msg.id is absent when the server decided we cannot see who fired: we get
+    // the tracer and the noise, but no name attached to it.
+    if (msg.id == null || msg.id !== this.selfId) {
+      const v = msg.id != null ? this.views.get(msg.id) : null;
       const pos = v ? v.root.position : { x: origin[0], y: origin[1], z: origin[2] };
       this.audio.gunshot(msg.w, pos);
+      // Only light up shooters we are allowed to see - a point light has no
+      // shadows and would otherwise glow through the wall they are behind.
+      if (v && v.root.visible) this.effects.flashAt(origin);
     }
   }
 
@@ -585,7 +590,7 @@ class Game {
           e.preventDefault();
           this.chatting = true;
           document.exitPointerLock?.();
-          this.hud.chatInput(true);
+          this.hud.chatInput(true, !this.self.alive);
           break;
       }
     });

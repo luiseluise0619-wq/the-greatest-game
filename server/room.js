@@ -7,13 +7,14 @@
 
 import {
   PLAYER, WEAPONS, DYNAMITE, WEAPON_ORDER, ROLES, PHASE, TIMING, ENDGAME,
-  SOCIAL, HITBOX, CHARACTERS, GAMBLER_BOONS, LOOT_RESPAWN, VOICE_LINES,
+  SOCIAL, HITBOX, CHARACTERS, GAMBLER_BOONS, LOOT_RESPAWN, VOICE_LINES, VISION,
   TICK_MS, MIN_PLAYERS, MAX_PLAYERS, rolesForPlayerCount, clamp,
 } from '../shared/constants.js';
 import MAP, { zoneAt, SPAWNS, LOOT_SPAWNS } from '../shared/map.js';
 import { raycastWorld, rayPlayerBox, lineOfSight } from '../shared/collision.js';
 import { C, S } from '../shared/protocol.js';
 import { BotBrain, BOT_NAMES } from './bots.js';
+import { telemetry } from './telemetry.js';
 
 const now = () => Date.now() / 1000;
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -96,6 +97,7 @@ export class Room {
     if (!this.clients.size) this.emptySince = now();
     const p = this.players.get(client.playerId);
     if (p) {
+      telemetry.sessionEnd(p, now() - (p.joinedAt || now()));
       if (this.phase === PHASE.LOBBY || this.phase === PHASE.RESULTS) {
         this.players.delete(p.id);
       } else {
@@ -215,6 +217,7 @@ export class Room {
       character: msg.character,
       client,
     });
+    p.joinedAt = now();
     client.playerId = p.id;
     this.players.set(p.id, p);
     this.send(client, this.welcomeMsg(p.id));
@@ -341,13 +344,19 @@ export class Room {
       if (hit.victim) this.applyDamage(hit.victim, p, hit.damage, w.id, hit.point, hit.zone);
     }
 
-    this.broadcast({
+    const shot = {
       t: S.SHOT,
-      id: p.id,
       w: w.id,
       o: [r2(origin.x), r2(origin.y), r2(origin.z)],
       rays: rays.map((r) => [r2(r.x), r2(r.y), r2(r.z)]),
-    });
+    };
+    for (const viewer of this.players.values()) {
+      if (viewer.bot || !viewer.client) continue;
+      // Tracers and noise are physical and everyone gets them; the shooter's
+      // identity is only attached for players who can actually see them.
+      const named = viewer.id === p.id || this.canSeeCached(viewer, p.id);
+      this.send(viewer.client, named ? { ...shot, id: p.id } : shot);
+    }
     this.notifyBots('gunshot', { pos: origin, shooter: p, weapon: w });
     if (g.mag === 0) this.startReload(p);
     this.pushSelf(p);
@@ -485,6 +494,7 @@ export class Room {
         youKilled: killer ? p.id === killer.id : false,
       });
     }
+    telemetry.death(this, victim, killer, cause, witnesses.size, place);
     this.notifyBots('kill', { victim, killer, witnesses });
 
     // Drop the good guns where you fell - the body is worth investigating.
@@ -627,6 +637,7 @@ export class Room {
     const t = now();
     if (t < p.abilityReadyAt) return;
     const c = CHARACTERS[p.character];
+    telemetry.social(this, 'ability');
     p.abilityReadyAt = t + c.cooldown;
     p.abilityKind = c.id;
     p.abilityUntil = t + (c.duration || 0);
@@ -753,8 +764,14 @@ export class Room {
     p.lastChatAt = t;
     const text = String(msg.text || '').slice(0, 140).trim();
     if (!text) return;
-    this.broadcast({ t: S.CHAT, from: p.name, id: p.id, text, dead: !p.alive });
-    this.notifyBots('chat', { from: p, text });
+    const midMatch = this.phase !== PHASE.LOBBY && this.phase !== PHASE.RESULTS;
+    const ghost = !p.alive && midMatch;
+    this.broadcast(
+      { t: S.CHAT, from: p.name, id: p.id, text, dead: !p.alive, ghost },
+      ghost ? (o) => !o.alive : null,
+    );
+    telemetry.social(this, 'chat');
+    if (!ghost) this.notifyBots('chat', { from: p, text });
   }
 
   onVoice(p, msg) {
@@ -776,6 +793,7 @@ export class Room {
     const target = this.players.get(msg.target);
     if (!target || target === p || !target.alive) return;
     p.lastAccuseAt = t;
+    telemetry.social(this, 'accuse');
     this.broadcast({
       t: S.FEED,
       text: `${p.name} calls out ${target.name}.`,
@@ -787,6 +805,7 @@ export class Room {
   onBadge(p) {
     if (!p.alive || p.role !== 'sheriff' || p.badge) return;
     p.badge = true;
+    telemetry.social(this, 'badge');
     p.maxHealth = PLAYER.maxHealth + (ROLES.sheriff.bonusHealth || 0) + SOCIAL.badgeHealthBonus;
     p.health = p.maxHealth;
     this.broadcast({ t: S.BADGE, id: p.id, name: p.name });
@@ -856,6 +875,8 @@ export class Room {
       p.revealUntil = 0;
       p.trailGroup = groups[i];
       p.lastHitBy = null;
+      p.seenAt = new Map();
+      p.lastVisible = null;
       const s = SPAWNS[spawnOrder[i % SPAWNS.length]];
       p.pos = { x: s.x, y: s.y, z: s.z };
       p.vel = { x: 0, y: 0, z: 0 };
@@ -870,6 +891,8 @@ export class Room {
       this.sendRole(p);
     }
 
+    telemetry.matchStart(this);
+    this.pushLobby();          // seeds every client's scoreboard roster
     this.setPhase(PHASE.PREP);
     this.broadcast({
       t: S.FEED,
@@ -966,6 +989,7 @@ export class Room {
     })).sort((a, b) => (b.won - a.won) || (b.kills - a.kills) || (b.damage - a.damage));
 
     this.results = { winner, blurb, rows };
+    telemetry.matchEnd(this, winner, blurb);
     this.setPhase(PHASE.RESULTS);
     this.broadcast({
       t: S.RESULTS, winner, blurb, rows,
@@ -1114,6 +1138,53 @@ export class Room {
   }
 
   // -------------------------------------------------------------------------
+  // Visibility
+  // -------------------------------------------------------------------------
+  /**
+   * Which players may this viewer be told about? Line of sight, with a short
+   * memory so corner-peeking does not strobe, and a proximity floor so someone
+   * pressed against you is never invisible.
+   *
+   * This is the difference between "you only know what you saw" being a design
+   * and being a decoration: without it, any modified client sees everyone.
+   */
+  visibleTo(viewer, t) {
+    const set = new Set([viewer.id]);
+    // Once the round is over, or once you are dead, there is nothing left to
+    // protect - the results screen reveals everything anyway.
+    const revealAll = this.phase === PHASE.RESULTS || !viewer.alive;
+    if (!viewer.seenAt) viewer.seenAt = new Map();
+
+    const eye = eyeOf(viewer);
+    for (const o of this.players.values()) {
+      if (o.id === viewer.id) continue;
+      if (revealAll) { set.add(o.id); continue; }
+
+      const dx = o.pos.x - viewer.pos.x;
+      const dz = o.pos.z - viewer.pos.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > VISION.far * VISION.far) continue;
+
+      let seen = false;
+      if (d2 < VISION.near * VISION.near) seen = true;
+      else seen = lineOfSight(eye, chestOf(o), MAP.solids);
+
+      if (seen) {
+        viewer.seenAt.set(o.id, t);
+        set.add(o.id);
+      } else if (t - (viewer.seenAt.get(o.id) ?? -99) < VISION.memory) {
+        set.add(o.id);
+      }
+    }
+    return set;
+  }
+
+  /** Can this viewer see the shooter right now? Reads the set cached by the last snapshot. */
+  canSeeCached(viewer, targetId) {
+    return viewer.lastVisible ? viewer.lastVisible.has(targetId) : true;
+  }
+
+  // -------------------------------------------------------------------------
   // Outbound state
   // -------------------------------------------------------------------------
   sendSnapshots(t) {
@@ -1144,10 +1215,16 @@ export class Room {
           if (Math.hypot(o.pos.x - viewer.pos.x, o.pos.z - viewer.pos.z) <= c.radius) reveal.push(o.id);
         }
       }
+      // Scout reveals punch through the cull, otherwise the ability would do
+      // nothing for anyone standing behind a wall.
+      const visible = this.visibleTo(viewer, t);
+      if (reveal) for (const id of reveal) visible.add(id);
+      viewer.lastVisible = visible;
+
       this.send(viewer.client, {
         t: S.SNAPSHOT,
         k: this.tick,
-        ps: base,
+        ps: base.filter((e) => visible.has(e.id)),
         dyn: this.dynamites.map((d) => ({ id: d.id, x: r2(d.pos.x), y: r2(d.pos.y), z: r2(d.pos.z) })),
         ring: this.phase === PHASE.ENDGAME ? r2(this.ringRadius || ENDGAME.startRadius) : 0,
         reveal,

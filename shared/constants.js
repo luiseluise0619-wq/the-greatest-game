@@ -312,6 +312,16 @@ export const SOCIAL = {
   footprintTtl: 24,
 };
 
+// What a client is allowed to know about where other people are. The whole
+// deduction design is theatre if every position is broadcast to every browser,
+// so the server only sends players the viewer can actually see.
+export const VISION = {
+  near: 4.5,        // this close, always sent - they are effectively on top of you
+  far: 165,         // beyond this, never sent (longest weapon reaches 140)
+  memory: 0.55,     // seconds a player keeps being sent after last being seen,
+                    // so peeking round a corner does not strobe them in and out
+};
+
 export const VOICE_LINES = [
   { id: 'friendly', text: 'Easy now - I ain\'t your problem.' },
   { id: 'follow', text: 'Stick with me, we\'ll live longer.' },

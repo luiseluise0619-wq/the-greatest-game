@@ -209,9 +209,9 @@ export class PlayerView {
       this.gun = gunMesh();
       rig.gunAttach.add(this.gun);
     }
-    this.muzzle = new THREE.PointLight(0xffcc77, 0, 9, 2);
-    (rig.gunAttach || this.body).add(this.muzzle);
-    if (!rig.gunAttach) this.muzzle.position.set(0.3, 1.2, -0.4);
+    // Muzzle lighting comes from the shared pool in effects.js, so the scene's
+    // light count never changes when players are culled.
+    this.muzzle = null;
   }
 
   // ------------------------------------------------------------- procedural
@@ -380,9 +380,7 @@ export class PlayerView {
     this.gun = gunMesh();
     this.gun.position.set(0, -0.03, -0.05);
     this.arms.r.hand.add(this.gun);
-    this.muzzle = new THREE.PointLight(0xffcc77, 0, 9, 2);
-    this.muzzle.position.set(0, 0, -0.32);
-    this.gun.add(this.muzzle);
+    this.muzzle = null;   // see effects.flashAt()
   }
 
   // ------------------------------------------------------------ shared bits
@@ -420,8 +418,17 @@ export class PlayerView {
   }
 
   push(state, time) {
+    // Coming back into view after being culled: drop the stale history so the
+    // avatar appears where it is rather than sliding across the map to get there.
+    const last = this.buffer[this.buffer.length - 1];
+    if (last && time - last.t > 0.5) this.buffer.length = 0;
     this.buffer.push({ ...state, t: time });
     if (this.buffer.length > 24) this.buffer.shift();
+  }
+
+  /** Out of sight: the server stops sending them, so stop drawing them. */
+  setVisible(on) {
+    this.root.visible = on;
   }
 
   // ----------------------------------------------------------------- pose

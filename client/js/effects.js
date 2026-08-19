@@ -29,6 +29,26 @@ export class Effects {
     });
 
     this.lootRingGeo = new THREE.RingGeometry(0.3, 0.42, 16);
+
+    // Fixed pool of muzzle lights. Attaching one to every player made the
+    // scene's light count vary as players were culled, which recompiles every
+    // shader in the scene - a visible hitch mid-fight.
+    this.flashPool = [];
+    for (let i = 0; i < 2; i++) {
+      const l = new THREE.PointLight(0xffcc77, 0, 11, 2);
+      l.visible = true;
+      scene.add(l);
+      this.flashPool.push(l);
+    }
+    this.flashNext = 0;
+  }
+
+  /** Light the room a shot was fired in. Only called for shooters we can see. */
+  flashAt(pos) {
+    const l = this.flashPool[this.flashNext % this.flashPool.length];
+    this.flashNext++;
+    l.position.set(pos[0], pos[1], pos[2]);
+    l.intensity = 6;
   }
 
   // -------------------------------------------------------------- gunfire
@@ -189,6 +209,9 @@ export class Effects {
 
   // --------------------------------------------------------------- update
   update(dt, t) {
+    for (const l of this.flashPool) {
+      if (l.intensity > 0.01) l.intensity = Math.max(0, l.intensity - dt * 60);
+    }
     for (let i = this.tracers.length - 1; i >= 0; i--) {
       const tr = this.tracers[i];
       tr.life -= dt;

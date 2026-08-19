@@ -7,3 +7,4 @@ Dockerfile
 .dockerignore
 client/models/*.glb
 client/models/*.gltf
+data

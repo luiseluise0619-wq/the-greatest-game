@@ -97,12 +97,16 @@ A 1 vCPU / 512 MB instance is a sensible place to start a playtest.
 
 ## Before you charge money for it
 
-Two things in the current build are fine for a friendly playtest and not fine
-for a paid product, both noted in the main README:
+Positions are now culled server-side, so a modified client cannot see through
+walls. What remains is that **movement is client-simulated and only
+speed-clamped** — a modified client can still move faster or more precisely than
+it should.
 
-- movement is client-simulated and only speed-clamped,
-- every player's position is broadcast to every client, so a modified client
-  can see through walls.
+That does not matter when you are playing with friends to find out whether the
+game is fun. It matters the moment strangers are competing for anything.
 
-Neither matters when you are playing with friends to find out whether the game
-is fun. Both matter the moment strangers are competing.
+While you are playtesting, `GET /stats` is worth more than your memory of it:
+
+```
+curl -s https://your-host/stats | jq '.witnessedKillShare, .accusationsPerMatch, .wins'
+```

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { RoomManager } from './rooms.js';
 import { TIMING } from '../shared/constants.js';
+import { telemetry } from './telemetry.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -82,6 +83,13 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // What the playtest actually produced. Read it with: curl -s host/stats | jq
+  if (urlPath === '/stats') {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ ...manager.stats(), ...telemetry.summary() }, null, 2));
+    return;
+  }
+
   const file = resolveRequest(urlPath);
   if (!file) { res.writeHead(404); res.end('not found'); return; }
   fs.readFile(file, (err, data) => {
@@ -126,4 +134,10 @@ server.listen(PORT, HOST, () => {
   console.log('');
 });
 
-process.on('SIGINT', () => { console.log('\n  ...adios.'); process.exit(0); });
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, () => {
+    telemetry.flush();        // do not lose the last few minutes of a playtest
+    console.log('\n  ...adios.');
+    process.exit(0);
+  });
+}

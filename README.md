@@ -87,6 +87,17 @@ tells everyone what you are not.
 **Bodies stay where they fell**, so a corpse in the mine means something happened
 in the mine.
 
+**You are only told about players you can actually see.** The server runs a
+line-of-sight check per viewer per tick and simply does not send the positions of
+anyone behind a wall — with a short memory so corner-peeking does not strobe, and
+a proximity floor so somebody pressed against you is never invisible. A gunshot
+from an unseen shooter arrives with its tracer and its noise but **no name
+attached**. Without this the entire information design would be decoration: any
+modified client could read every position out of the network tab.
+
+**The dead talk only to the dead.** Dying does not turn you into a spotter for
+whoever is still alive.
+
 **The Sheriff may pin on the star** (`B`). It is public and permanent: +45 max
 health and 15% damage resistance, but every Outlaw in town now has a name and a
 face. Going loud is usually the Sheriff's strongest and most dangerous play.
@@ -263,6 +274,25 @@ bots cannot do anything a player could not.
 
 ---
 
+## Watching a playtest
+
+The server keeps score of the thing that actually matters. `GET /stats` returns
+live aggregates, and every event is appended to `data/telemetry.jsonl`:
+
+```
+curl -s localhost:8080/stats | jq
+```
+
+The headline number is **`witnessedKillShare`** — the share of kills a third
+party actually saw. Near 1 and the town has no secrets; near 0 and nobody can
+ever learn anything and the round decays into a shooting gallery. Next to it sit
+accusations, chat volume, badge reveals and ability use per match, the faction
+win split, average human session length, and which parts of the map people
+actually die in.
+
+No chat text is ever written, and player names are omitted unless you set
+`HNH_TELEMETRY_NAMES=1`. Turn the whole thing off with `HNH_TELEMETRY=0`.
+
 ## Design target
 
 The brief was 40% gunplay / 30% deduction / 20% abilities / 10% luck, and the
@@ -287,10 +317,8 @@ Prototype, deliberately scoped to a vertical slice:
 
 - **One map**, three guns, six characters, one game mode.
 - **Client-authoritative movement** with a speed clamp. Fine for friends on a LAN;
-  not hardened against a determined cheater.
-- **All player positions are broadcast** to every client for interpolation, so a
-  modified client could see through walls. Hardening this needs server-side
-  visibility culling, which is worth doing before this is ever public.
+  not hardened against a determined cheater — a modified client can still move
+  faster or more precisely than it should, it just cannot see through walls.
 - **Bots do not use rooftops or the water tower** — the nav graph is ground-level
   only. Deliberate for now, and it makes verticality a human edge.
 - **No voice chat.** Text chat and the shout wheel stand in for it.

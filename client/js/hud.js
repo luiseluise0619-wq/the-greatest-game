@@ -67,9 +67,15 @@ export class HUD {
     const ul = $('lobbyList');
     ul.innerHTML = '';
     for (const p of msg.players) {
+      // Seed the scoreboard here: with visibility culling the snapshots only
+      // carry people you can see, but you still need to be able to name and
+      // accuse everyone in the round.
+      const cur = this.roster.get(p.id) || { alive: true };
+      this.roster.set(p.id, { ...cur, name: p.name, character: p.character, bot: p.bot });
       const li = document.createElement('li');
       const c = CHARACTERS[p.character];
       li.innerHTML = `<b>${escapeHtml(p.name)}</b><span>${c ? c.role : ''}${p.bot ? ' · bot' : ''}</span>`;
+      void 0;
       ul.appendChild(li);
     }
     if (!msg.players.length) ul.innerHTML = '<li><span>nobody yet</span></li>';
@@ -346,8 +352,10 @@ export class HUD {
 
   showVoiceWheel(show) { $('voiceWheel').classList.toggle('hidden', !show); }
 
-  chatInput(show) {
+  chatInput(show, dead = false) {
     $('chatInputWrap').classList.toggle('hidden', !show);
+    // Being dead is not a broadcast licence - say so before they type.
+    $('chatInputWrap').firstElementChild.textContent = dead ? 'SAY (ONLY THE DEAD HEAR YOU)' : 'SAY';
     if (show) { $('chatInput').value = ''; $('chatInput').focus(); }
     else $('chatInput').blur();
   }
