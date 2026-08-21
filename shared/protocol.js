@@ -45,4 +45,5 @@ export const S = {
   ERROR: 'error',
   SOUND: 'sound',
   REPLAY: 'replay',
+  CORRECT: 'correct',
 };

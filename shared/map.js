@@ -117,13 +117,20 @@ function floatSteps(x, z, dirX, dirZ, count, baseY, rise = STEP_RISE, run = 0.8,
   return baseY + rise * count;
 }
 
-function porch(x0, z0, x1, z1, deckY = 0.28, postH = 3.2) {
+/**
+ * Covered boardwalk. `doors` lists x-ranges that must stay clear - a post in the
+ * middle of a doorway is the kind of thing you only notice when somebody tries
+ * to run through it under fire.
+ */
+function porch(x0, z0, x1, z1, doors = [], deckY = 0.28, postH = 3.2) {
   box([x0, 0, z0], [x1, deckY, z1], 'boardwalk');
   const span = x1 - x0;
   const n = Math.max(2, Math.round(span / 3.6));
+  const zc = (z0 + z1) / 2;
   for (let i = 0; i <= n; i++) {
     const px = x0 + (span * i) / n;
-    box([px - 0.11, deckY, (z0 + z1) / 2 - 0.11], [px + 0.11, postH, (z0 + z1) / 2 + 0.11], 'wood');
+    if (doors.some(([a, b]) => px > a - 0.75 && px < b + 0.75)) continue;
+    box([px - 0.11, deckY, zc - 0.11], [px + 0.11, postH, zc + 0.11], 'wood');
   }
   box([x0 - 0.2, postH, z0 - 0.1], [x1 + 0.2, postH + 0.22, z1 + 0.35], 'awning');
 }
@@ -187,9 +194,9 @@ for (let i = 0; i < 7; i++) {
 // ---------------------------------------------------------------------------
 // MAIN STREET
 // ---------------------------------------------------------------------------
-porch(-32, -8.6, -12, -6.4);
-porch(-9, -8.6, 5, -6.4);
-porch(9, -8.6, 27, -6.4);
+porch(-32, -8.6, -12, -6.4, [[-24.0, -20.6]]);      // saloon doors
+porch(-9, -8.6, 5, -6.4, [[-3.4, -0.6]]);            // office door
+porch(9, -8.6, 27, -6.4, [[16.2, 19.4]]);            // store door
 
 box([-26, 0, -4.4], [-20, 0.95, -3.4], 'trough');
 box([2, 0, 3.2], [8, 0.95, 4.2], 'trough');
@@ -353,10 +360,17 @@ box([8.2, 7.5, 20.2], [10.0, 7.66, 17.6], 'wood');
 // ---------------------------------------------------------------------------
 // CEMETERY - low cover, long lines, the classic showdown ground.
 // ---------------------------------------------------------------------------
-fence(14, 10, 36, 10);
+// Gates: without gaps this is a sealed box nobody can ever walk into.
+fence(14, 10, 22, 10);            // north fence, gate at x 22..26 facing the street
+fence(26, 10, 36, 10);
 fence(14, 26, 36, 26);
-fence(14, 10, 14, 26);
+fence(14, 10, 14, 16);             // west fence, gate at z 16..19
+fence(14, 19, 14, 26);
 fence(36, 10, 36, 26);
+// Gateposts, so the openings read as gates rather than gaps.
+for (const [gx, gz] of [[22, 10], [26, 10], [14, 16], [14, 19]]) {
+  box([gx - 0.13, 0, gz - 0.13], [gx + 0.13, 1.65, gz + 0.13], 'wood');
+}
 for (const [gx, gz] of [
   [17, 13], [20.5, 13], [24, 13.5], [27.5, 13], [31, 13.5],
   [17.5, 17], [21, 17.5], [24.5, 17], [28, 17.5], [32, 17],
@@ -489,7 +503,7 @@ export const SPAWNS = [
   { x: 0, y: 0, z: 40, yaw: Math.PI },
   { x: 30, y: 0, z: 34, yaw: -2.4 },
   { x: 46, y: 0, z: 6, yaw: 1.9 },
-  { x: 48, y: 0, z: -38, yaw: 2.6 },
+  { x: 27.9, y: 0, z: -41.9, yaw: 2.6 },
   { x: 6, y: 0, z: -42, yaw: 0.2 },
   { x: -28, y: 0, z: -42, yaw: 0.6 },
   { x: -58, y: 0, z: 24, yaw: -0.9 },
@@ -502,15 +516,15 @@ export const LOOT_SPAWNS = [
   { x: -16.0, y: 0.85, z: -13.0, type: 'whiskey' },
   { x: -23.4, y: 0.85, z: -12.4, type: 'ammo' },
   { x: -33.4, y: 3.66, z: -10.5, type: 'ammo' },
-  { x: 3.4, y: 1.6, z: -21.3, type: 'rifle' },
+  { x: 3.4, y: 2.65, z: -21.3, type: 'rifle' },      // on top of the gun rack
   { x: -0.6, y: 0.9, z: -12.4, type: 'ammo' },
-  { x: -7.6, y: 0.45, z: -20.4, type: 'whiskey' },
+  { x: -7.6, y: 1.08, z: -20.3, type: 'whiskey' },   // on the cell cot
   { x: 13.1, y: 2.2, z: -17.0, type: 'ammo' },
   { x: 17.5, y: 2.2, z: -20.0, type: 'shotgun' },
   { x: 21.9, y: 2.2, z: -16.0, type: 'dynamite' },
   { x: 25.3, y: 1.1, z: -16.0, type: 'whiskey' },
   { x: -26.5, y: 2.9, z: 11.2, type: 'rifle' },
-  { x: -37.0, y: 0.2, z: 19.6, type: 'ammo' },
+  { x: -36.5, y: 0.2, z: 21.0, type: 'ammo' },
   { x: -23.1, y: 1.6, z: 18.5, type: 'dynamite' },
   { x: 0.0, y: 1.0, z: 27.6, type: 'whiskey' },
   { x: -5.4, y: 0.2, z: 16.0, type: 'ammo' },
@@ -518,16 +532,16 @@ export const LOOT_SPAWNS = [
   { x: 29.0, y: 0.2, z: 25.0, type: 'shotgun' },    // mausoleum
   { x: 22.0, y: 0.2, z: 19.0, type: 'ammo' },
   { x: 57.2, y: 1.4, z: -21.4, type: 'dynamite' },
-  { x: 61.0, y: 0.2, z: -12.5, type: 'rifle' },
+  { x: 58.5, y: 0.2, z: -12.5, type: 'rifle' },
   { x: 44.0, y: 0.2, z: -17.8, type: 'ammo' },
   { x: 54.2, y: 1.05, z: -11.9, type: 'whiskey' },
   { x: -38.0, y: 1.85, z: 0.5, type: 'ammo' },
   { x: 30.0, y: 1.85, z: -1.5, type: 'dynamite' },
   { x: -20.4, y: 1.2, z: -30.6, type: 'ammo' },
   { x: 14.6, y: 1.3, z: -28.5, type: 'shotgun' },
-  { x: -45.0, y: 8.7, z: -0.6, type: 'rifle' },     // water tower
+  { x: -45.0, y: 8.75, z: 2.5, type: 'rifle' },      // water tower deck     // water tower
   { x: -0.5, y: 0.2, z: -30.5, type: 'whiskey' },   // outhouse
-  { x: -52.0, y: 0.4, z: -40.0, type: 'ammo' },
+  { x: -52.0, y: 0.45, z: -37.4, type: 'ammo' },
   { x: 18.5, y: 5.56, z: -16.0, type: 'ammo' },     // store roof
   { x: -22.0, y: 5.76, z: -17.0, type: 'whiskey' }, // saloon roof
 ];
@@ -536,23 +550,23 @@ export const LOOT_SPAWNS = [
 // NAV GRAPH - hand-placed waypoints; links computed by line of sight at load.
 // ---------------------------------------------------------------------------
 export const NAV_NODES = [
-  { x: -44, z: -1 }, { x: -38, z: 3 }, { x: -34, z: -2 }, { x: -28, z: 1 },
+  { x: -44, z: 1 }, { x: -38, z: 3 }, { x: -34, z: -2 }, { x: -28, z: 1 },
   { x: -22, z: -2 }, { x: -16, z: 2 }, { x: -10, z: -1 }, { x: -4, z: 2 },
   { x: 2, z: -1 }, { x: 8, z: 2 }, { x: 14, z: -1 }, { x: 20, z: 2 },
   { x: 26, z: -2 }, { x: 32, z: 1 },
   { x: -22, z: -10 }, { x: -22, z: -16 }, { x: -28.5, z: -14 }, { x: -16, z: -12 },
   { x: -25, z: -23 }, { x: -16, z: -22 },
   { x: -2, z: -10 }, { x: -2, z: -13.5 }, { x: -6, z: -18 }, { x: 2, z: -19 },
-  { x: 18, z: -10 }, { x: 18, z: -12.6 }, { x: 12, z: -20 }, { x: 22, z: -21 }, { x: 25.4, z: -10.5 },
+  { x: 18, z: -10 }, { x: 18, z: -12.6 }, { x: 12, z: -20 }, { x: 20.8, z: -19.4 }, { x: 25.4, z: -10.5 },
   { x: -30, z: -30 }, { x: -18, z: -29 }, { x: -6, z: -28 }, { x: 4, z: -29 },
-  { x: 16, z: -30 }, { x: 26, z: -28 }, { x: 7.5, z: -12 }, { x: -11, z: -14 },
+  { x: 16, z: -30 }, { x: 26, z: -28 }, { x: 7.5, z: -12 }, { x: -9.8, z: -12.4 },
   { x: 36, z: -18 }, { x: 44, z: -18 }, { x: 46, z: -11 }, { x: 54, z: -18 }, { x: 60, z: -13 },
   { x: -30, z: 10.5 }, { x: -31, z: 16 }, { x: -36, z: 20 }, { x: -24, z: 20 }, { x: -18, z: 14 },
   { x: 0, z: 9 }, { x: 0, z: 13 }, { x: 0, z: 22 }, { x: -5, z: 26 }, { x: 5, z: 26 },
   { x: 17, z: 12 }, { x: 24, z: 16 }, { x: 31, z: 14 }, { x: 29, z: 24 }, { x: 20, z: 24 },
-  { x: -46, z: -14 }, { x: -50, z: 8 }, { x: -46, z: 24 }, { x: -34, z: 32 },
+  { x: -46, z: -14 }, { x: -49, z: 8 }, { x: -46, z: 24 }, { x: -34, z: 32 },
   { x: -14, z: 34 }, { x: 8, z: 34 }, { x: 30, z: 32 }, { x: 44, z: 20 },
-  { x: 52, z: 4 }, { x: 40, z: -34 }, { x: 20, z: -40 }, { x: -4, z: -40 },
+  { x: 52, z: 4 }, { x: 32.4, z: -31.5 }, { x: 18.4, z: -41.2 }, { x: -4, z: -40 },
   { x: -26, z: -40 }, { x: -46, z: -32 }, { x: -58, z: -12 }, { x: -56, z: 30 },
   // Rooftops / perches
   { x: -22, z: -17, y: 5.76 }, { x: -14, z: -19, y: 5.76 }, { x: -2, z: -19, y: 4.96 },

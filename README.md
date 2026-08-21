@@ -20,6 +20,11 @@ model and sound in the game is generated procedurally at runtime.
 
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
+```
+npm test               # 28 checks: map, collision, match rules, information rules, anti-cheat
+npm run test:browser   # optional: real Chromium, needs playwright installed
+```
+
 ## Playing with other people
 
 Opening the page drops you into a **public town** with a four-letter code. Share
@@ -303,6 +308,29 @@ actually die in.
 No chat text is ever written, and player names are omitted unless you set
 `HNH_TELEMETRY_NAMES=1`. Turn the whole thing off with `HNH_TELEMETRY=0`.
 
+## Tests
+
+`npm test` runs 28 checks on plain Node, no browser and no extra dependencies.
+They are grouped by what they protect:
+
+- **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
+  no loot is buried in furniture, walls stop movement and doorways do not, the
+  nav graph is one connected town with no orphan nodes, weapons are internally
+  consistent, and every role table adds up.
+- **`test/match.test.js`** — roles are dealt correctly, guns are inert during
+  preparation, each faction's win condition fires, and the information rules
+  hold: an unwitnessed kill names nobody, the victim always learns their killer,
+  a death replay carries only two people, and the dead cannot talk to the living.
+- **`test/security.test.js`** — what a lying client cannot do: teleport, walk
+  through a wall, end up inside geometry, be told about players it cannot see, or
+  learn the name of a shooter it could not have seen.
+
+They found real bugs while being written, which is the point: a spawn buried in
+the mine hillside, a porch post planted dead-centre in the saloon's front
+doorway, six loot items rendered inside the furniture they sat on, six nav nodes
+no bot could ever reach — and a cemetery fenced on all four sides with no gate,
+which no player could enter at all.
+
 ## Design target
 
 The brief was 40% gunplay / 30% deduction / 20% abilities / 10% luck, and the
@@ -326,9 +354,14 @@ Outlaw / 1 Renegade wins, with the first death around a minute in.
 Prototype, deliberately scoped to a vertical slice:
 
 - **One map**, three guns, six characters, one game mode.
-- **Client-authoritative movement** with a speed clamp. Fine for friends on a LAN;
-  not hardened against a determined cheater — a modified client can still move
-  faster or more precisely than it should, it just cannot see through walls.
+- **Movement is client-simulated and server-validated.** The client integrates
+  its own movement for a crisp feel; the server treats the position it reports as
+  a *target* and walks it through the real geometry, so no client gets through a
+  wall, off the map, or across town in one packet. What is not solved is the fine
+  grain — a modified client can still shade its speed within the clamp, or aim
+  more precisely than a hand can. Closing that needs full input-replay
+  reconciliation, which is a rewrite of the movement path and worth doing only
+  once the game has proven it deserves it.
 - **Bots do not use rooftops or the water tower** — the nav graph is ground-level
   only. Deliberate for now, and it makes verticality a human edge.
 - **No voice chat.** Text chat and the shout wheel stand in for it.

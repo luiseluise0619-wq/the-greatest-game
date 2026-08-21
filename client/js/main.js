@@ -344,6 +344,13 @@ class Game {
         this.audio.blip(700, 0.4, 'triangle', 0.16, 1200);
         break;
 
+      case S.CORRECT:
+        // The server walked our move through the world and disagreed by enough
+        // to matter. It is right; snap.
+        this.self.pos.set(msg.pos[0], msg.pos[1], msg.pos[2]);
+        this.self.vel.set(0, 0, 0);
+        break;
+
       case S.REPLAY: this.startReplay(msg); break;
       case S.RESULTS: this.endReplay(); this.hud.showResults(msg); break;
       case S.SOUND: if (msg.sound === 'bell') this.audio.bell(); break;

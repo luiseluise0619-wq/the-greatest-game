@@ -11,7 +11,7 @@ import {
   TICK_MS, MIN_PLAYERS, MAX_PLAYERS, rolesForPlayerCount, clamp,
 } from '../shared/constants.js';
 import MAP, { zoneAt, SPAWNS, LOOT_SPAWNS } from '../shared/map.js';
-import { raycastWorld, rayPlayerBox, lineOfSight } from '../shared/collision.js';
+import { raycastWorld, rayPlayerBox, lineOfSight, moveAndCollide } from '../shared/collision.js';
 import { C, S } from '../shared/protocol.js';
 import { BotBrain, BOT_NAMES } from './bots.js';
 import { telemetry } from './telemetry.js';
@@ -279,21 +279,48 @@ export class Room {
     p.sprint = !!msg.sprint;
     p.moving = !!msg.moving;
 
-    if (msg.pos && Number.isFinite(msg.pos.x)) {
-      const nx = clamp(msg.pos.x, MAP.bounds.min, MAP.bounds.max);
-      const ny = clamp(msg.pos.y, -2, 40);
-      const nz = clamp(msg.pos.z, MAP.bounds.min, MAP.bounds.max);
-      // Speed clamp: generous enough for stairs and falls, tight enough that a
-      // hacked client cannot teleport across the map.
-      const allowed = PLAYER.maxServerSpeed * dt + 0.6;
-      const dx = nx - p.pos.x, dy = ny - p.pos.y, dz = nz - p.pos.z;
-      const d = Math.hypot(dx, dy, dz);
-      if (d <= allowed || d > 400) {
-        p.pos.x = nx; p.pos.y = ny; p.pos.z = nz;
-      } else {
-        const k = allowed / d;
-        p.pos.x += dx * k; p.pos.y += dy * k; p.pos.z += dz * k;
-      }
+    if (!msg.pos || !Number.isFinite(msg.pos.x) || !Number.isFinite(msg.pos.y) || !Number.isFinite(msg.pos.z)) return;
+
+    const want = {
+      x: clamp(msg.pos.x, MAP.bounds.min + 0.5, MAP.bounds.max - 0.5),
+      y: clamp(msg.pos.y, -2, 40),
+      z: clamp(msg.pos.z, MAP.bounds.min + 0.5, MAP.bounds.max - 0.5),
+    };
+
+    // 1. Speed clamp. Generous enough for stairs and falls, tight enough that a
+    //    hacked client cannot teleport across the map.
+    let dx = want.x - p.pos.x, dy = want.y - p.pos.y, dz = want.z - p.pos.z;
+    const dist = Math.hypot(dx, dy, dz);
+    const allowed = PLAYER.maxServerSpeed * dt + 0.6;
+    if (dist > allowed) {
+      const k = allowed / dist;
+      dx *= k; dy *= k; dz *= k;
+    }
+
+    // 2. Walk the move through the actual world instead of taking the client's
+    //    word for it. The claimed position is a *target*: we move toward it
+    //    against the same geometry the client collides with, so no amount of
+    //    lying gets anybody through a wall. Sub-stepped so a fast move resolves
+    //    the way the client's per-frame integration did, rather than tunnelling.
+    const height = p.crouch ? PLAYER.crouchHeight : PLAYER.height;
+    const steps = Math.min(8, Math.max(1, Math.ceil(Math.hypot(dx, dy, dz) / 0.25)));
+    const cur = { x: p.pos.x, y: p.pos.y, z: p.pos.z };
+    for (let i = 0; i < steps; i++) {
+      const res = moveAndCollide(
+        cur, { x: dx / steps, y: dy / steps, z: dz / steps },
+        PLAYER.radius, height, MAP.solids, PLAYER.stepHeight,
+      );
+      cur.x = res.x; cur.y = res.y; cur.z = res.z;
+    }
+
+    p.pos.x = cur.x; p.pos.y = cur.y; p.pos.z = cur.z;
+
+    // 3. If the server's honest answer is far from what the client believes,
+    //    tell it once so it snaps back rather than fighting us every tick.
+    const drift = Math.hypot(want.x - cur.x, want.y - cur.y, want.z - cur.z);
+    if (drift > 2.0 && t - (p.lastCorrectAt || 0) > 0.5) {
+      p.lastCorrectAt = t;
+      this.emit(p, { t: S.CORRECT, pos: [r2(cur.x), r2(cur.y), r2(cur.z)] });
     }
   }
 
