@@ -93,7 +93,13 @@
   <div class="panel wide">
     <h1 id="resultTitle">THE LAW HOLDS</h1>
     <p id="resultBlurb"></p>
-    <table id="resultTable"><thead><tr><th>Gunhand</th><th>Role</th><th>Character</th><th>Kills</th><th>Damage</th><th></th></tr></thead><tbody></tbody></table>
+    <div class="resultCols">
+      <table id="resultTable"><thead><tr><th>Gunhand</th><th>Role</th><th>Character</th><th>Kills</th><th>Damage</th><th></th></tr></thead><tbody></tbody></table>
+      <div class="timelineWrap">
+        <h3>HOW IT WENT</h3>
+        <ol id="timeline"></ol>
+      </div>
+    </div>
     <div class="row">
       <button id="playAgain" class="primary">RIDE AGAIN</button>
       <span id="resultCountdown" class="muted"></span>
@@ -168,6 +174,13 @@
 </div>
 
 <div id="chatInputWrap" class="hidden"><span>SAY</span><input id="chatInput" maxlength="140" /></div>
+<div id="killcam" class="hidden">
+  <div class="kcTop"><b>KILLCAM</b><span id="kcWhere"></span></div>
+  <div class="kcName">killed by <em id="kcKiller"></em></div>
+  <div class="kcBar"><i id="kcFill"></i></div>
+  <div class="kcSkip">any key to skip</div>
+</div>
+
 <div id="deadBanner" class="hidden"><b>YOU ARE DEAD</b><span>Spectating. The round is still going.</span></div>
 <div id="loading">saddling up…</div>
 

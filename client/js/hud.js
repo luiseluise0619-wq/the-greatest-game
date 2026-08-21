@@ -185,6 +185,23 @@ export class HUD {
     $('dustOverlay').style.opacity = (s.buffs || []).includes('dust') ? '1' : '0';
   }
 
+  showKillcam(msg) {
+    $('kcKiller').textContent = msg.killerName;
+    $('kcWhere').textContent = msg.place ? `— ${msg.place}` : '';
+    $('kcFill').style.width = '0%';
+    $('killcam').classList.remove('hidden');
+    $('deadBanner').classList.add('hidden');
+    $('hud').classList.add('replay');
+  }
+
+  killcamProgress(k) { $('kcFill').style.width = `${Math.round(k * 100)}%`; }
+
+  hideKillcam() {
+    $('killcam').classList.add('hidden');
+    $('hud').classList.remove('replay');
+    if (!this.game.self.alive && this.game.inGame) $('deadBanner').classList.remove('hidden');
+  }
+
   setDead(dead) {
     $('deadBanner').classList.toggle('hidden', !dead);
     $('crosshair').classList.toggle('hide', dead);
@@ -333,7 +350,43 @@ export class HUD {
         <td>${r.won ? '<span class="wonTag">WON</span>' : '<span class="lostTag">lost</span>'}</td>`;
       tb.appendChild(tr);
     }
+    this.renderTimeline(msg.timeline || []);
     $('results').classList.remove('hidden');
+  }
+
+  /** The round's public account - the bit worth screenshotting. */
+  renderTimeline(events) {
+    const ol = $('timeline');
+    ol.innerHTML = '';
+    if (!events.length) {
+      ol.innerHTML = '<li><span class="muted">Nobody did anything worth recording.</span></li>';
+      return;
+    }
+    for (const e of events) {
+      const li = document.createElement('li');
+      const mm = Math.floor(e.at / 60);
+      const ss = String(e.at % 60).padStart(2, '0');
+      let body;
+      if (e.type === 'death') {
+        const r = ROLES[e.victimRole];
+        const who = `<b>${escapeHtml(e.victim)}</b> <span class="rle" style="color:${r?.color}">${r?.name || ''}</span>`;
+        if (e.cause === 'storm') body = `${who} choked out in the storm`;
+        else if (e.cause === 'left') body = `${who} rode out`;
+        else if (e.killer) {
+          const kr = ROLES[e.killerRole];
+          body = `<b>${escapeHtml(e.killer)}</b> <span class="rle" style="color:${kr?.color}">${kr?.name || ''}</span> killed ${who} in ${e.place}`;
+        } else body = `${who} died in ${e.place}`;
+        li.className = 'death';
+      } else if (e.type === 'badge') {
+        body = `<b>${escapeHtml(e.who)}</b> pinned on the star`;
+        li.className = 'badge';
+      } else {
+        body = `<b>${escapeHtml(e.who)}</b> called out <b>${escapeHtml(e.target)}</b>`;
+        li.className = 'accuse';
+      }
+      li.innerHTML = `<time>${mm}:${ss}</time>${body}`;
+      ol.appendChild(li);
+    }
   }
 
   hideResults() {

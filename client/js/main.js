@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import MAP from '../../shared/map.js';
 import { moveAndCollide } from '../../shared/collision.js';
 import {
-  PLAYER, WEAPONS, PHASE, VOICE_LINES, ENDGAME, clamp,
+  PLAYER, WEAPONS, PHASE, VOICE_LINES, ENDGAME, REPLAY, clamp,
 } from '../../shared/constants.js';
 import { C, S } from '../../shared/protocol.js';
 import { buildWorld, animateWorld } from './world.js';
@@ -344,7 +344,8 @@ class Game {
         this.audio.blip(700, 0.4, 'triangle', 0.16, 1200);
         break;
 
-      case S.RESULTS: this.hud.showResults(msg); break;
+      case S.REPLAY: this.startReplay(msg); break;
+      case S.RESULTS: this.endReplay(); this.hud.showResults(msg); break;
       case S.SOUND: if (msg.sound === 'bell') this.audio.bell(); break;
       case S.ERROR:
         this.hud.setStatus(msg.msg);
@@ -379,8 +380,10 @@ class Game {
       v.push(p, now);
     }
     // Anyone missing from the snapshot is simply out of sight - keep the view
-    // (their corpse may still be evidence) and stop drawing it.
-    for (const [id, v] of this.views) v.setVisible(seen.has(id));
+    // (their corpse may still be evidence) and stop drawing it. During a killcam
+    // the live world stays hidden entirely, or players would wander through the
+    // replay.
+    for (const [id, v] of this.views) v.setVisible(!this.replay && seen.has(id));
 
     const revealed = new Set(msg.reveal || []);
     for (const [id, v] of this.views) v.setRevealed(revealed.has(id));
@@ -461,8 +464,70 @@ class Game {
     }
   }
 
+  // -------------------------------------------------------------- killcam
+  /**
+   * Replay the last few seconds from behind whoever shot you. The server only
+   * sends the killer's and your own tracks, so this shows you nothing you were
+   * not already told - it just makes it legible, and worth clipping.
+   */
+  startReplay(msg) {
+    if (this.replay) this.endReplay();
+    for (const [, v] of this.views) v.setVisible(false);
+    const views = new Map();
+    views.set(msg.killer, new PlayerView(this.scene, msg.killer, msg.killerName, msg.killerChar));
+    views.set(msg.victim, new PlayerView(this.scene, msg.victim, 'YOU', msg.victimChar));
+    this.replay = { ...msg, t0: performance.now() / 1000, views, pushed: 0, shotIdx: 0 };
+    this.hud.showKillcam(msg);
+  }
+
+  endReplay() {
+    if (!this.replay) return;
+    for (const [, v] of this.replay.views) v.dispose(this.scene);
+    this.replay = null;
+    this.hud.hideKillcam();
+    for (const [, v] of this.views) v.setVisible(true);
+  }
+
+  updateReplay(dt, t) {
+    const r = this.replay;
+    const elapsed = t - r.t0;
+    if (elapsed > r.duration + 0.7) { this.endReplay(); return; }
+    this.hud.killcamProgress(Math.min(1, elapsed / (r.duration + 0.7)));
+
+    while (r.pushed < r.frames.length && r.frames[r.pushed].rt <= elapsed + INTERP_DELAY + 0.05) {
+      const f = r.frames[r.pushed++];
+      for (const e of f.ps) r.views.get(e.id)?.push(e, r.t0 + f.rt);
+    }
+    const renderTime = t - INTERP_DELAY;
+    for (const [, v] of r.views) v.update(renderTime, dt, this.camera);
+
+    while (r.shotIdx < r.shots.length && r.shots[r.shotIdx].rt <= elapsed) {
+      const sh = r.shots[r.shotIdx++];
+      for (const ray of sh.rays) { this.effects.tracer(sh.o, ray); this.effects.impact(ray, false); }
+      this.effects.flashAt(sh.o);
+      this.audio.gunshot(sh.w, { x: sh.o[0], y: sh.o[1], z: sh.o[2] });
+    }
+
+    // Chase camera behind the killer: their silhouette is the whole point.
+    const kv = r.views.get(r.killer);
+    if (kv) {
+      const p = kv.root.position;
+      const yaw = kv.body.rotation.y;
+      const sin = Math.sin(yaw), cos = Math.cos(yaw);
+      const want = new THREE.Vector3(
+        p.x + sin * REPLAY.camBack,
+        p.y + 1.5 + REPLAY.camUp,
+        p.z + cos * REPLAY.camBack,
+      );
+      if (!r.camReady) { this.camera.position.copy(want); r.camReady = true; }
+      else this.camera.position.lerp(want, Math.min(1, dt * 6));
+      this.camera.lookAt(p.x - sin * 5, p.y + 1.25, p.z - cos * 5);
+    }
+  }
+
   // ----------------------------------------------------------- game state
   enterGame() {
+    this.endReplay();
     this.ensureWorld();
     this.inGame = true;
     this.hud.showMenu(false);
@@ -530,6 +595,7 @@ class Game {
     });
 
     document.addEventListener('mousedown', (e) => {
+      if (this.replay) { this.endReplay(); return; }
       if (this.dismissRoleCard()) return;
       if (!this.inGame || document.pointerLockElement !== canvas) return;
       if (e.button === 0) { this.wantFire = true; this.tryFire(); }
@@ -562,6 +628,7 @@ class Game {
       this.keys.add(k);
 
       if (!this.inGame) return;
+      if (this.replay) { this.endReplay(); return; }
       if ((k === 'Space' || k === 'Enter' || k === 'Escape') && this.dismissRoleCard()) return;
 
       // Voice wheel: hold V, press a number.
@@ -694,6 +761,7 @@ class Game {
 
   // ------------------------------------------------------------- movement
   updateLocal(dt) {
+    if (this.replay) return;      // the killcam owns the camera while it runs
     const s = this.self;
     const wish = new THREE.Vector3();
     const fwd = new THREE.Vector3(-Math.sin(s.yaw), 0, -Math.cos(s.yaw));
@@ -814,12 +882,13 @@ class Game {
       const t = nowMs / 1000;
 
       this.updateLocal(dt);
+      if (this.replay) this.updateReplay(dt, t);
 
       inputAcc += dt;
       if (inputAcc > 1 / 30) { inputAcc = 0; this.sendInput(); }
 
       const renderTime = t - INTERP_DELAY;
-      for (const [, v] of this.views) v.update(renderTime, dt, this.camera);
+      if (!this.replay) for (const [, v] of this.views) v.update(renderTime, dt, this.camera);
 
       this.effects.update(dt, t);
       if (this.world) animateWorld(this.world, dt, t, this.camera);
@@ -850,10 +919,13 @@ class Game {
       this.audio.setListener(this.camera.position.x, this.camera.position.y, this.camera.position.z, this.self.yaw);
 
       this.renderer.render(this.scene, this.camera);
-      this.renderer.autoClear = false;
-      this.renderer.clearDepth();
-      this.renderer.render(this.vmScene, this.vmCamera);
-      this.renderer.autoClear = true;
+      // No first-person gun during a killcam - you are watching, not holding one.
+      if (!this.replay) {
+        this.renderer.autoClear = false;
+        this.renderer.clearDepth();
+        this.renderer.render(this.vmScene, this.vmCamera);
+        this.renderer.autoClear = true;
+      }
     };
     requestAnimationFrame(loop);
   }

@@ -98,6 +98,16 @@ modified client could read every position out of the network tab.
 **The dead talk only to the dead.** Dying does not turn you into a spotter for
 whoever is still alive.
 
+**When somebody kills you, you see how they did it.** A four-second killcam
+replays the last moments from behind the shooter. It carries *only* the killer's
+and your own tracks — replaying what the killer could see would leak every
+bystander they walked past, which is exactly what the visibility cull exists to
+prevent. You already learn who shot you; the killcam only makes it legible.
+
+**Every round ends with its own account.** The results screen lists what happened
+and when — each death with both roles, every star pinned on, every accusation —
+next to the table of who everyone really was.
+
 **The Sheriff may pin on the star** (`B`). It is public and permanent: +45 max
 health and 15% damage resistance, but every Outlaw in town now has a name and a
 face. Going loud is usually the Sheriff's strongest and most dangerous play.

@@ -322,6 +322,18 @@ export const VISION = {
                     // so peeking round a corner does not strobe them in and out
 };
 
+// Death replay. Deliberately narrow: it only ever shows the killer and the
+// victim, because those are the two identities the victim is already entitled
+// to. Replaying the killer's full view would leak every bystander they walked
+// past, which is exactly what the visibility cull exists to prevent.
+export const REPLAY = {
+  rate: 10,          // frames per second recorded
+  window: 7,         // seconds of history the server keeps
+  duration: 4.2,     // seconds actually replayed
+  camBack: 2.6,      // chase camera distance behind the killer
+  camUp: 0.75,
+};
+
 export const VOICE_LINES = [
   { id: 'friendly', text: 'Easy now - I ain\'t your problem.' },
   { id: 'follow', text: 'Stick with me, we\'ll live longer.' },

@@ -71,6 +71,41 @@ location / {
 The client picks `ws://` or `wss://` from the page's own protocol, so serving the
 page over HTTPS is all that is needed for a secure socket.
 
+## Can I just put it on Vercel?
+
+Not the game server, no — and it is worth understanding why before you spend an
+afternoon on it.
+
+Vercel runs **serverless functions**: short-lived, stateless, spun up per request
+and torn down. This game needs the opposite of all three:
+
+| The game needs | Serverless gives |
+|---|---|
+| A process that lives for the whole match | A function that ends with the request |
+| A 20 Hz tick loop running continuously | No background execution between requests |
+| Rooms held in memory across minutes | No shared memory between invocations |
+| Persistent WebSocket connections | Request/response, no long-lived sockets |
+
+You could host the *client* on Vercel and point it at a game server somewhere
+else, but then you are running two deployments to serve one game, and the static
+files are the easy half anyway. The Node server already serves them.
+
+**What to use instead.** The hosts in the section above are the same "connect a
+repo, press deploy" experience as Vercel, but they run a persistent container:
+
+- **Fly.io** — `fly.toml` is already in this repo
+- **Railway** — detects the Dockerfile, no config
+- **Render** — same, pick "Web Service"
+
+All three keep a process alive and pass WebSockets through, which is the entire
+requirement. It is still a web game either way: players click a link and play in
+the browser. Only the hosting changes.
+
+The same reasoning rules out Netlify, Cloudflare Pages, and GitHub Pages. If you
+ever *must* be on one of those, the game would have to move its realtime layer to
+a managed service (Cloudflare Durable Objects, Ably, PartyKit and similar), which
+is a real rewrite of `server/rooms.js` and `server/room.js` — not a config change.
+
 ## The one caveat that will bite you
 
 **Rooms live in memory in a single process.** Two instances behind a load

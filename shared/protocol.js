@@ -44,4 +44,5 @@ export const S = {
   RESULTS: 'results',
   ERROR: 'error',
   SOUND: 'sound',
+  REPLAY: 'replay',
 };

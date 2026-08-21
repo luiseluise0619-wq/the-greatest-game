@@ -7,7 +7,7 @@
 
 import {
   PLAYER, WEAPONS, DYNAMITE, WEAPON_ORDER, ROLES, PHASE, TIMING, ENDGAME,
-  SOCIAL, HITBOX, CHARACTERS, GAMBLER_BOONS, LOOT_RESPAWN, VOICE_LINES, VISION,
+  SOCIAL, HITBOX, CHARACTERS, GAMBLER_BOONS, LOOT_RESPAWN, VOICE_LINES, VISION, REPLAY,
   TICK_MS, MIN_PLAYERS, MAX_PLAYERS, rolesForPlayerCount, clamp,
 } from '../shared/constants.js';
 import MAP, { zoneAt, SPAWNS, LOOT_SPAWNS } from '../shared/map.js';
@@ -52,6 +52,9 @@ export class Room {
     this.loot = [];
     this.dynamites = [];
     this.footprints = [];
+    this.history = [];      // rolling position log, for death replays
+    this.shotLog = [];
+    this.timeline = [];     // the round's public account, shown on the results screen
     this.results = null;
     this.matchNumber = 0;
     this.lastTime = now();
@@ -350,6 +353,7 @@ export class Room {
       o: [r2(origin.x), r2(origin.y), r2(origin.z)],
       rays: rays.map((r) => [r2(r.x), r2(r.y), r2(r.z)]),
     };
+    this.shotLog.push({ t, id: p.id, o: shot.o, rays: shot.rays, w: w.id });
     for (const viewer of this.players.values()) {
       if (viewer.bot || !viewer.client) continue;
       // Tracers and noise are physical and everyone gets them; the shooter's
@@ -493,6 +497,17 @@ export class Room {
         youDied: p.id === victim.id,
         youKilled: killer ? p.id === killer.id : false,
       });
+    }
+    this.timeline.push({
+      at: Math.max(0, Math.round(now() - (this.stats?.started || now()))),
+      type: 'death', victim: victim.name, victimRole: victim.role,
+      killer: killer && killer !== victim ? killer.name : null,
+      killerRole: killer && killer !== victim ? killer.role : null,
+      cause, place,
+    });
+    if (killer && killer !== victim && !victim.bot && victim.client) {
+      const replay = this.buildReplay(victim, killer, now());
+      if (replay) this.emit(victim, replay);
     }
     telemetry.death(this, victim, killer, cause, witnesses.size, place);
     this.notifyBots('kill', { victim, killer, witnesses });
@@ -793,6 +808,10 @@ export class Room {
     const target = this.players.get(msg.target);
     if (!target || target === p || !target.alive) return;
     p.lastAccuseAt = t;
+    this.timeline.push({
+      at: Math.max(0, Math.round(now() - (this.stats?.started || now()))),
+      type: 'accuse', who: p.name, target: target.name,
+    });
     telemetry.social(this, 'accuse');
     this.broadcast({
       t: S.FEED,
@@ -808,6 +827,7 @@ export class Room {
     telemetry.social(this, 'badge');
     p.maxHealth = PLAYER.maxHealth + (ROLES.sheriff.bonusHealth || 0) + SOCIAL.badgeHealthBonus;
     p.health = p.maxHealth;
+    this.timeline.push({ at: Math.max(0, Math.round(now() - (this.stats?.started || now()))), type: 'badge', who: p.name });
     this.broadcast({ t: S.BADGE, id: p.id, name: p.name });
     this.broadcast({
       t: S.FEED,
@@ -832,6 +852,9 @@ export class Room {
     this.results = null;
     this.dynamites = [];
     this.footprints = [];
+    this.history = [];
+    this.shotLog = [];
+    this.timeline = [];
     this.resetLoot();
 
     // Drop leftover bots, then refill to the table size.
@@ -988,11 +1011,11 @@ export class Room {
       won: p.faction === winner,
     })).sort((a, b) => (b.won - a.won) || (b.kills - a.kills) || (b.damage - a.damage));
 
-    this.results = { winner, blurb, rows };
+    this.results = { winner, blurb, rows, timeline: this.timeline.slice(-24) };
     telemetry.matchEnd(this, winner, blurb);
     this.setPhase(PHASE.RESULTS);
     this.broadcast({
-      t: S.RESULTS, winner, blurb, rows,
+      t: S.RESULTS, winner, blurb, rows, timeline: this.results.timeline,
       title: winner === 'law' ? 'THE LAW HOLDS'
         : winner === 'outlaw' ? 'THE OUTLAWS RIDE OUT'
         : winner === 'renegade' ? 'THE RENEGADE STANDS ALONE' : 'NOBODY WINS',
@@ -1058,7 +1081,59 @@ export class Room {
     }
   }
 
+  /** Rolling snapshot log at REPLAY.rate, kept only long enough to build a killcam. */
+  recordHistory(t) {
+    if (this.phase !== PHASE.COMBAT && this.phase !== PHASE.ENDGAME) return;
+    if (this.lastRecord && t - this.lastRecord < 1 / REPLAY.rate) return;
+    this.lastRecord = t;
+    const ps = [];
+    for (const p of this.players.values()) {
+      if (!p.alive) continue;
+      ps.push({
+        id: p.id, x: r2(p.pos.x), y: r2(p.pos.y), z: r2(p.pos.z),
+        yw: r2(p.yaw), pt: r2(p.pitch),
+        st: (p.crouch ? 1 : 0) | (p.sprint ? 2 : 0) | (p.moving ? 4 : 0) | (t - p.firedAt < 0.15 ? 64 : 0),
+      });
+    }
+    this.history.push({ t, ps });
+    const cutoff = t - REPLAY.window;
+    while (this.history.length && this.history[0].t < cutoff) this.history.shift();
+    while (this.shotLog.length && this.shotLog[0].t < cutoff) this.shotLog.shift();
+  }
+
+  /**
+   * The last few seconds from behind the killer, carrying only the killer's and
+   * the victim's tracks. The victim already learns who shot them, so this adds
+   * no information - it just makes it legible, and clippable.
+   */
+  buildReplay(victim, killer, t) {
+    const from = t - REPLAY.duration;
+    const ids = new Set([victim.id, killer.id]);
+    const frames = [];
+    for (const f of this.history) {
+      if (f.t < from) continue;
+      const ps = f.ps.filter((e) => ids.has(e.id));
+      if (ps.length) frames.push({ rt: r2(f.t - from), ps });
+    }
+    if (frames.length < 3) return null;
+    return {
+      t: S.REPLAY,
+      duration: REPLAY.duration,
+      killer: killer.id,
+      killerName: killer.name,
+      killerChar: killer.character,
+      victim: victim.id,
+      victimChar: victim.character,
+      place: zoneAt(victim.pos.x, victim.pos.z, victim.pos.y),
+      frames,
+      shots: this.shotLog
+        .filter((s) => s.t >= from && s.id === killer.id)
+        .map((s) => ({ rt: r2(s.t - from), o: s.o, rays: s.rays, w: s.w })),
+    };
+  }
+
   stepPlayers(t, dt) {
+    this.recordHistory(t);
     for (const p of this.players.values()) {
       if (!p.alive) continue;
 

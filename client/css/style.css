@@ -302,6 +302,50 @@ button.big { width: 100%; padding: 14px; font-size: 15px; letter-spacing: .22em;
 #chatInputWrap span { font-size: 10px; letter-spacing: .2em; color: var(--gold); }
 #chatInputWrap input { border: none; background: none; padding: 2px; font-size: 13px; }
 
+/* The HUD belongs to the living: fade it out while a killcam plays. */
+#hud.replay #topbar,
+#hud.replay #bottomLeft,
+#hud.replay #bottomRight,
+#hud.replay #crosshair,
+#hud.replay #statusStrip { opacity: 0; }
+#hud #topbar, #hud #bottomLeft, #hud #bottomRight,
+#hud #crosshair, #hud #statusStrip { transition: opacity .25s; }
+
+/* ------------------------------------------------------------- KILLCAM */
+#killcam {
+  position: fixed; left: 50%; bottom: 78px; transform: translateX(-50%); z-index: 25;
+  text-align: center; pointer-events: none; width: 460px;
+}
+.kcTop { display: flex; align-items: baseline; justify-content: center; gap: 12px; }
+.kcTop b { font-size: 13px; letter-spacing: .42em; color: var(--blood); }
+.kcTop span { font-size: 11px; letter-spacing: .1em; color: rgba(232,217,189,.5); }
+.kcName { font-size: 21px; letter-spacing: .06em; margin-top: 4px; text-shadow: 0 2px 8px rgba(0,0,0,.9); }
+.kcName em { font-style: normal; color: var(--gold); }
+.kcBar { width: 100%; height: 2px; background: rgba(12,9,6,.8); margin-top: 10px; }
+.kcBar i { display: block; height: 100%; width: 0; background: var(--blood); }
+.kcSkip { font-size: 10px; letter-spacing: .2em; color: rgba(232,217,189,.35); margin-top: 7px; }
+
+/* ------------------------------------------------------- ROUND TIMELINE */
+.resultCols { display: grid; grid-template-columns: 1fr 300px; gap: 26px; align-items: start; }
+@media (max-width: 900px) { .resultCols { grid-template-columns: 1fr; } }
+.timelineWrap h3 {
+  font-size: 10px; letter-spacing: .28em; color: rgba(232,217,189,.45);
+  margin: 0 0 10px; font-weight: normal;
+}
+#timeline { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto; }
+#timeline li {
+  font-size: 12px; line-height: 1.5; padding: 5px 0 5px 52px; position: relative;
+  border-bottom: 1px solid rgba(200,180,140,.08); color: rgba(232,217,189,.78);
+}
+#timeline li time {
+  position: absolute; left: 0; top: 5px; font-size: 11px;
+  color: rgba(232,217,189,.35); font-variant-numeric: tabular-nums;
+}
+#timeline li b { font-weight: normal; color: var(--sand); }
+#timeline li .rle { font-weight: bold; }
+#timeline li.badge { color: var(--gold); }
+#timeline li.accuse { color: #f0d99a; }
+
 #deadBanner {
   position: fixed; left: 50%; top: 22%; transform: translateX(-50%); text-align: center; z-index: 20;
   pointer-events: none;
