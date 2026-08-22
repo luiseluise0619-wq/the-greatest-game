@@ -653,3 +653,73 @@ test('a Renegade helps with the outlaws and keeps the star breathing', () => {
       'a Renegade went after the Sheriff early, which loses him the round');
   } finally { clock.restore(); }
 });
+
+// ---------------------------------------------------------------------------
+// The Tracker reads the dust. Same rule again: a place, never a name.
+// ---------------------------------------------------------------------------
+
+test('footprints go to the Tracker alone, and carry no names', () => {
+  const { room, clock, stub, me } = makeRoom({ bots: 8 });
+  try {
+    intoCombat(room, clock);
+    const tracker = me();
+    tracker.character = 'tracker';
+    tracker.abilityReadyAt = 0;
+
+    // Everybody walks about for a while.
+    for (const p of room.players.values()) { p.moving = true; p.lastFootprintAt = 0; }
+    for (let i = 0; i < 30; i++) {
+      for (const p of room.players.values()) p.lastFootprintAt = 0;
+      tick(clock, room, 1);
+    }
+    assert.ok(room.footprints.length > 10, 'nobody left any prints to read');
+
+    const other = stubClient();
+    room.addConnection(other.client);
+    room.handleMessage(other.client, { t: 'join', name: 'Bystander' });
+
+    stub.reset(); other.reset();
+    room.onAbility(tracker);
+
+    const read = stub.last('prints');
+    assert.ok(read, 'the Tracker read the dust and got nothing');
+    assert.ok(read.prints.length > 5);
+    assert.equal(other.of('prints').length, 0, 'somebody else was handed the trail too');
+
+    for (const print of read.prints) {
+      assert.equal(print.length, 4, 'a print carries more than a place and a group');
+      const [x, y, z, group] = print;
+      assert.ok(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z));
+      assert.ok(Number.isInteger(group) && group >= 0 && group < room.players.size,
+        `a print is tagged ${group}, which is not a trail group`);
+      // The group must not BE anybody's id, or the trail is a name.
+      assert.equal(room.players.has(group), false, 'a trail group collided with a player id');
+    }
+  } finally { clock.restore(); }
+});
+
+test('trail groups are shuffled, so a trail is not a seating plan', () => {
+  const { room, clock } = makeRoom({ bots: 8 });
+  try {
+    // Deal several times: if groups were handed out in player order, the same
+    // player would keep the same group and a Tracker could learn it once and
+    // read it for the rest of the evening.
+    const seen = new Map();
+    for (let i = 0; i < 12; i++) {
+      room.beginMatch();
+      for (const p of room.players.values()) {
+        if (p.bot) continue;
+        if (!seen.has(p.id)) seen.set(p.id, new Set());
+        seen.get(p.id).add(p.trailGroup);
+      }
+    }
+    for (const [id, groups] of seen) {
+      assert.ok(groups.size > 1, `player ${id} was handed the same trail group every round`);
+    }
+
+    // And within one round they are unique, or two people share a trail.
+    room.beginMatch();
+    const groups = [...room.players.values()].map((p) => p.trailGroup);
+    assert.equal(new Set(groups).size, groups.length, 'two players share a trail group');
+  } finally { clock.restore(); }
+});

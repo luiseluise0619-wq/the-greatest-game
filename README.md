@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 93 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 95 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 ```
@@ -447,7 +447,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 93 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 95 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -471,8 +471,10 @@ They are grouped by what they protect:
 - **`test/cards.test.js`** — the deck, and the footstep channel it sits next to:
   a step is heard nearby, never carries a name, lands a little off where the
   walker really is, does not carry across town, dies when they crouch, and comes
-  at the pace of a gait rather than of the tick rate. The rest is assertions
-  about *absent*
+  at the pace of a gait rather than of the tick rate. Plus the Tracker's dust:
+  the trail goes to the Tracker alone, carries a place and a group and never a
+  name, and the groups are reshuffled every round so nobody learns somebody's
+  trail once and reads it all evening. The rest is assertions about *absent*
   information — a Rain Barrel that must swallow the shooter's hitmarker as well as
   the bullet, a bought kill that reaches neither the town, the victim nor the
   killcam, a ledger that stays armed because there was nothing to read, a Wanted

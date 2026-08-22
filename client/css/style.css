@@ -447,6 +447,8 @@ button.big { width: 100%; padding: 14px; font-size: 15px; letter-spacing: .22em;
 }
 #hud.replay #handStrip,
 #hud.resultsUp #handStrip { opacity: 0; transition: opacity .25s; }
+/* Dead men play no cards, and the hand should say so before you press one. */
+#handStrip.spent { filter: grayscale(1) brightness(.55); transition: filter .3s; }
 
 /* The card you just played, held up where you cannot miss it, then flicked. */
 #cardPlay {

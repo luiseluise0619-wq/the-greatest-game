@@ -417,6 +417,8 @@ export class HUD {
   setDead(dead) {
     $('deadBanner').classList.toggle('hidden', !dead);
     $('crosshair').classList.toggle('hide', dead);
+    // A hand you cannot play should not look playable.
+    $('handStrip').classList.toggle('spent', dead);
   }
 
   setCrosshairSpread(px) {
