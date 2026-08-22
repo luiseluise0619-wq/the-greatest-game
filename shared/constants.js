@@ -29,6 +29,11 @@ export const PLAYER = {
   staminaRegen: 0.9,        // per second
   // Server-side sanity clamp: how far a client may claim to have moved per second.
   maxServerSpeed: 12.5,
+  // Jitter slack for the server's speed clamp, as a BUDGET rather than a per
+  // packet allowance. Given free every message, a client flooding inputs at
+  // 1000Hz would earn hundreds of metres a second out of the slack alone.
+  serverSlack: 0.9,          // metres a client may be ahead of the clamp
+  serverSlackRefill: 1.4     // metres per second that budget comes back at,
 };
 
 // ---------------------------------------------------------------------------

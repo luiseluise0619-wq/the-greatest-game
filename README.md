@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 54 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 60 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 ```
 
@@ -350,6 +350,7 @@ shared/     constants.js  all tuning in one place, imported by both sides
 server/     index.js      static files + websockets
             room.js       match state machine, authoritative combat, information rules
             bots.js       perception, suspicion, faction goals, navigation
+            ratelimit.js  per-socket token bucket, so one client cannot flood
 client/     js/main.js    networking, local movement, input, render loop
             js/world.js   builds the town in three.js, procedural textures
             js/players.js remote avatars, interpolation, silhouettes
@@ -400,7 +401,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 54 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 60 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -431,8 +432,13 @@ They are grouped by what they protect:
   slider past its own limits, garbage in one field does not take the others with
   it, and every default is reachable with its own control.
 - **`test/security.test.js`** — what a lying client cannot do: teleport, walk
-  through a wall, end up inside geometry, be told about players it cannot see, or
-  learn the name of a shooter it could not have seen.
+  through a wall, end up inside geometry, buy speed by flooding input packets,
+  be told about players it cannot see, or learn the name of a shooter it could
+  not have seen. One check runs the other way and makes sure an honest sprint at
+  30Hz is never clamped.
+- **`test/ratelimit.test.js`** — the socket token bucket: a burst gets through,
+  a flood does not, an idle socket cannot save up more than one burst, and a
+  stream at exactly the limit is never refused.
 
 `npm run test:browser` drives a real Chromium through a whole round with two
 players — lobby, room codes, the deck printed face up, the role card, the hand
@@ -481,11 +487,13 @@ Prototype, deliberately scoped to a vertical slice:
 - **Movement is client-simulated and server-validated.** The client integrates
   its own movement for a crisp feel; the server treats the position it reports as
   a *target* and walks it through the real geometry, so no client gets through a
-  wall, off the map, or across town in one packet. What is not solved is the fine
-  grain — a modified client can still shade its speed within the clamp, or aim
-  more precisely than a hand can. Closing that needs full input-replay
-  reconciliation, which is a rewrite of the movement path and worth doing only
-  once the game has proven it deserves it.
+  wall, off the map, or across town in one packet. The jitter slack in that clamp
+  is a budget that refills over time rather than an allowance per packet, so
+  flooding inputs buys nothing — that one was a real hole, and it is tested from
+  both sides. What is *not* solved is the fine grain: a modified client can still
+  shade its speed inside the clamp, or aim more precisely than a hand can.
+  Closing that needs full input-replay reconciliation, which is a rewrite of the
+  movement path and worth doing only once the game has proven it deserves it.
 - **Bots do not use rooftops or the water tower** — the nav graph is ground-level
   only. Deliberate for now, and it makes verticality a human edge.
 - **No voice chat.** Text chat and the shout wheel stand in for it.

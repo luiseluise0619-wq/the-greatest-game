@@ -9,6 +9,7 @@ import { WebSocketServer } from 'ws';
 import { RoomManager } from './rooms.js';
 import { TIMING } from '../shared/constants.js';
 import { telemetry } from './telemetry.js';
+import { tokenBucket, MSG_RATE, MSG_BURST, MAX_DROPPED } from './ratelimit.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -102,12 +103,24 @@ const server = http.createServer((req, res) => {
   });
 });
 
-const wss = new WebSocketServer({ server });
+// Nothing this protocol sends is large: chat is capped at 140 characters and
+// the biggest message is a movement packet. 8KB is generous and stops a socket
+// from making the process hold a megabyte of nonsense.
+const wss = new WebSocketServer({ server, maxPayload: 8 * 1024 });
 
 wss.on('connection', (ws) => {
   // A socket is roomless until its join message says which town it wants.
   const client = { ws, room: null, playerId: null };
+  const allow = tokenBucket(MSG_RATE, MSG_BURST);
+  let dropped = 0;
   ws.on('message', (raw) => {
+    // Movement is the expensive message - the server walks the claimed position
+    // through the whole map - so one socket must not be able to spend the
+    // server's frame on its own.
+    if (!allow()) {
+      if (++dropped > MAX_DROPPED) ws.close(1008, 'too many messages');
+      return;
+    }
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch { return; }
     if (!msg || typeof msg.t !== 'string') return;

@@ -185,6 +185,7 @@ export class Room {
       lastChatAt: 0,
       lastAccuseAt: 0,
       lastInputAt: now(),
+      moveSlack: PLAYER.serverSlack,   // see onInput: jitter budget, not per packet
       revealUntil: 0,
       trailGroup: 0,
       brain: null,
@@ -302,10 +303,21 @@ export class Room {
     //    hacked client cannot teleport across the map.
     let dx = want.x - p.pos.x, dy = want.y - p.pos.y, dz = want.z - p.pos.z;
     const dist = Math.hypot(dx, dy, dz);
-    const allowed = PLAYER.maxServerSpeed * dt + 0.6;
+    // Slack absorbs network jitter, but it is a budget that refills over time,
+    // not a free allowance per packet: dt shrinks with the message rate, so a
+    // client flooding inputs would otherwise turn a constant into a teleport.
+    p.moveSlack = Math.min(
+      PLAYER.serverSlack,
+      (p.moveSlack ?? PLAYER.serverSlack) + dt * PLAYER.serverSlackRefill,
+    );
+    const fair = PLAYER.maxServerSpeed * dt;
+    const allowed = fair + p.moveSlack;
     if (dist > allowed) {
       const k = allowed / dist;
       dx *= k; dy *= k; dz *= k;
+      p.moveSlack = 0;
+    } else {
+      p.moveSlack -= Math.max(0, dist - fair);
     }
 
     // 2. Walk the move through the actual world instead of taking the client's
@@ -1111,6 +1123,7 @@ export class Room {
       p.glassMarks = new Map();
       p.lastCardAt = 0;
       p.lastHitBy = null;
+      p.moveSlack = PLAYER.serverSlack;
       p.seenAt = new Map();
       p.lastVisible = null;
       const s = SPAWNS[spawnOrder[i % SPAWNS.length]];

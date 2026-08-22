@@ -159,3 +159,44 @@ test('vision settings stay coherent', () => {
   assert.ok(VISION.far > 140, 'the rifle must still work at its own range');
   assert.ok(VISION.memory > 0 && VISION.memory < 2, 'visibility memory should be brief');
 });
+
+test('flooding inputs does not buy speed', () => {
+  const { room, clock, me } = liveRoom();
+  try {
+    // Open ground on Main Street, so nothing here is a collision result.
+    me.pos = { x: 0, y: 0, z: 0 };
+    me.moveSlack = PLAYER.serverSlack;
+    const start = { x: me.pos.x, z: me.pos.z };
+
+    // One second of wall clock, but 500 input packets instead of the 30 a real
+    // client sends. Each one asks to be a metre further down the street.
+    for (let i = 0; i < 500; i++) {
+      clock.advance(2);
+      room.onInput(me, { pos: { x: me.pos.x + 1, y: 0, z: me.pos.z }, yaw: 0, pitch: 0 });
+    }
+
+    const moved = Math.hypot(me.pos.x - start.x, me.pos.z - start.z);
+    // A second at the clamp is 12.5m, plus the slack budget. Anything near the
+    // 500m the client asked for means the per-packet allowance is back.
+    assert.ok(moved <= PLAYER.maxServerSpeed * 1.2 + PLAYER.serverSlack + 1,
+      `flooding inputs moved ${moved.toFixed(1)}m in one second`);
+  } finally { clock.restore(); }
+});
+
+test('the jitter budget still lets an honest client through', () => {
+  const { room, clock, me } = liveRoom();
+  try {
+    me.pos = { x: 0, y: 0, z: 0 };
+    me.moveSlack = PLAYER.serverSlack;
+    // 30Hz, sprinting: what the real client actually produces.
+    const perTick = PLAYER.sprintSpeed / 30;
+    let asked = 0;
+    for (let i = 0; i < 60; i++) {
+      clock.advance(1000 / 30);
+      asked += perTick;
+      room.onInput(me, { pos: { x: me.pos.x + perTick, y: 0, z: me.pos.z }, yaw: 0, pitch: 0 });
+    }
+    const moved = me.pos.x;
+    assert.ok(moved > asked * 0.97, `an honest sprint was clamped: asked ${asked.toFixed(1)}m, got ${moved.toFixed(1)}m`);
+  } finally { clock.restore(); }
+});
