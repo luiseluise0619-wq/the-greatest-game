@@ -374,7 +374,7 @@ test('the aftermath screen is the first place a silent card is ever named', () =
   } finally { clock.restore(); }
 });
 
-test('a bot holding the Long Glass gets the name too', () => {
+test('a bot holding the Long Glass gets the name, but not a place to run to', () => {
   const { room, clock } = makeRoom({ bots: 8 });
   try {
     intoCombat(room, clock);
@@ -383,26 +383,36 @@ test('a bot holding the Long Glass gets the name too', () => {
     // intoCombat freezes the bots, so give this one its brain back by hand.
     watcher.brain = new BotBrain(room, watcher);
     watcher.pos = { x: 58, y: 0, z: -18 };
-    shooter.pos = { x: -26, y: 0, z: 18 };
+    shooter.pos = { x: -26, y: 0, z: 18 };          // ~90m away, well out of earshot
     watcher.hand = ['spyglass'];
     watcher.lastCardAt = 0;
     room.onCard(watcher, { card: 'spyglass' });
     assert.ok(watcher.glassUntil > 0, 'the card did not take');
 
+    const shot = () => watcher.brain.onEvent('gunshot', {
+      pos: { x: shooter.pos.x, y: 1.6, z: shooter.pos.z },
+      shooter, weapon: { noise: 45 },
+    });
+
     const before = watcher.brain.susOf(shooter.id);
-    watcher.brain.onEvent('gunshot', {
-      pos: { x: shooter.pos.x, y: 1.6, z: shooter.pos.z },
-      shooter, weapon: { noise: 45 },
-    });
-    assert.equal(watcher.brain.noise?.shooter, shooter.id, 'the glass named nobody for the bot');
+    shot();
+    const seen = watcher.brain.lastSeen.get(shooter.id);
+    assert.ok(seen, 'the glass named nobody for the bot');
+    assert.equal(Math.round(seen.x), Math.round(shooter.pos.x), 'the place should be exact');
     assert.ok(watcher.brain.susOf(shooter.id) > before, 'the bot learned nothing from it');
-    // Same shot without the glass, from across town, stays anonymous.
+    // Identity, not a summons: a shot this far off is still not somewhere to go.
+    assert.equal(watcher.brain.noise, null, 'the glass turned a distant shot into a destination');
+
+    // And it cannot stack: emptying a magazine is one lead, not six.
+    const after = watcher.brain.susOf(shooter.id);
+    for (let i = 0; i < 6; i++) shot();
+    assert.equal(watcher.brain.susOf(shooter.id), after, 'suspicion stacked once per bullet');
+
+    // Once the glass runs out the same shot is neither seen nor heard.
     watcher.glassUntil = 0;
-    watcher.brain.noise = null;
-    watcher.brain.onEvent('gunshot', {
-      pos: { x: shooter.pos.x, y: 1.6, z: shooter.pos.z },
-      shooter, weapon: { noise: 45 },
-    });
+    watcher.brain.lastSeen.delete(shooter.id);
+    shot();
+    assert.equal(watcher.brain.lastSeen.has(shooter.id), false, 'the glass never expired');
     assert.equal(watcher.brain.noise, null, 'a shot 90m away should not even be heard');
   } finally { clock.restore(); }
 });

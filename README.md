@@ -433,11 +433,16 @@ won by information. The knobs that control that balance, if you want to move it:
 - `ROLE_TABLE` — faction counts per table size.
 - `TIMING` — phase lengths (or the `HNH_*` env overrides).
 
-Balance across 12 headless bot-only rounds currently sits at roughly 3 Law / 7
-Outlaw / 2 Renegade wins, with the first death around a minute in. Bots play
-about a third of the cards they are dealt; running the same sim with hands
-emptied moves neither the win split nor the round length outside the noise, which
-is what you want from a layer that adds information rather than firepower.
+Balance across 24 headless bot-only rounds currently sits at 14 Outlaw / 9 Law /
+1 Renegade, with the first death about a minute in. Round length is strongly
+**bimodal** — either somebody finds the Sheriff inside two minutes or nothing is
+resolved and the storm decides it — so the mean (around 280s) says much less than
+that shape does, and anything under about twenty rounds is noise.
+
+Bots play roughly a third of the cards they are dealt. Running the same sim with
+every hand emptied moves neither the win split (16/6/2) nor the pace (first death
+61s) outside that noise, which is exactly what you want from a layer that adds
+information rather than firepower.
 
 ---
 

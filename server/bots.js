@@ -172,6 +172,7 @@ export class BotBrain {
     this.protecteeThreat = null;    // deputies remember who went for their man
     this.nextProbeAt = 0;
     this.sheriffness = new Map();   // id -> "looks like the law" score
+    this.glassBumped = new Map();   // id -> t, so the Long Glass cannot stack suspicion per bullet
     // Skill spread so a lobby of bots does not feel like one machine.
     this.skill = clamp(rnd(0.32, 0.86), 0, 1);
     this.reactionTime = rnd(0.55, 0.24 + (1 - this.skill) * 0.9);
@@ -262,19 +263,34 @@ export class BotBrain {
     switch (kind) {
       case 'gunshot': {
         const d = Math.hypot(data.pos.x - me.pos.x, data.pos.z - me.pos.z);
-        // A bot holding the Long Glass gets the same deal a player does: the
-        // shot is town-wide, the position is exact, and it comes with a name.
+        const heard = d < (data.weapon?.noise ?? 45);
         const glass = t < (me.glassUntil || 0);
-        if (d < (data.weapon?.noise ?? 45) || glass) {
-          // Otherwise a shot heard is a lead, not a fact - the position is fuzzed.
-          const seen = !!data.shooter && (glass || this.canSee(data.shooter));
+
+        // The Long Glass puts a name and an exact place on any shot in town.
+        // Two things it deliberately does NOT do, because it does not do them
+        // for a player either: it is identity, not guilt - so the suspicion it
+        // buys is small and rate limited rather than stacking once per bullet -
+        // and it is not somewhere to GO. Seeing a man fire four hundred yards
+        // off is not the same as hearing it happen next door.
+        if (data.shooter && glass) {
+          this.lastSeen.set(data.shooter.id, { x: data.pos.x, y: 0, z: data.pos.z, t });
+          if (t - (this.glassBumped.get(data.shooter.id) ?? -99) > 3) {
+            this.glassBumped.set(data.shooter.id, t);
+            this.suspect(data.shooter.id, 0.09 * this.paranoia);
+          }
+        }
+
+        if (heard) {
+          // A shot heard is a lead, not a fact - the position is fuzzed, and
+          // the shooter only gets named if this bot could actually see them.
+          const named = !!data.shooter && (glass || this.canSee(data.shooter));
           this.noise = {
-            x: seen && glass ? data.pos.x : data.pos.x + rnd(-4, 4),
-            z: seen && glass ? data.pos.z : data.pos.z + rnd(-4, 4),
+            x: glass ? data.pos.x : data.pos.x + rnd(-4, 4),
+            z: glass ? data.pos.z : data.pos.z + rnd(-4, 4),
             t,
-            shooter: seen ? data.shooter.id : null,
+            shooter: named ? data.shooter.id : null,
           };
-          if (this.noise.shooter) this.suspect(this.noise.shooter, (glass ? 0.16 : 0.1) * this.paranoia);
+          if (!glass && this.noise.shooter) this.suspect(this.noise.shooter, 0.1 * this.paranoia);
         }
         break;
       }
