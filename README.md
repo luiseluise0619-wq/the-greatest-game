@@ -21,8 +21,9 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 85 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 86 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
+npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 ```
 
 ## Playing with other people
@@ -405,6 +406,7 @@ client/     js/main.js    networking, local movement, input, render loop
             js/cardart.js the printing press: every card face drawn onto a canvas
             js/settings.js local preferences, guarded against blocked storage
             proof/        /proof/ - the deck at full size, for tuning cardart.js
+tools/      balance.mjs   headless bot rounds -> win split, pace, crossfire share
 ```
 
 **Authority split.** Movement is simulated on the client and speed-clamped by the
@@ -445,15 +447,17 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 85 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 86 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
   no loot is buried in furniture, walls stop movement and doorways do not, the
   nav graph is one connected town with no orphan nodes, weapons are internally
   consistent, every role table adds up, the sprint budget always recovers, the
-  swap lockout is one rule rather than two, and every place the brief asked the
-  town to have exists, can be stood in and reports its own name.
+  swap lockout is one rule rather than two, every place the brief asked the town
+  to have exists, can be stood in and reports its own name, and nothing in
+  `shared/` reaches for Node — the browser imports those four files directly, so
+  one `process.env` in there breaks the whole game rather than one test.
 - **`test/match.test.js`** — roles are dealt correctly, guns are inert during
   preparation, each faction's win condition fires (including at the bell, for a
   Sheriff who walked out during prep), the dust storm hurts outside the ring and
@@ -525,17 +529,40 @@ won by information. The knobs that control that balance, if you want to move it:
   (or the `HNH_*` env overrides: `HNH_PREP`, `HNH_COMBAT`, `HNH_ENDGAME`,
   `HNH_RESULTS`, `HNH_LOBBYCOUNTDOWN`).
 
-Balance across 20 headless bot-only rounds currently sits at 11 Outlaw / 7 Law /
-2 Renegade, with the first death about a minute in, and roughly one death in nine
-belonging to the dust storm. Round length is strongly **bimodal** — either
-somebody finds the Sheriff inside two minutes or nothing is resolved and the
-storm decides it — so the mean (around 360s) says much less than that shape does,
-and anything under about twenty rounds is noise.
+Balance over **200 headless bot-only rounds** (`npm run balance -- 80`) sits at:
 
-Bots play roughly a third of the cards they are dealt. Running the same sim with
-every hand emptied moves neither the win split (16/6/2) nor the pace (first death
-61s) outside that noise, which is exactly what you want from a layer that adds
-information rather than firepower.
+| | Outlaws | The Law | Renegade |
+|---|---|---|---|
+| win share | **57%** | 36% | 7% |
+
+with 99% of rounds resolving on a kill rather than running out on the storm, and
+those averaging about **five minutes**. The Sheriff dies in roughly six rounds in
+ten, and a little over half of the players who killed one had actually picked
+them out first — the rest is crossfire, which is the number to watch: if it goes
+much higher the round is being decided by chaos rather than by anybody working
+anything out.
+
+Three things about those numbers, all learned by getting them wrong first:
+
+- **Round length is bimodal**, not short. A round either resolves in a couple of
+  minutes or nobody finds anybody and the dust storm decides it. Quoting a median
+  is meaningless — it flips between the two clusters depending on which side of
+  half the sample lands. The share that resolve is the stable statistic.
+- **Anything under about fifty rounds is noise.** Twenty rounds produced outlaw
+  win shares from 45% to 80% at *identical* settings while this was being
+  measured. Two separate runs of sixty gave 52% and 63%.
+- **These are bots playing bots.** They find each other faster than people do and
+  they never lie to each other, so the split above is a regression check on the
+  simulation, not a claim about the game. The outlaw lean is real and it is the
+  first thing worth attacking with human data — deliberately *not* tuned against
+  bot data, because tuning a game to beat its own robots is how a game ends up
+  only fun for robots.
+
+Two bot knobs are overridable so a real playtest can sweep them:
+`HNH_HOSTILITY` (the draw-your-gun line, default 1.25) and `HNH_BADGE_ODDS` (how
+often a Sheriff bot pins the star on at all, default 0.6). Sweeping the second
+one is instructive: at 0.95 the Sheriff dies *sooner* and the Law wins *less*,
+which is the star doing exactly what it is supposed to do.
 
 ---
 

@@ -120,7 +120,27 @@ const pick = (a) => a[(Math.random() * a.length) | 0];
 // Draw-your-gun line. Tuned so that a stranger (~0.3) never crosses it and a
 // confirmed enemy (>2.0) always does. Lower this and the match becomes a
 // deathmatch; raise it and nobody ever starts anything.
-const HOSTILITY_THRESHOLD = 1.25;
+//
+// This and BADGE_ODDS below are the two knobs worth sweeping against real
+// playtest data, so they are overridable from the environment - see the tuning
+// section of the README. They are read once, at import, deliberately: changing
+// how bots think halfway through a round would make any measurement worthless.
+export const BOT_TUNING = {
+  hostility: envNumber('HNH_HOSTILITY', 1.25),
+  // How often a Sheriff bot decides to pin the star on at all. The star is
+  // armour and a target at the same time, and the measurements say it is very
+  // close to a coin flip which of those wins - so this one is worth leaving
+  // alone without human data.
+  badgeOdds: envNumber('HNH_BADGE_ODDS', 0.6),
+};
+
+function envNumber(key, fallback) {
+  const raw = process.env[key];
+  const n = Number(raw);
+  return raw !== undefined && Number.isFinite(n) ? n : fallback;
+}
+
+const HOSTILITY_THRESHOLD = BOT_TUNING.hostility;
 
 function weightedPick(items, weightOf) {
   let total = 0;
@@ -202,7 +222,7 @@ export class BotBrain {
       this.trustUp(this.protectee, 0.4);
     } else if (p.role === 'sheriff') {
       // Sheriffs sometimes go loud. It is the most interesting thing they can do.
-      this.wantBadgeAt = Math.random() < 0.6 ? rnd(30, 190) : Infinity;
+      this.wantBadgeAt = Math.random() < BOT_TUNING.badgeOdds ? rnd(30, 190) : Infinity;
     } else if (p.role === 'renegade') {
       const lawmen = all.filter((o) => o.id !== p.id && o.faction === 'law');
       if (lawmen.length) this.suspect(pick(lawmen).id, 0.25);

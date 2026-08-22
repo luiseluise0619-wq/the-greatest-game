@@ -216,3 +216,19 @@ test('a bot cannot see as far as a player can shoot', () => {
     `a bot notices you at ${VISION.botSight}m and the longest gun still bites at ${longest}m`);
   assert.ok(VISION.botSight > 40, 'bots this blind would never find anybody');
 });
+
+test('nothing in shared/ reaches for Node', async () => {
+  // shared/ is imported by the browser as-is, with no build step. One
+  // `process.env` in here and the module fails to evaluate, which does not
+  // break a test - it breaks the entire game, silently, for every player.
+  const { readFile } = await import('node:fs/promises');
+  const files = ['constants.js', 'map.js', 'collision.js', 'protocol.js'];
+  for (const f of files) {
+    const src = await readFile(new URL(`../shared/${f}`, import.meta.url), 'utf8');
+    const stripped = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    for (const nodeism of ['process.', 'require(', '__dirname', 'node:']) {
+      assert.equal(stripped.includes(nodeism), false,
+        `shared/${f} uses ${nodeism} - the browser imports this file directly`);
+    }
+  }
+});
