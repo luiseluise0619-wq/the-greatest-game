@@ -400,6 +400,9 @@ export const SOCIAL = {
   badgeHealthBonus: 45,
   badgeDamageResist: 0.85,
   cardCooldown: 1.6,
+  // A refresh should not be a death sentence. Your body stands in the street
+  // for this long, shootable and mute, waiting for you to come back.
+  reconnectGrace: 25,
   // Boots. Everyone in earshot hears a step and gets a direction; nobody is ever
   // told whose it was. Same deal as a gunshot: physical, and anonymous.
   stepInterval: { sprint: 0.31, walk: 0.44, crouch: 0.62 },

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
-import { PHASE, TIMING, ROLES, PLAYER, ENDGAME } from '../shared/constants.js';
+import { PHASE, TIMING, ROLES, PLAYER, ENDGAME, SOCIAL } from '../shared/constants.js';
 
 const { Room } = await import('../server/room.js');
 
@@ -300,5 +300,104 @@ test('a private town waits for whoever you invited', () => {
     tick(clock, room, 200);
     assert.equal(room.phase, PHASE.LOBBY, 'a private room started without being asked');
     assert.equal(room.lobbyStartAt, 0);
+  } finally { clock.restore(); }
+});
+
+test('a refresh gets your body back, and a no-show falls over', () => {
+  const { room, clock, stub, me } = makeRoom({ bots: 6, prep: 1 });
+  try {
+    room.beginMatch();
+    tick(clock, room, 40);
+    freezeBots(room);
+    const player = me();
+    const token = player.token;
+    const role = player.role;
+    player.pos = { x: 6, y: 0, z: 12 };
+    player.health = 61;
+    const hand = player.hand.slice();
+    assert.ok(token, 'a player should be issued a token to come back with');
+
+    // The tab goes away. The body does not.
+    room.removeConnection(stub.client);
+    tick(clock, room, 20);
+    assert.equal(player.alive, true, 'a disconnect killed the player outright');
+    assert.equal(player.connected, false);
+    assert.equal(player.moving, false, 'a body with nobody driving it kept walking');
+    assert.ok(room.players.has(player.id));
+
+    // ...and it is every bit as shootable while it stands there.
+    const shooter = [...room.players.values()].find((p) => p.bot && p.alive);
+    room.applyDamage(player, shooter, 10, 'revolver', null);
+    assert.equal(player.health, 51, 'a disconnected body was invulnerable');
+
+    // Same tab, same token, back inside the grace.
+    const again = stubClient();
+    room.addConnection(again.client);
+    room.handleMessage(again.client, { t: 'join', name: 'Tester', token });
+    assert.equal(again.client.playerId, player.id, 'the token did not find the body');
+    assert.equal(player.connected, true);
+    assert.equal(player.role, role, 'came back as somebody else');
+    assert.deepEqual(again.last('cards').hand, hand, 'the hand did not come back');
+    assert.equal(again.last('role').role, role);
+    assert.equal(again.last('self').hp, 51, 'the health did not come back');
+  } finally { clock.restore(); }
+});
+
+test('a body nobody comes back for falls over on its own', () => {
+  const { room, clock, stub, me } = makeRoom({ bots: 6, prep: 1 });
+  try {
+    room.beginMatch();
+    tick(clock, room, 40);
+    freezeBots(room);
+    const player = me();
+    room.removeConnection(stub.client);
+    assert.equal(player.alive, true);
+
+    clock.advance((SOCIAL.reconnectGrace + 1) * 1000);
+    tick(clock, room, 2);
+    assert.equal(player.alive, false, 'the grace never ran out');
+  } finally { clock.restore(); }
+});
+
+test('a stranger cannot claim somebody else\'s body', () => {
+  const { room, clock, stub, me } = makeRoom({ bots: 6, prep: 1 });
+  try {
+    room.beginMatch();
+    tick(clock, room, 40);
+    const player = me();
+    room.removeConnection(stub.client);
+
+    const thief = stubClient();
+    room.addConnection(thief.client);
+    room.handleMessage(thief.client, { t: 'join', name: 'Thief', token: 'not-the-token' });
+    assert.notEqual(thief.client.playerId, player.id, 'a made up token took over a body');
+    assert.equal(player.connected, false, 'the real player lost their seat');
+  } finally { clock.restore(); }
+});
+
+test('reclaiming a seat wins the race against the old socket', () => {
+  const { room, clock, stub, me } = makeRoom({ bots: 6, prep: 1 });
+  try {
+    room.beginMatch();
+    tick(clock, room, 40);
+    freezeBots(room);
+    const player = me();
+    const token = player.token;
+    const role = player.role;
+
+    // The reload's new socket arrives BEFORE the browser's close for the old
+    // one - which is what actually happens about half the time.
+    const again = stubClient();
+    room.addConnection(again.client);
+    room.handleMessage(again.client, { t: 'join', name: 'Tester', token });
+    assert.equal(again.client.playerId, player.id, 'the seat went to a stranger');
+    assert.equal(player.role, role);
+    assert.equal(player.client, again.client, 'the body is still pointed at the dead socket');
+
+    // ...and the old socket closing afterwards must not take the body away.
+    room.removeConnection(stub.client);
+    assert.equal(player.alive, true, 'the stale close killed the reclaimed player');
+    assert.equal(player.connected, true);
+    assert.equal(player.client, again.client);
   } finally { clock.restore(); }
 });

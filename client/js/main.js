@@ -325,12 +325,15 @@ class Game {
         t: C.JOIN,
         name: $('nameInput').value.trim() || undefined,
         character: this.character,
+        // A refresh in the same tab reclaims the body it left standing in the
+        // street. sessionStorage on purpose: a new tab is a new player.
+        token: readToken(),
         ...this.joinIntent,
       });
     };
     this.ws.onclose = () => {
       if (this.switching) return;               // we closed it on purpose
-      this.hud.setStatus('connection lost — refresh to ride again');
+      this.hud.setStatus('connection lost — refresh, your body is still standing');
     };
     this.ws.onerror = () => this.hud.setStatus('connection error');
     this.ws.onmessage = (e) => {
@@ -350,6 +353,8 @@ class Game {
   switchRoom(intent) {
     if (this.inGame) { this.hud.setStatus('finish this round before changing towns'); return; }
     this.joinIntent = intent;
+    // A new town means a new body; the old token belongs to the room we left.
+    try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* nothing to do */ }
     this.roomCode = null;
     this.selfId = null;
     this.switching = true;
@@ -374,6 +379,7 @@ class Game {
     switch (msg.t) {
       case S.WELCOME:
         if (msg.selfId) this.selfId = msg.selfId;
+        if (msg.token) writeToken(msg.token);
         this.setRoom(msg);
         break;
       case S.LOBBY: this.hud.setLobby(msg); break;
@@ -1098,6 +1104,14 @@ class Game {
     };
     requestAnimationFrame(loop);
   }
+}
+
+const TOKEN_KEY = 'hnh.token';
+function readToken() {
+  try { return sessionStorage.getItem(TOKEN_KEY) || undefined; } catch { return undefined; }
+}
+function writeToken(token) {
+  try { sessionStorage.setItem(TOKEN_KEY, token); } catch { /* nothing to do */ }
 }
 
 function parseRoomFromUrl() {

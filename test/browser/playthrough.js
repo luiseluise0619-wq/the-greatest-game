@@ -33,7 +33,7 @@ const server = spawn('node', ['server/index.js'], {
     ...process.env, PORT: String(PORT), HNH_TELEMETRY: '0',
     // Short enough that one run reaches the aftermath screen, which is the
     // only place the round's cards are ever named.
-    HNH_PREP: '6', HNH_COMBAT: '26', HNH_ENDGAME: '8', HNH_RESULTS: '45',
+    HNH_PREP: '5', HNH_COMBAT: '70', HNH_ENDGAME: '8', HNH_RESULTS: '45',
   },
   stdio: ['ignore', 'ignore', 'pipe'],
 });
@@ -187,6 +187,26 @@ try {
 
   const bState = await B.evaluate(() => ({ inGame: window.game.inGame, role: !!window.game.selfRole }));
   check(bState.inGame && bState.role, 'the second player is in the same round');
+
+  // A refresh mid-round must give the same body back, not a fresh stranger.
+  const bBefore = await B.evaluate(() => ({
+    id: window.game.selfId,
+    role: window.game.selfRole?.role,
+    hand: window.game.hud.hand.slice(),
+  }));
+  await B.reload({ waitUntil: 'domcontentloaded' });
+  const bBack = await B.waitForFunction(() => window.game?.selfRole && window.game.inGame, null, { timeout: 30000 })
+    .then(() => true).catch(() => false);
+  const bAfter = await B.evaluate(() => ({
+    id: window.game.selfId,
+    role: window.game.selfRole?.role,
+    hand: window.game.hud.hand.slice(),
+    phase: window.game.phase,
+  }));
+  check(bBack && bAfter.id === bBefore.id && bAfter.role === bBefore.role,
+    `a refresh reclaims the same body (${bBefore.role} -> ${bAfter.role || 'lost'}, phase ${bAfter.phase || '?'})`);
+  check(bBack && JSON.stringify(bAfter.hand) === JSON.stringify(bBefore.hand),
+    'the hand comes back with it');
 
   // Ride the round out: the aftermath screen is where every silent card is
   // finally named, and nothing else in this suite ever reaches it.

@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 68 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 72 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 ```
 
@@ -111,6 +111,13 @@ position carries a little slop, so it is a direction rather than a pin. Running
 carries about 30m, walking 22m, and crouching drops it to 9m, which is the
 counterplay. The Lookout's boots carry barely half as far as anybody's, which is
 that character's whole passive.
+
+**Leaving is not free, and a refresh is not leaving.** Disconnect mid-round and
+your body stays standing in the street — silent, unmoving and every bit as
+shootable as it was. Come back in the same tab within 25 seconds and it is yours
+again, with your role, your hand, your health and your position intact. Nobody
+comes back for it and it falls over where it stands, because a player who simply
+vanished would take the round's evidence with them.
 
 **The dead talk only to the dead.** Dying does not turn you into a spotter for
 whoever is still alive.
@@ -420,7 +427,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 68 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 72 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -432,7 +439,9 @@ They are grouped by what they protect:
   Sheriff who walked out during prep), the dust storm hurts outside the ring and
   not inside it, and the information rules hold: an unwitnessed kill names
   nobody, the victim always learns their killer, a death replay carries only two
-  people, and the dead cannot talk to the living.
+  people, the dead cannot talk to the living, and a refresh reclaims the same
+  body — including when the reload's new socket beats the old one's close, which
+  is what actually happens about half the time.
 - **`test/cards.test.js`** — the deck, and the footstep channel it sits next to:
   a step is heard nearby, never carries a name, lands a little off where the
   walker really is, does not carry across town, dies when they crouch, and comes

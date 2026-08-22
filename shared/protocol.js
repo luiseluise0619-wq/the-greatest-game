@@ -3,7 +3,6 @@
 // client -> server
 export const C = {
   JOIN: 'join',
-  READY: 'ready',
   INPUT: 'input',
   SHOOT: 'shoot',
   RELOAD: 'reload',

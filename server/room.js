@@ -9,14 +9,14 @@ import {
   PLAYER, WEAPONS, DYNAMITE, WEAPON_ORDER, ROLES, PHASE, TIMING, ENDGAME,
   SOCIAL, HITBOX, CHARACTERS, GAMBLER_BOONS, LOOT_RESPAWN, VOICE_LINES, VISION, REPLAY,
   CARDS, CARD_ORDER, CARD_DEAL,
-  TICK_MS, MIN_PLAYERS, MAX_PLAYERS, rolesForPlayerCount, clamp,
-  stepStamina, canSprint,
+  MIN_PLAYERS, MAX_PLAYERS, rolesForPlayerCount, clamp, stepStamina,
 } from '../shared/constants.js';
 import MAP, { zoneAt, SPAWNS, LOOT_SPAWNS } from '../shared/map.js';
 import { raycastWorld, rayPlayerBox, lineOfSight, moveAndCollide } from '../shared/collision.js';
 import { C, S } from '../shared/protocol.js';
 import { BotBrain, BOT_NAMES } from './bots.js';
 import { telemetry } from './telemetry.js';
+import { randomUUID } from 'node:crypto';
 
 const now = () => Date.now() / 1000;
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -77,10 +77,11 @@ export class Room {
     return client;
   }
 
-  welcomeMsg(selfId = null) {
+  welcomeMsg(selfId = null, token = null) {
     return {
       t: S.WELCOME,
       selfId,
+      token,
       map: MAP.name,
       phase: this.phase,
       maxPlayers: MAX_PLAYERS,
@@ -106,11 +107,19 @@ export class Room {
       telemetry.sessionEnd(p, now() - (p.joinedAt || now()));
       if (this.phase === PHASE.LOBBY || this.phase === PHASE.RESULTS) {
         this.players.delete(p.id);
-      } else {
-        // Mid-match disconnects leave a corpse so the deduction state stays honest.
+      } else if (p.alive) {
+        // Mid-match, the body stays: standing in the street, silent, and every
+        // bit as shootable as it was. Come back inside the grace and it is
+        // yours again; do not, and it falls over where it stands, because a
+        // vanishing player would take the round's evidence with them.
         p.connected = false;
-        if (p.alive) this.killPlayer(p, null, 'left', null);
-        else this.players.delete(p.id);
+        p.client = null;
+        p.disconnectedAt = now();
+        p.moving = false;
+        p.sprint = false;
+        p.vel = { x: 0, y: 0, z: 0 };
+      } else {
+        this.players.delete(p.id);
       }
       this.pushLobby();
     }
@@ -146,6 +155,8 @@ export class Room {
       bot: !!opts.bot,
       client: opts.client || null,
       connected: true,
+      token: randomUUID(),      // lets one tab reclaim this body after a refresh
+      disconnectedAt: 0,
       character,
       role: null,
       faction: null,
@@ -227,6 +238,27 @@ export class Room {
 
   onJoin(client, msg) {
     if (client.playerId) return;
+
+    // A refresh is not a decision to leave. If this tab still has the token for
+    // a body in this town, give it back.
+    //
+    // Deliberately not conditional on the old socket having been reaped first:
+    // a reload opens the new connection before the browser's close reaches us
+    // about half the time, and the loser of that race would be handed a
+    // stranger's body instead of their own. A token owns exactly one seat, so
+    // claiming it evicts whoever is sitting in it.
+    if (msg.token) {
+      const back = [...this.players.values()].find((o) => !o.bot && o.token === msg.token);
+      if (back) {
+        const stale = back.client;
+        if (stale && stale !== client) {
+          stale.playerId = null;        // so its close does not take the body with it
+          try { stale.ws.close(4000, 'seat reclaimed'); } catch { /* already gone */ }
+        }
+        return this.resumePlayer(client, back);
+      }
+    }
+
     const humans = [...this.players.values()].filter((p) => !p.bot).length;
     if (humans >= MAX_PLAYERS) {
       return this.send(client, { t: S.ERROR, msg: 'Town is full - 8 guns is the limit.' });
@@ -239,7 +271,7 @@ export class Room {
     p.joinedAt = now();
     client.playerId = p.id;
     this.players.set(p.id, p);
-    this.send(client, this.welcomeMsg(p.id));
+    this.send(client, this.welcomeMsg(p.id, p.token));
     this.sendPhaseTo(client);
 
     // A human joining mid-match takes over the quietest bot so they play now,
@@ -254,14 +286,42 @@ export class Room {
         bot.name = p.name;
         bot.character = p.character;
         client.playerId = bot.id;
-        this.send(client, this.welcomeMsg(bot.id));
+        bot.token = randomUUID();
+        bot.connected = true;
+        this.send(client, this.welcomeMsg(bot.id, bot.token));
         this.sendRole(bot);
+        this.pushCards(bot);
+        this.pushSelf(bot);
         this.sendPhaseTo(client);
         this.pushLobby();
         return;
       }
     }
     this.pushLobby();
+  }
+
+  /** Hand a reconnecting tab its own body back, exactly where it left it. */
+  resumePlayer(client, p) {
+    p.connected = true;
+    p.client = client;
+    p.disconnectedAt = 0;
+    p.lastInputAt = now();
+    p.moveSlack = PLAYER.serverSlack;
+    client.playerId = p.id;
+
+    this.send(client, this.welcomeMsg(p.id, p.token));
+    if (p.role) this.sendRole(p);       // also snaps the camera back to the body
+    this.pushCards(p);
+    this.sendPhaseTo(client);
+    this.pushSelf(p);
+    this.pushLobby();
+    this.emit(p, {
+      t: S.FEED,
+      text: p.alive
+        ? 'You are back. Your body never left the street - hope nobody used the quiet.'
+        : 'You are back, and still dead.',
+      tone: 'system',
+    });
   }
 
   onAddBot(p, msg) {
@@ -1418,6 +1478,10 @@ export class Room {
   stepPlayers(t, dt) {
     this.recordHistory(t);
     for (const p of this.players.values()) {
+      // Nobody came back for this one.
+      if (!p.bot && !p.connected && p.alive && t - p.disconnectedAt > SOCIAL.reconnectGrace) {
+        this.killPlayer(p, null, 'left', null);
+      }
       if (!p.alive) continue;
 
       if (p.reloading && t >= p.reloading.until) this.finishReload(p);
