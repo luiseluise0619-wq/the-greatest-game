@@ -104,6 +104,22 @@ function buildHat(cfg, hatMat, accentMat) {
   return g;
 }
 
+/**
+ * How readable somebody's name is from here.
+ *
+ * The dust cloud is the whole reason this is a function: it drops a player's
+ * body to 42% opacity, and a floating name tag at full strength over the top of
+ * that gave the boon away completely - you could not see the man but you could
+ * read his name. In a game about not knowing who somebody is, the dust takes
+ * the name with it.
+ */
+export const TAG_RANGE = 34;
+
+export function tagOpacity(dist, dusty, maxDist = TAG_RANGE) {
+  if (dusty) return 0;
+  return Math.max(0, Math.min(1, (maxDist - dist) / 10));
+}
+
 /** Coat/duster/apron: a flared surface of revolution hanging from the waist. */
 function buildCoat(look, mat) {
   const len = look.coatLen, flare = look.coatFlare;
@@ -600,8 +616,9 @@ export class PlayerView {
     }
     if (camera) {
       const d = camera.position.distanceTo(this.root.position);
-      this.tag.visible = d < 34;
-      this.tag.material.opacity = Math.max(0, Math.min(1, (34 - d) / 10));
+      const op = tagOpacity(d, dusty);
+      this.tag.visible = op > 0;
+      this.tag.material.opacity = op;
       this.tag.position.y = 2.15 - pose.crouch * 0.42;
     }
   }

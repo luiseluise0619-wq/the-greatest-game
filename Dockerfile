@@ -11,6 +11,13 @@ COPY shared ./shared
 COPY server ./server
 COPY client ./client
 
+# Telemetry appends to ./data. The process runs as `node`, so the directory has
+# to exist and be writable by it - otherwise the server starts, warns, and
+# quietly turns the playtest readout off, which is the one thing you deployed
+# it to collect. Mount a volume here to keep it across restarts.
+RUN mkdir -p /app/data && chown -R node:node /app/data
+VOLUME ["/app/data"]
+
 ENV NODE_ENV=production
 ENV PORT=8080
 EXPOSE 8080

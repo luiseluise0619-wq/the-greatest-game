@@ -270,7 +270,7 @@ export const GAMBLER_BOONS = [
   { id: 'armour', label: 'IRON PLATE - damage soaked', armour: 45, duration: 12 },
   { id: 'ammo', label: 'FULL BELT - every gun loaded', duration: 0 },
   { id: 'damage', label: 'HOT STREAK - shots bite deeper', damageMult: 1.35, duration: 8 },
-  { id: 'dust', label: 'DUST DEVIL - harder to see', dust: true, duration: 7 },
+  { id: 'dust', label: 'DUST DEVIL - no name, no clear shape', dust: true, duration: 7 },
   { id: 'bust', label: 'BUSTED - the deck was cold', duration: 0 },
 ];
 

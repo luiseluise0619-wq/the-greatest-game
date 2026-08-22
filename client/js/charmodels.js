@@ -12,8 +12,27 @@
 // A model with neither still loads; it just stands there and slides.
 
 import * as THREE from 'three';
-import { GLTFLoader } from '/vendor/jsm/loaders/GLTFLoader.js';
-import { clone as cloneSkinned } from '/vendor/jsm/utils/SkeletonUtils.js';
+
+// The loader and the skinned-mesh cloner are pulled in on demand rather than at
+// module load. Almost nobody configures glTF models - the game ships none - so
+// this is two fetches everyone else does not make, and it keeps this module
+// importable outside a browser, which is what lets the render helpers next door
+// be unit tested at all.
+let GLTFLoader = null;
+let cloneSkinned = null;
+async function loadAddons() {
+  if (GLTFLoader && cloneSkinned) return true;
+  try {
+    [{ GLTFLoader }, { clone: cloneSkinned }] = await Promise.all([
+      import('/vendor/jsm/loaders/GLTFLoader.js'),
+      import('/vendor/jsm/utils/SkeletonUtils.js'),
+    ]);
+    return true;
+  } catch (err) {
+    console.warn('[models] could not load the glTF addons - staying procedural', err);
+    return false;
+  }
+}
 
 const CONFIG_URL = '/client/models/characters.json';
 
@@ -42,6 +61,7 @@ export function initCharacterModels() {
     const entries = Object.entries(config || {}).filter(([k]) => !k.startsWith('$'));
     if (!entries.length) return;
 
+    if (!await loadAddons()) return;
     const loader = new GLTFLoader();
     await Promise.all(entries.map(async ([character, cfg]) => {
       if (!cfg || !cfg.url) return;

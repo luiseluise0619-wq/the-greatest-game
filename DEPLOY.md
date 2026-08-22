@@ -27,6 +27,18 @@ docker run -p 8080:8080 highnoonhollow
 The image is Node 22 Alpine with production dependencies only. `PORT` is
 respected, so most hosts need no configuration at all.
 
+Telemetry appends to `/app/data`, which the image creates and owns and declares
+as a volume. Mount something there if you want the playtest log to survive a
+restart:
+
+```
+docker run -p 8080:8080 -v hnh-data:/app/data highnoonhollow
+```
+
+Without a mount it still works, it just starts empty each deploy. Set
+`HNH_TELEMETRY=0` to turn the whole thing off, or `HNH_TELEMETRY_DIR` to write
+somewhere else.
+
 `GET /healthz` returns live state and is wired to the container healthcheck:
 
 ```json
@@ -143,5 +155,9 @@ game is fun. It matters the moment strangers are competing for anything.
 While you are playtesting, `GET /stats` is worth more than your memory of it:
 
 ```
-curl -s https://your-host/stats | jq '.witnessedKillShare, .accusationsPerMatch, .wins'
+curl -s https://your-host/stats | jq '.witnessedKillShare, .cardPlayRate, .wins'
 ```
+
+`witnessedKillShare` is the headline: if almost every kill is witnessed the map
+has no secrets, and if almost none are, nobody can ever learn anything.
+`cardPlayRate` is the deck's: below about half and it is decoration.
