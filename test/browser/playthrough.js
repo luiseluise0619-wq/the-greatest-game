@@ -144,6 +144,39 @@ try {
   });
   check(churn && churn.grew === 0, `loot churn allocates nothing (${churn ? `+${churn.grew} geometries` : 'no loot'})`);
 
+  // Every key that can do nothing has to say so. A silent no-op reads as a
+  // dropped input rather than a rule the player has not learned yet.
+  const denials = await A.evaluate(async () => {
+    const g = window.game;
+    let denied = 0;
+    const realDeny = g.audio.deny.bind(g.audio);
+    g.audio.deny = () => { denied += 1; realDeny(); };
+    const sent = [];
+    const realSend = g.send.bind(g);
+    g.send = (m) => { sent.push(m.t); realSend(m); };
+
+    g.self.cd = 9;              // ability on cooldown
+    g.tryAbility();
+    const abilityQuiet = !sent.includes('ability');
+
+    g.self.dyn = 0;             // no dynamite to throw
+    g.tryThrow();
+    const throwQuiet = !sent.includes('throw');
+
+    g.lastCardAt = performance.now() / 1000;   // a card a moment ago
+    const before = g.hud.hand.length;
+    g.playCard(0);
+    const cardQuiet = !sent.includes('card') && g.hud.hand.length === before;
+
+    g.audio.deny = realDeny;
+    g.send = realSend;
+    g.self.cd = 0;
+    g.lastCardAt = 0;
+    return { denied, abilityQuiet, throwQuiet, cardQuiet };
+  });
+  check(denials.abilityQuiet && denials.throwQuiet && denials.cardQuiet && denials.denied === 3,
+    `keys that cannot fire say so instead of nothing (${denials.denied}/3 refused out loud)`);
+
   // Swapping a weapon has to lock the trigger on the client too, or the first
   // clicks after a swap flash and bang and the server drops every one of them.
   const swap = await A.evaluate(async () => {

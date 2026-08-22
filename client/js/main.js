@@ -8,8 +8,8 @@ import * as THREE from 'three';
 import MAP from '../../shared/map.js';
 import { moveAndCollide } from '../../shared/collision.js';
 import {
-  PLAYER, WEAPONS, PHASE, VOICE_LINES, ENDGAME, REPLAY, CARD_ORDER, INPUT_RATE, clamp,
-  stepStamina, canSprint, swapTime,
+  PLAYER, WEAPONS, PHASE, VOICE_LINES, ENDGAME, REPLAY, CARD_ORDER, INPUT_RATE, SOCIAL,
+  clamp, stepStamina, canSprint, swapTime,
 } from '../../shared/constants.js';
 import { C, S } from '../../shared/protocol.js';
 import { buildWorld, animateWorld } from './world.js';
@@ -721,6 +721,8 @@ class Game {
     this.self.alive = true;
     this.self.vel.set(0, 0, 0);
     this.self.stamina = PLAYER.staminaMax;
+    this.lastCardAt = 0;
+    this.lastAccuseAt = 0;
     this.audio.init();
     this.audio.resume();
     // No pointer lock yet - the role card is up and the player needs a cursor.
@@ -840,7 +842,7 @@ class Game {
         case 'Digit1': this.swapTo('revolver'); break;
         case 'Digit2': this.swapTo('shotgun'); break;
         case 'Digit3': this.swapTo('rifle'); break;
-        case 'KeyQ': this.send({ t: C.ABILITY }); break;
+        case 'KeyQ': this.tryAbility(); break;
         case 'KeyE': this.tryPickup(); break;
         case 'KeyG': this.tryThrow(); break;
         case 'KeyF': this.tryAccuse(); break;
@@ -883,8 +885,13 @@ class Game {
   playCard(i) {
     const id = this.hud.hand[i];
     if (!id || !this.self.alive) { this.audio.deny(); return; }
-    // No sound yet: the server may refuse this (a Wanted Poster with nobody in
-    // the crosshair), and the flick belongs to the card actually leaving.
+    // Two cards in the same breath is a rule, not a dropped keypress.
+    const now = performance.now() / 1000;
+    if (now - (this.lastCardAt || 0) < SOCIAL.cardCooldown) { this.audio.deny(); return; }
+    this.lastCardAt = now;
+    // No sound for the play itself yet: the server may refuse it (a Wanted
+    // Poster with nobody in the crosshair), and the flick belongs to the card
+    // actually leaving the hand.
     this.send({ t: C.CARD, card: id });
   }
 
@@ -892,6 +899,15 @@ class Game {
     const near = this.effects.nearestLoot(this.camera.position, 2.6);
     if (near) this.send({ t: C.PICKUP, id: near.id });
     else this.audio.deny();
+  }
+
+  /**
+   * The cooldown ring is on screen, but a key that does nothing and makes no
+   * sound reads as a dropped input rather than a rule.
+   */
+  tryAbility() {
+    if (!this.self.alive || this.self.cd > 0) { this.audio.deny(); return; }
+    this.send({ t: C.ABILITY });
   }
 
   tryThrow() {
@@ -908,8 +924,13 @@ class Game {
   }
 
   tryAccuse() {
+    const now = performance.now() / 1000;
     const target = this.playerInCrosshair(60);
-    if (!target) { this.audio.deny(); return; }
+    if (!target || !this.self.alive || now - (this.lastAccuseAt || 0) < SOCIAL.accuseCooldown) {
+      this.audio.deny();
+      return;
+    }
+    this.lastAccuseAt = now;
     this.send({ t: C.ACCUSE, target: target.id });
   }
 
