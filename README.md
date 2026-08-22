@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 51 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 54 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 ```
 
@@ -400,7 +400,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 51 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 54 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -408,9 +408,11 @@ They are grouped by what they protect:
   nav graph is one connected town with no orphan nodes, weapons are internally
   consistent, and every role table adds up.
 - **`test/match.test.js`** — roles are dealt correctly, guns are inert during
-  preparation, each faction's win condition fires, and the information rules
-  hold: an unwitnessed kill names nobody, the victim always learns their killer,
-  a death replay carries only two people, and the dead cannot talk to the living.
+  preparation, each faction's win condition fires (including at the bell, for a
+  Sheriff who walked out during prep), the dust storm hurts outside the ring and
+  not inside it, and the information rules hold: an unwitnessed kill names
+  nobody, the victim always learns their killer, a death replay carries only two
+  people, and the dead cannot talk to the living.
 - **`test/cards.test.js`** — the deck. Mostly assertions about *absent*
   information: a Rain Barrel that must swallow the shooter's hitmarker as well as
   the bullet, a bought kill that reaches neither the town, the victim nor the
@@ -457,11 +459,12 @@ won by information. The knobs that control that balance, if you want to move it:
 - `ROLE_TABLE` — faction counts per table size.
 - `TIMING` — phase lengths (or the `HNH_*` env overrides).
 
-Balance across 24 headless bot-only rounds currently sits at 14 Outlaw / 9 Law /
-1 Renegade, with the first death about a minute in. Round length is strongly
-**bimodal** — either somebody finds the Sheriff inside two minutes or nothing is
-resolved and the storm decides it — so the mean (around 280s) says much less than
-that shape does, and anything under about twenty rounds is noise.
+Balance across 20 headless bot-only rounds currently sits at 10 Law / 9 Outlaw /
+1 Renegade, with the first death about a minute in, and roughly one death in six
+now belongs to the dust storm. Round length is strongly **bimodal** — either
+somebody finds the Sheriff inside two minutes or nothing is resolved and the
+storm decides it — so the mean (around 360s) says much less than that shape does,
+and anything under about twenty rounds is noise.
 
 Bots play roughly a third of the cards they are dealt. Running the same sim with
 every hand emptied moves neither the win split (16/6/2) nor the pace (first death

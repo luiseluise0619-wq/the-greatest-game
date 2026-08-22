@@ -171,6 +171,7 @@ export class Room {
       armed: new Set(),         // cards played and waiting on a trigger
       cardsPlayed: [],
       barrelUntil: 0,           // still soaking the rest of one burst
+      dmgCarry: 0,              // sub-point damage waiting to add up
       noPrintsUntil: 0,
       glassUntil: 0,
       glassMarks: new Map(),    // id -> until: shooters the Long Glass has lit up
@@ -488,7 +489,15 @@ export class Room {
       victim.armour -= soaked;
       dmg -= soaked;
     }
-    dmg = Math.round(dmg);
+
+    // Carry the fraction instead of rounding it away. Without this any source
+    // that deals less than half a point per call is silently free: the dust
+    // storm ticks 9 dps at 20Hz, which is 0.45 a tick, which rounded to zero -
+    // the whole endgame was cosmetic.
+    dmg += victim.dmgCarry || 0;
+    const whole = Math.floor(dmg);
+    victim.dmgCarry = dmg - whole;
+    dmg = whole;
     if (dmg <= 0) return;
 
     victim.health -= dmg;
@@ -1096,6 +1105,7 @@ export class Room {
       p.armed = new Set();
       p.cardsPlayed = [];
       p.barrelUntil = 0;
+      p.dmgCarry = 0;
       p.noPrintsUntil = 0;
       p.glassUntil = 0;
       p.glassMarks = new Map();
@@ -1199,6 +1209,11 @@ export class Room {
     if (phase === PHASE.COMBAT) {
       this.broadcast({ t: S.FEED, text: 'The bell rings. Nothing is holstered now.', tone: 'system' });
       this.broadcast({ t: S.SOUND, sound: 'bell' });
+      // Somebody can leave during preparation - the Sheriff, even - and their
+      // corpse settles a faction's win condition before a shot is fired.
+      // checkVictory only runs from a kill, and it ignores the prep phase, so
+      // without this the round would run on until the next death.
+      this.checkVictory();
     }
     if (phase === PHASE.ENDGAME) {
       this.broadcast({ t: S.FEED, text: 'A dust storm closes on the town square. Get in or choke.', tone: 'bad' });

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
-import { PHASE, TIMING, ROLES, PLAYER } from '../shared/constants.js';
+import { PHASE, TIMING, ROLES, PLAYER, ENDGAME } from '../shared/constants.js';
 
 const { Room } = await import('../server/room.js');
 
@@ -185,5 +185,61 @@ test('the dead cannot talk to the living', () => {
     other.reset();
     room.onChat(player, { text: 'still breathing' });
     assert.equal(other.of('chat').length, 1, 'living chat should reach everyone');
+  } finally { clock.restore(); }
+});
+
+test('the dust storm actually hurts, a fraction of a point at a time', () => {
+  const { room, clock, me } = makeRoom({ bots: 6, prep: 1, combat: 2 });
+  try {
+    room.beginMatch();
+    tick(clock, room, 80);                       // through prep and combat
+    assert.equal(room.phase, PHASE.ENDGAME);
+    freezeBots(room);
+    const player = me();
+    player.alive = true;
+    player.health = player.maxHealth;
+    // Well outside the ring at its widest, and kept there.
+    const far = ENDGAME.startRadius + 40;
+    const hold = () => { player.pos = { x: far, y: 0, z: 0 }; };
+    hold();
+    const before = player.health;
+    for (let i = 0; i < 40; i++) { hold(); tick(clock, room, 1); }   // two seconds
+
+    const lost = before - player.health;
+    // 9 dps for 2s. Rounding each 0.45 tick to zero used to make this exactly 0.
+    assert.ok(lost >= 14, `the storm did almost nothing (${lost} damage in 2s)`);
+    assert.ok(lost <= 24, `the storm hit far too hard (${lost} damage in 2s)`);
+  } finally { clock.restore(); }
+});
+
+test('standing inside the ring costs nothing', () => {
+  const { room, clock, me } = makeRoom({ bots: 6, prep: 1, combat: 2 });
+  try {
+    room.beginMatch();
+    tick(clock, room, 80);
+    freezeBots(room);
+    const player = me();
+    player.alive = true;
+    player.health = player.maxHealth;
+    const hold = () => { player.pos = { x: 0, y: 0, z: 0 }; };
+    hold();
+    for (let i = 0; i < 40; i++) { hold(); tick(clock, room, 1); }
+    assert.equal(player.health, player.maxHealth, 'the storm reached inside the ring');
+  } finally { clock.restore(); }
+});
+
+test('a Sheriff who walks out during preparation settles it at the bell', () => {
+  const { room, clock } = makeRoom({ bots: 8, prep: 1 });
+  try {
+    room.beginMatch();
+    const sheriff = [...room.players.values()].find((p) => p.role === 'sheriff');
+    // Leaving mid-round leaves a corpse; during prep nothing checks it.
+    room.killPlayer(sheriff, null, 'left', null);
+    assert.equal(room.phase, PHASE.PREP, 'prep should not end on a death');
+    assert.equal(room.results, null);
+
+    tick(clock, room, 40);              // ring the bell
+    assert.equal(room.phase, PHASE.RESULTS, 'the round ran on with a dead Sheriff');
+    assert.equal(room.results.winner, 'outlaw');
   } finally { clock.restore(); }
 });
