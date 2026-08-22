@@ -347,6 +347,7 @@ client/     js/main.js    networking, local movement, input, render loop
             js/audio.js   every sound synthesised in WebAudio, no files
             js/hud.js     HUD, feed, role card, your hand, scoreboard, results
             js/cardart.js the printing press: every card face drawn onto a canvas
+            proof/        /proof/ - the deck at full size, for tuning cardart.js
 ```
 
 **Authority split.** Movement is simulated on the client and speed-clamped by the
@@ -413,6 +414,12 @@ They are grouped by what they protect:
 - **`test/security.test.js`** — what a lying client cannot do: teleport, walk
   through a wall, end up inside geometry, be told about players it cannot see, or
   learn the name of a shooter it could not have seen.
+
+`npm run test:browser` drives a real Chromium through a whole round with two
+players — lobby, room codes, the deck printed face up, the role card, the hand
+dealt and a card played, and on to the aftermath screen where the round's cards
+are finally named — checking for console errors and server noise the whole way.
+It needs `playwright` installed and skips cleanly if it is not there.
 
 They found real bugs while being written, which is the point: a spawn buried in
 the mine hillside, a porch post planted dead-centre in the saloon's front

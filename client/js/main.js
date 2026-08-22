@@ -302,6 +302,9 @@ class Game {
         if ((msg.phase === PHASE.PREP || msg.phase === PHASE.COMBAT || msg.phase === PHASE.ENDGAME) && !this.inGame) {
           this.enterGame();
         }
+        // The bell is the last moment a hand can still be sitting face down:
+        // a player who never dismissed the role card gets it turned over now.
+        if (msg.phase === PHASE.COMBAT) this.hud.playDealAnimation();
         if (msg.phase === PHASE.RESULTS) this.exitToResults();
         if (msg.phase === PHASE.LOBBY) { this.inGame = false; this.hud.showMenu(true); this.hud.hideResults(); document.exitPointerLock?.(); }
         this.ringMesh.visible = msg.phase === PHASE.ENDGAME;

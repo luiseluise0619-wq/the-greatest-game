@@ -236,7 +236,9 @@ export class HUD {
     // A brand new hand arrives while the role card is still covering the screen,
     // so it is dealt face down and held until the player takes the reins.
     const fresh = (!prev || !prev.length) && this.hand.length > 0;
-    if (fresh) this.pendingDeal = true;
+    // Only a fresh deal is laid out face down. Anything else - a card played,
+    // a card armed - redraws face up, and cancels a deal that never got shown.
+    this.pendingDeal = fresh;
 
     const el = $('handStrip');
     const keys = ['Z', 'X'];
@@ -250,8 +252,8 @@ export class HUD {
       d.title = `${c.name} — ${c.desc}`;
       d.style.setProperty('--i', String(i));
       d.style.setProperty('--n', String(this.hand.length));
-      d.innerHTML = `<div class="flip"><img src="${this.pendingDeal ? cardUrl('back') : face}"
-        alt="${escapeHtml(this.pendingDeal ? 'face down' : c.name)}"></div><b>${keys[i] || ''}</b>`;
+      d.innerHTML = `<div class="flip"><img src="${fresh ? cardUrl('back') : face}"
+        alt="${escapeHtml(fresh ? 'face down' : c.name)}"></div><b>${keys[i] || ''}</b>`;
       d.querySelector('img').dataset.face = face;
       d.dataset.name = c.name;
       el.appendChild(d);
@@ -298,6 +300,8 @@ export class HUD {
 
   /** The card you just played, held up long enough to be read, then flicked away. */
   flourish(id) {
+    this.lastFlourish = id;          // read by the browser suite, which cannot
+                                     // reliably catch a 1.7s animation mid-flight
     const box = $('cardPlay');
     const c = CARDS[id];
     box.innerHTML = `<img src="${cardUrl(id)}" alt="${escapeHtml(c.name)}">`;

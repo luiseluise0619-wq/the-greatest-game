@@ -29,7 +29,12 @@ const CARD_NAMES = {
 };
 
 const server = spawn('node', ['server/index.js'], {
-  env: { ...process.env, PORT: String(PORT), HNH_PREP: '10', HNH_COMBAT: '90', HNH_TELEMETRY: '0' },
+  env: {
+    ...process.env, PORT: String(PORT), HNH_TELEMETRY: '0',
+    // Short enough that one run reaches the aftermath screen, which is the
+    // only place the round's cards are ever named.
+    HNH_PREP: '6', HNH_COMBAT: '26', HNH_ENDGAME: '8', HNH_RESULTS: '45',
+  },
   stdio: ['ignore', 'ignore', 'pipe'],
 });
 const serverErrors = [];
@@ -69,8 +74,10 @@ try {
 
   // The whole deck is printed face up in the lobby; if cardart.js is broken
   // this is the first place it shows.
+  // Printed one per idle slice, so this is generous: on a loaded machine with
+  // software rendering the six faces can take a while to come off the press.
   const deck = await A.waitForFunction(() => document.querySelectorAll('#deckStrip img').length === 6,
-    null, { timeout: 15000 }).then(() => 6).catch(() => -1);
+    null, { timeout: 40000 }).then(() => 6).catch(() => -1);
   check(deck === 6, `the deck is on show in the lobby (${deck} faces)`);
 
   const code = (await A.textContent('#roomCode')).trim();
@@ -116,22 +123,31 @@ try {
   // without a word of it reaching the other player's screen.
   const handBefore = await A.evaluate(() => window.game.hud.hand.slice());
   const bFeedBefore = await B.evaluate(() => document.getElementById('feed').textContent);
-  await A.keyboard.press('KeyZ');
   // Wait for the server's answer rather than a fixed pause: the Wanted Poster
   // is refused with nobody in the crosshair, and that is a correct outcome too.
-  const spent = await A.waitForFunction(() => window.game.hud.hand.length < 2, null, { timeout: 4000 })
-    .then(() => true).catch(() => false);
+  // Two attempts, because a keypress can land while the page is mid-frame and
+  // this browser renders in software.
+  let spent = false;
+  for (let attempt = 0; attempt < 3 && !spent; attempt++) {
+    await A.keyboard.press('KeyZ');
+    spent = await A.waitForFunction(() => window.game.hud.hand.length < 2, null, { timeout: 9000 })
+      .then(() => true).catch(() => false);
+  }
   const handAfter = await A.evaluate(() => ({ hand: window.game.hud.hand.slice(), armed: window.game.hud.armed.slice() }));
   check(handBefore.length === 2, `hand starts full (${handBefore.length})`);
   check(spent || handBefore[0] === 'poster',
     `playing a card spends it (${handAfter.hand.length} left, ${handBefore[0]})`);
   const chips = await A.evaluate(() => document.querySelectorAll('#handStrip .cardChip').length);
   check(chips === handAfter.hand.length + handAfter.armed.length, `the hand strip matches the hand (${chips} chips)`);
-  const flourish = await A.evaluate(() => {
-    const el = document.getElementById('cardPlay');
-    return { shown: !el.classList.contains('hidden'), img: !!el.querySelector('img') };
-  });
-  check(!spent || (flourish.shown && flourish.img), 'the played card is held up on screen');
+  // The flourish is a 1.7s animation, which this browser cannot be relied on to
+  // still be showing by the time the next round trip lands - so ask the HUD what
+  // it held up rather than racing its own animation.
+  const flourish = await A.evaluate(() => ({
+    played: window.game.hud.lastFlourish || null,
+    img: !!document.querySelector('#cardPlay img'),
+  }));
+  check(!spent || (flourish.played === handBefore[0] && flourish.img),
+    `the played card is held up on screen (${flourish.played})`);
   await A.screenshot({ path: `${SHOTS}/03-card-played.png` });
   const bFeedAfter = await B.evaluate(() => document.getElementById('feed').textContent.toLowerCase());
   const aName = await A.evaluate(() => document.getElementById('nameInput').value || 'Stranger');
@@ -144,8 +160,44 @@ try {
     check(!bFeedAfter.includes(name), `a silent card stays silent for everyone else (${handBefore[0]})`);
   }
 
+  // Nothing in the hand may still be face down once the deal is over - the
+  // strip is re-rendered on every change and it must never re-deal the backs.
+  const faceDown = await A.evaluate(() => [...document.querySelectorAll('#handStrip .cardChip img')]
+    .filter((i) => i.dataset.face && i.src !== i.dataset.face).length);
+  check(faceDown === 0, `no card is left face down (${faceDown})`);
+
   const bState = await B.evaluate(() => ({ inGame: window.game.inGame, role: !!window.game.selfRole }));
   check(bState.inGame && bState.role, 'the second player is in the same round');
+
+  // Ride the round out: the aftermath screen is where every silent card is
+  // finally named, and nothing else in this suite ever reaches it.
+  const reachedResults = await A.waitForFunction(
+    () => !document.getElementById('results').classList.contains('hidden'),
+    null, { timeout: 90000 },
+  ).then(() => true).catch(() => false);
+  check(reachedResults, 'the round reaches the aftermath screen');
+  if (reachedResults) {
+    // Wait for the fade rather than sleeping through it: this page renders in
+    // software here, so a 250ms transition can take a couple of seconds of
+    // wall clock to commit.
+    const handAway = await A.waitForFunction(
+      () => getComputedStyle(document.getElementById('handStrip')).opacity === '0',
+      null, { timeout: 10000 },
+    ).then(() => true).catch(() => false);
+    const after = await A.evaluate(() => ({
+      rows: [...document.querySelectorAll('#resultTable tbody tr')].length,
+      roles: [...document.querySelectorAll('#resultTable tbody td.role')].map((t) => t.textContent.trim()).filter(Boolean).length,
+      faces: document.querySelectorAll('#resultTable .crdMini').length,
+      timelineCards: [...document.querySelectorAll('#timeline li.card')].length,
+      hudClass: document.getElementById('hud').className,
+    }));
+    check(after.rows >= 6, `everyone is on the table (${after.rows} rows)`);
+    check(after.roles === after.rows, `every role is revealed (${after.roles}/${after.rows})`);
+    check(after.faces >= 1, `the cards played are shown face up (${after.faces})`);
+    check(after.timelineCards >= 1, `the timeline names them (${after.timelineCards})`);
+    check(handAway && after.hudClass.includes('resultsUp'), 'the hand is put away for the aftermath');
+    await A.screenshot({ path: `${SHOTS}/04-aftermath.png` });
+  }
 
   check(serverErrors.length === 0, `server stayed quiet${serverErrors.length ? `: ${serverErrors[0]}` : ''}`);
   check(problems.length === 0 || problems.every((p) => !p.includes('console') && !p.includes(':')), 'no page errors');

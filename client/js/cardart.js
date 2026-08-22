@@ -279,7 +279,6 @@ const CUT = {
   // A water barrel with a fresh hole in it, still spouting.
   barrel(g, R) {
     const cx = 300, top = 268, bot = 566, hw = 116;
-    const side = (s) => (t) => cx + s * (hw - 18 * Math.sin(t * Math.PI) * -1) * 1;
     // Staves: bulging sides.
     const body = (c) => {
       c.moveTo(cx - hw + 16, top);
@@ -292,7 +291,7 @@ const CUT = {
     g.beginPath(); body(g); g.stroke();
 
     // Shading down the left flank and under the belly.
-    hatch(g, (c) => { body(c); }, 0.28, 7, 1.5, 0.55);
+    hatch(g, body, 0.28, 7, 1.5, 0.55);
     g.save();
     g.beginPath(); body(g); g.clip();
     g.fillStyle = 'rgba(255,255,255,1)';
