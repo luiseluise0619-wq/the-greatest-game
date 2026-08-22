@@ -2,7 +2,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
-import { PHASE, TIMING, ROLES, PLAYER, ENDGAME, SOCIAL } from '../shared/constants.js';
+import {
+  PHASE, TIMING, ROLES, PLAYER, ENDGAME, SOCIAL, MIN_PLAYERS, MAX_PLAYERS, CARD_DEAL,
+} from '../shared/constants.js';
 
 const { Room } = await import('../server/room.js');
 
@@ -508,4 +510,55 @@ test('one player cannot drag the whole town into the next round', () => {
     assert.equal(a.wantsAgain, false);
     assert.equal(b.wantsAgain, false);
   } finally { clock.restore(); }
+});
+
+test('somebody walking out of the aftermath does not strand the rest', () => {
+  const { room, clock, me } = makeRoom({ bots: 6, prep: 1, combat: 2 });
+  try {
+    const other = stubClient();
+    room.addConnection(other.client);
+    room.handleMessage(other.client, { t: 'join', name: 'Quitter' });
+    room.beginMatch();
+    const first = room.matchNumber;
+    room.endMatch('law', 'test');
+
+    room.onRestart(me());
+    assert.equal(room.phase, PHASE.RESULTS, 'one vote of two started the round');
+
+    // The other one closes the tab instead of answering.
+    room.removeConnection(other.client);
+    assert.equal(room.phase, PHASE.PREP, 'the round never started after the hold-out left');
+    assert.equal(room.matchNumber, first + 1);
+  } finally { clock.restore(); }
+});
+
+test('a full round runs at every table size the lobby allows', () => {
+  for (let table = MIN_PLAYERS; table <= MAX_PLAYERS; table++) {
+    const { room, clock } = makeRoom({ bots: table, prep: 1, combat: 60 });
+    try {
+      room.beginMatch();
+      assert.equal(room.players.size, table, `a table of ${table} dealt ${room.players.size} in`);
+      const roles = [...room.players.values()].map((p) => p.role);
+      assert.equal(roles.filter((r) => r === 'sheriff').length, 1, `${table}: not exactly one Sheriff`);
+      assert.equal(roles.filter((r) => r === 'renegade').length, 1, `${table}: not exactly one Renegade`);
+      assert.ok([...room.players.values()].every((p) => p.hand.length === CARD_DEAL),
+        `${table}: somebody was not dealt a hand`);
+
+      // Nobody spawns on top of anybody, at any table size.
+      const spots = [...room.players.values()].map((p) => p.pos);
+      for (let i = 0; i < spots.length; i++) {
+        for (let j = i + 1; j < spots.length; j++) {
+          const d = Math.hypot(spots[i].x - spots[j].x, spots[i].z - spots[j].z);
+          assert.ok(d > 2, `${table}: two players spawned ${d.toFixed(1)}m apart`);
+        }
+      }
+
+      // And the round runs to an end without throwing or hanging.
+      let ticks = 0;
+      while (room.phase !== PHASE.RESULTS && ticks < 20 * 60 * 5) { clock.advance(50); room.step(); ticks++; }
+      assert.equal(room.phase, PHASE.RESULTS, `a table of ${table} never finished`);
+      assert.ok(room.results.rows.length === table, `${table}: the aftermath lost somebody`);
+      assert.ok(['law', 'outlaw', 'renegade', 'none'].includes(room.results.winner));
+    } finally { clock.restore(); }
+  }
 });

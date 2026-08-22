@@ -105,6 +105,8 @@ export class Room {
       telemetry.sessionEnd(p, now() - (p.joinedAt || now()));
       if (this.phase === PHASE.LOBBY || this.phase === PHASE.RESULTS) {
         this.players.delete(p.id);
+        // The people still here may have been waiting on the one who just left.
+        this.checkReady();
       } else {
         // Mid-match nobody is removed. A living body stays standing in the
         // street, silent and every bit as shootable as it was; come back inside
@@ -358,6 +360,20 @@ export class Room {
         tone: 'system',
       });
     }
+    this.checkReady();
+  }
+
+  /**
+   * Deal again once everybody still here has asked for it. Called when somebody
+   * presses the button AND when somebody leaves, because otherwise the last
+   * player to walk out could strand the rest waiting on a vote that can never
+   * arrive.
+   */
+  checkReady() {
+    if (this.phase !== PHASE.RESULTS) return;
+    const humans = [...this.players.values()].filter((o) => !o.bot && o.connected);
+    if (!humans.length) return;
+    const ready = humans.filter((o) => o.wantsAgain).length;
     this.broadcast({ t: S.READY, ready, of: humans.length });
     if (ready >= humans.length) {
       this.toLobby();
