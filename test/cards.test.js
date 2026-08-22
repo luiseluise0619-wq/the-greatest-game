@@ -626,3 +626,30 @@ test('a busy round cannot push the cards off its own account', () => {
     assert.ok(timeline.some((e) => e.type === 'accuse'), 'the account dropped everything else');
   } finally { clock.restore(); }
 });
+
+test('a Renegade helps with the outlaws and keeps the star breathing', () => {
+  const { room, clock } = makeRoom({ bots: 8 });
+  try {
+    intoCombat(room, clock);
+    const all = [...room.players.values()];
+    const me = all.find((p) => p.bot) || all[0];
+    me.role = 'renegade';
+    me.faction = 'renegade';
+    me.badge = false;
+    const brain = new BotBrain(room, me);
+    const stranger = all.find((p) => p !== me);
+    const star = all.find((p) => p !== me && p !== stranger);
+    brain.sheriffGuess = star.id;
+
+    // Somebody he is nearly certain about, early in the round.
+    brain.suspicion.set(stranger.id, 1);
+    const onStranger = brain.wantsDead(stranger);
+    assert.ok(onStranger > 1.25,
+      `a Renegade would not draw on a man he is certain of (${onStranger.toFixed(2)} against a 1.25 line)`);
+
+    // The man he thinks wears the star is worth more to him alive.
+    brain.suspicion.set(star.id, 1);
+    assert.ok(brain.wantsDead(star) < 0,
+      'a Renegade went after the Sheriff early, which loses him the round');
+  } finally { clock.restore(); }
+});

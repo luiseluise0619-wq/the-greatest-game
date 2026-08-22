@@ -464,7 +464,10 @@ class Game {
         if (msg.youDied) this.onSelfDeath();
         break;
 
-      case S.FEED: this.hud.addFeed(escapeHtml(msg.text), msg.tone); break;
+      case S.FEED:
+        this.hud.addFeed(escapeHtml(msg.text), msg.tone);
+        if (msg.deny) this.audio.deny();
+        break;
       case S.CHAT:
         this.hud.addChat(msg);
         // A shout has a direction; typed chat does not.

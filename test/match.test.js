@@ -435,3 +435,32 @@ test('a dead spectator who reloads keeps their seat and their row', () => {
       'the aftermath screen forgot a player who died and reloaded');
   } finally { clock.restore(); }
 });
+
+test('a pickup that cannot happen says why', () => {
+  const { room, clock, stub, me } = makeRoom({ bots: 6, prep: 1 });
+  try {
+    room.beginMatch();
+    tick(clock, room, 40);
+    freezeBots(room);
+    const player = me();
+    player.health = player.maxHealth;            // nothing a bottle can do
+
+    const bottle = room.loot.find((l) => l.active && l.type === 'whiskey');
+    assert.ok(bottle, 'the town has no whiskey in it');
+    player.pos = { x: bottle.x, y: bottle.y - 0.9, z: bottle.z };
+
+    stub.reset();
+    room.onPickup(player, { id: bottle.id });
+    assert.equal(bottle.active, true, 'a full-health player drank it anyway');
+    const said = stub.of('feed').find((f) => f.deny);
+    assert.ok(said, 'pressing E on something you cannot take said nothing at all');
+    assert.ok(/hurt/i.test(said.text), `unhelpful refusal: "${said.text}"`);
+
+    // Hurt, and it works and says nothing.
+    player.health = 20;
+    stub.reset();
+    room.onPickup(player, { id: bottle.id });
+    assert.equal(bottle.active, false, 'a hurt player could not drink');
+    assert.equal(stub.of('feed').filter((f) => f.deny).length, 0);
+  } finally { clock.restore(); }
+});

@@ -508,8 +508,16 @@ export class BotBrain {
       case 'renegade': {
         // The Renegade wants a thin crowd, not a fast kill. He turns late.
         const late = alive <= 3;
-        if (o.badge || this.sheriffGuess === o.id) return late ? 2.8 : 0.1;
-        return (late ? 1.5 : 0.15) + sus * (late ? 1.2 : 0.85);
+        // The star has to stay up until everyone else is down, or somebody
+        // else's win condition fires first and he gets nothing.
+        if (o.badge || this.sheriffGuess === o.id) return late ? 2.8 : -1;
+        // Until then he draws only on somebody he is genuinely certain of. The
+        // old numbers here topped out at 1.0 against a threshold of 1.25, which
+        // meant a Renegade could not draw on anybody at all before the turn
+        // except in self defence - he spent two thirds of every round as
+        // scenery. He is still the least trigger-happy man in town, because
+        // every fight he is not in is one he does not have to win.
+        return (late ? 1.5 : 0.1) + sus * (late ? 1.2 : 1.25);
       }
       default:
         return 0.15 + sus;

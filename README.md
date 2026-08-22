@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 86 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 88 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 ```
@@ -447,7 +447,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 86 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 88 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -529,15 +529,15 @@ won by information. The knobs that control that balance, if you want to move it:
   (or the `HNH_*` env overrides: `HNH_PREP`, `HNH_COMBAT`, `HNH_ENDGAME`,
   `HNH_RESULTS`, `HNH_LOBBYCOUNTDOWN`).
 
-Balance over **200 headless bot-only rounds** (`npm run balance -- 80`) sits at:
+Balance over **120 headless bot-only rounds** (`npm run balance -- 120`) sits at:
 
 | | Outlaws | The Law | Renegade |
 |---|---|---|---|
-| win share | **57%** | 36% | 7% |
+| win share | **59%** | 34% | 7% |
 
-with 99% of rounds resolving on a kill rather than running out on the storm, and
-those averaging about **five minutes**. The Sheriff dies in roughly six rounds in
-ten, and a little over half of the players who killed one had actually picked
+with 98% of rounds resolving on a kill rather than running out on the storm, and
+those averaging about **five minutes**. The Sheriff dies in about two rounds in
+three, and a little over half of the players who killed one had actually picked
 them out first — the rest is crossfire, which is the number to watch: if it goes
 much higher the round is being decided by chaos rather than by anybody working
 anything out.

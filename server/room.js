@@ -796,7 +796,11 @@ export class Room {
       }
     }
 
-    if (!took) return;
+    if (!took) {
+      // Silence here reads as a broken keybind. Say why instead.
+      this.emit(p, { t: S.FEED, text: NO_ROOM[item.type] || 'You have no use for that.', tone: 'bad', deny: true });
+      return;
+    }
     item.active = false;
     item.respawnAt = item.dropped ? 0 : now() + LOOT_RESPAWN;
     if (item.dropped) item.remove = true;
@@ -1779,6 +1783,14 @@ export class Room {
     });
   }
 }
+
+const NO_ROOM = {
+  whiskey: 'You are not hurt enough to want it.',
+  ammo: 'Every belt you carry is already full.',
+  dynamite: 'You cannot carry another stick.',
+  shotgun: 'You have a coach gun and all the shells for it.',
+  rifle: 'You have a lever rifle and all the rounds for it.',
+};
 
 const ARMED_LINE = {
   barrel: 'You roll the rain barrel into place. The next shot that finds you finds water instead.',
