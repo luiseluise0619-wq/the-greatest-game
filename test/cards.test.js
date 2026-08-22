@@ -6,7 +6,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
-import { PHASE, TIMING, CARDS, CARD_ORDER, CARD_DEAL, SOCIAL, CHARACTERS, WEAPONS } from '../shared/constants.js';
+import {
+  PHASE, TIMING, CARDS, CARD_ORDER, CARD_DEAL, SOCIAL, CHARACTERS, WEAPONS,
+  BUFF_VALUES, GAMBLER_BOONS, PLAYER,
+} from '../shared/constants.js';
 
 const { Room } = await import('../server/room.js');
 const { BotBrain } = await import('../server/bots.js');
@@ -762,5 +765,46 @@ test('Hair Trigger rations shots by the number on the character, and says so', (
     assert.ok(self, 'the player was never told their own state');
     assert.ok(self.buffs.includes('fireRateMult'), 'the client is never told Hair Trigger is up');
     assert.ok(!self.buffs.includes('until'), 'the buff list leaks its own bookkeeping');
+  } finally { clock.restore(); }
+});
+
+// The client is handed buff names and looks their values up locally, so a
+// number the server grants and a number the client predicts are two copies of
+// one thing. These are the two the client predicts.
+test('every buff the client predicts is worth what the server granted', () => {
+  const { room, clock, me } = makeRoom({ bots: 6 });
+  try {
+    intoCombat(room, clock);
+    freezeBots(room);
+
+    const shooter = me();
+    shooter.character = 'gunslinger';
+    shooter.abilityReadyAt = 0;
+    room.onAbility(shooter);
+    assert.equal(shooter.buffs.fireRateMult, BUFF_VALUES.fireRateMult,
+      'the client would predict the wrong gap between shots');
+
+    // The Gambler's boon is dealt at random, so hand it out directly rather
+    // than pulling on the ability until the right card turns up.
+    const runner = me();
+    runner.buffs = {};
+    const boon = GAMBLER_BOONS.find((b) => b.speedMult);
+    runner.buffs.speedMult = boon.speedMult;
+    assert.equal(runner.buffs.speedMult, BUFF_VALUES.speedMult,
+      'the client would predict the wrong walking speed');
+
+    // And the server's own clamp has to allow for it, or the boon would be
+    // handed out and then confiscated: walking with it on is still walking,
+    // and walking must not burn the sprint budget.
+    runner.pos = { x: 0, y: 0, z: 0 };
+    runner.stamina = PLAYER.staminaMax;
+    runner.lastInputAt = null;
+    const step = PLAYER.walkSpeed * boon.speedMult * 0.05;   // one 20Hz frame of it
+    for (let i = 1; i <= 20; i++) {
+      tick(clock, room, 0.05);
+      room.onInput(runner, { pos: { x: 0, y: 0, z: -step * i }, moving: true });
+    }
+    assert.equal(runner.stamina, PLAYER.staminaMax,
+      'walking with the boon on was read as a sprint and charged for');
   } finally { clock.restore(); }
 });

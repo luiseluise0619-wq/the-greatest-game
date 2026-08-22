@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import MAP from '../../shared/map.js';
 import { moveAndCollide } from '../../shared/collision.js';
 import {
-  PLAYER, WEAPONS, CHARACTERS, PHASE, VOICE_LINES, ENDGAME, REPLAY, CARD_ORDER, INPUT_RATE, SOCIAL,
+  PLAYER, WEAPONS, BUFF_VALUES, PHASE, VOICE_LINES, ENDGAME, REPLAY, CARD_ORDER, INPUT_RATE, SOCIAL,
   clamp, stepStamina, canSprint, swapTime,
 } from '../../shared/constants.js';
 import { C, S } from '../../shared/protocol.js';
@@ -995,8 +995,7 @@ class Game {
     const t = now;
     // Hair Trigger is the one thing in this town that fires faster than a hand
     // can work an action, and the server rations it by the same number.
-    const ch = CHARACTERS[this.character] || {};
-    const hair = (s.buffs || []).includes("fireRateMult");
+    const hair = (s.buffs || []).includes('fireRateMult');
     // Every gun here is worked by hand - a hammer thumbed back, a lever thrown,
     // a breech broken open - so one press is one shot. Holding the button down
     // keeps the intent alive until the gun is ready for it, and no longer. The
@@ -1004,7 +1003,7 @@ class Game {
     if (!w.auto && !hair) this.wantFire = false;
     // Predict locally so the click feels instant; the server still owns the hit.
     s.mag -= 1;
-    s.nextFireAt = t + w.fireInterval * (hair ? (ch.fireMult ?? 1) : 1);
+    s.nextFireAt = t + w.fireInterval * (hair ? BUFF_VALUES.fireRateMult : 1);
     this.send({ t: C.SHOOT, dir: this.aimDir(), ads: this.ads });
     this.viewmodel.kick(s.weapon);
     this.worldFlash.intensity = 7;
@@ -1041,8 +1040,8 @@ class Game {
     s.stamina = stepStamina(s.stamina, s.sprint, dt);
 
     let speed = s.crouch ? PLAYER.crouchSpeed : s.sprint ? PLAYER.sprintSpeed : PLAYER.walkSpeed;
-    if ((s.buffs || []).includes('speedMult')) speed *= 1.35;
-    if (this.ads) speed *= 0.55;
+    if ((s.buffs || []).includes('speedMult')) speed *= BUFF_VALUES.speedMult;
+    if (this.ads) speed *= PLAYER.adsSpeed;
 
     // Horizontal accel/friction
     const vel = s.vel;

@@ -33,7 +33,8 @@ export const PLAYER = {
   // packet allowance. Given free every message, a client flooding inputs at
   // 1000Hz would earn hundreds of metres a second out of the slack alone.
   serverSlack: 0.9,          // metres a client may be ahead of the clamp
-  serverSlackRefill: 1.4     // metres per second that budget comes back at,
+  serverSlackRefill: 1.4,    // metres per second that budget comes back at,
+  adsSpeed: 0.55,            // how much of your speed you keep down the sights
 };
 
 // ---------------------------------------------------------------------------
@@ -279,6 +280,21 @@ export const GAMBLER_BOONS = [
   { id: 'dust', label: 'DUST DEVIL - no name, no clear shape', dust: true, duration: 7 },
   { id: 'bust', label: 'BUSTED - the deck was cold', duration: 0 },
 ];
+
+// ---------------------------------------------------------------------------
+// What a buff is worth.
+//
+// The server hands each player a list of the buffs they are carrying, by name
+// and without values - there is no reason to put a number on the wire that
+// both ends already have. But the client predicts its own movement and its own
+// trigger, so it has to look those numbers up, and this is the one place they
+// live. Anything the client never predicts (soaked damage, a reload it does
+// not time itself) is deliberately absent.
+// ---------------------------------------------------------------------------
+export const BUFF_VALUES = {
+  speedMult: GAMBLER_BOONS.find((b) => b.speedMult).speedMult,
+  fireRateMult: CHARACTERS.gunslinger.fireMult,
+};
 
 // ---------------------------------------------------------------------------
 // Sprint budget
