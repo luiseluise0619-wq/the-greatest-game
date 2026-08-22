@@ -296,6 +296,19 @@ export class BotBrain {
         }
         break;
       }
+      case 'step': {
+        // Boots nearby. A lead, never a name, and a much weaker one than a
+        // gunshot: if there has been shooting recently that is the better
+        // thread to pull, and a step points at a rough area rather than a spot.
+        if (this.noise && !this.noise.soft && t - this.noise.t < 5) break;
+        if (Math.random() > 0.35 + this.paranoia * 0.4) break;
+        this.noise = {
+          x: data.pos.x + rnd(-4, 4), z: data.pos.z + rnd(-4, 4),
+          t, shooter: null, soft: true,
+        };
+        break;
+      }
+
       case 'damaged': {
         if (data.victim === me && data.attacker) {
           this.suspect(data.attacker.id, 0.6);
@@ -621,7 +634,11 @@ export class BotBrain {
       }
     }
 
-    if (this.noise && t - this.noise.t < 8 && Math.random() < 0.6) {
+    // Gunfire is worth walking towards. Boots are worth wandering towards.
+    const noiseAge = this.noise ? t - this.noise.t : Infinity;
+    const noiseWindow = this.noise?.soft ? 5 : 8;
+    const noiseOdds = this.noise?.soft ? 0.3 : 0.6;
+    if (this.noise && noiseAge < noiseWindow && Math.random() < noiseOdds) {
       this.state = 'investigate';
       this.setGoal({ x: this.noise.x, z: this.noise.z });
       return;

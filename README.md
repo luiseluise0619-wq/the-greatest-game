@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 79 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 81 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 ```
 
@@ -440,7 +440,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 79 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 81 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -516,9 +516,9 @@ won by information. The knobs that control that balance, if you want to move it:
 - `ROLE_TABLE` — faction counts per table size.
 - `TIMING` — phase lengths (or the `HNH_*` env overrides).
 
-Balance across 20 headless bot-only rounds currently sits at 10 Law / 9 Outlaw /
-1 Renegade, with the first death about a minute in, and roughly one death in six
-now belongs to the dust storm. Round length is strongly **bimodal** — either
+Balance across 20 headless bot-only rounds currently sits at 11 Outlaw / 7 Law /
+2 Renegade, with the first death about a minute in, and roughly one death in nine
+belonging to the dust storm. Round length is strongly **bimodal** — either
 somebody finds the Sheriff inside two minutes or nothing is resolved and the
 storm decides it — so the mean (around 360s) says much less than that shape does,
 and anything under about twenty rounds is noise.

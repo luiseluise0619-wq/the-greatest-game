@@ -532,3 +532,60 @@ test('a step is paced by the gait, not by the tick rate', () => {
     assert.ok(Math.abs(n - expected) <= 1.5, `${n} steps in two seconds, expected about ${expected.toFixed(1)}`);
   } finally { clock.restore(); }
 });
+
+test('bots have ears, so crouching past one is worth something', () => {
+  const { room, clock } = makeRoom({ bots: 8 });
+  try {
+    intoCombat(room, clock);
+    const bots = [...room.players.values()].filter((p) => p.bot && p.alive);
+    const [listener, walker] = bots;
+    listener.brain = new BotBrain(room, listener);
+    listener.brain.paranoia = 1;              // take the dice out of it
+    listener.pos = { x: 0, y: 0, z: 0 };
+    walker.moving = true;
+    walker.character = 'gunslinger';
+
+    const walkPast = (dist, crouch) => {
+      walker.pos = { x: dist, y: 0, z: 0 };
+      walker.crouch = crouch;
+      walker.sprint = false;
+      walker.lastStepAt = 0;
+      listener.brain.noise = null;
+      for (let i = 0; i < 12; i++) room.stepSound(walker, Date.now() / 1000);
+      return listener.brain.noise;
+    };
+
+    const heard = walkPast(12, false);
+    assert.ok(heard, 'a bot never heard somebody walk past at 12m');
+    assert.equal(heard.shooter, null, 'a footstep told a bot who it was');
+    assert.equal(heard.soft, true, 'a footstep counted as hard evidence');
+
+    assert.equal(walkPast(12, true), null, 'crouching past a bot did nothing');
+    assert.equal(walkPast(90, false), null, 'a bot heard boots from across town');
+  } finally { clock.restore(); }
+});
+
+test('gunfire outranks boots as a lead', () => {
+  const { room, clock } = makeRoom({ bots: 8 });
+  try {
+    intoCombat(room, clock);
+    const bots = [...room.players.values()].filter((p) => p.bot && p.alive);
+    const [listener, walker] = bots;
+    listener.brain = new BotBrain(room, listener);
+    listener.brain.paranoia = 1;
+    listener.pos = { x: 0, y: 0, z: 0 };
+
+    // A shot, then somebody strolling about nearby.
+    listener.brain.onEvent('gunshot', {
+      pos: { x: 20, y: 1.6, z: 0 }, shooter: walker, weapon: { noise: 45 },
+    });
+    const fromShot = { ...listener.brain.noise };
+    assert.equal(fromShot.soft, undefined, 'a gunshot came through as a soft lead');
+
+    walker.pos = { x: -8, y: 0, z: 0 };
+    walker.moving = true; walker.crouch = false; walker.sprint = false;
+    walker.lastStepAt = 0;
+    for (let i = 0; i < 12; i++) room.stepSound(walker, Date.now() / 1000);
+    assert.equal(listener.brain.noise.x, fromShot.x, 'footsteps overwrote a fresh gunshot lead');
+  } finally { clock.restore(); }
+});

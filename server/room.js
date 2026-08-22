@@ -1557,10 +1557,17 @@ export class Room {
     const fuzz = SOCIAL.stepFuzz;
 
     for (const o of this.players.values()) {
-      if (o.bot || !o.client || o.id === p.id) continue;
+      if (o.id === p.id) continue;
       // The dead hear the whole town - they have nothing left to do with it.
       const heard = !o.alive || Math.hypot(o.pos.x - p.pos.x, o.pos.z - p.pos.z) <= range;
       if (!heard) continue;
+      // Bots have ears too, or crouching past one would do nothing at all and
+      // the counterplay would exist only against humans.
+      if (o.bot) {
+        if (o.alive && o.brain) o.brain.onEvent('step', { pos: p.pos, sprint: gait === 'sprint' });
+        continue;
+      }
+      if (!o.client) continue;
       this.send(o.client, {
         t: S.STEP,
         x: r2(p.pos.x + rnd(-fuzz, fuzz)),
