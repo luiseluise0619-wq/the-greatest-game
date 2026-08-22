@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 95 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 106 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 ```
@@ -449,7 +449,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 95 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 106 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -495,6 +495,14 @@ They are grouped by what they protect:
   the map is built out of is one the town knows how to draw — the renderer falls
   back to plain wood for an unknown tag, silently, so a missing look would not
   show up until somebody noticed the church was made of planks.
+- **`test/rooms.test.js`** — how a socket finds a town, which is the first
+  thing that happens to every player who ever arrives: codes that can be read
+  aloud without being misheard and never collide, quick play filling the busiest
+  lobby instead of scattering four people across four empty towns, preferring a
+  lobby to a fight already in progress, private towns that quick play cannot
+  walk into, refusals that name the code that failed, empty towns reaped only
+  after their grace, and one broken town not taking the rest of the server down
+  with it.
 - **`test/settings.test.js`** — everything the settings panel stores comes back
   out of `localStorage`, which anybody can edit by hand, so the part that decides
   what a stored value is *allowed* to be is pure and tested: no value can push a
