@@ -320,6 +320,11 @@ keeps sprinting from being free — and the trigger stays locked while a gun is
 coming up after a swap, on the client as well as the server, so the two never
 disagree about whether a shot happened.
 
+Every one of them is worked by hand — a hammer thumbed back, a lever thrown, a
+breech broken open — so **the trigger is not a button you hold down**: one press
+is one shot, however long you lean on it. The single exception is the five
+seconds of the Gunslinger's Hair Trigger, which is most of what that ability is.
+
 ---
 
 ## The map — Perdition Flats
@@ -389,7 +394,7 @@ with site data blocked falls back to the defaults instead of failing to start.
 
 | | |
 |---|---|
-| `WASD` move · `Shift` sprint (5s of it) · `Ctrl` crouch · `Space` jump | `LMB` fire · `RMB` aim (rifle) · `R` reload |
+| `WASD` move · `Shift` sprint (5s of it) · `Ctrl` crouch · `Space` jump | `LMB` fire — one press, one shot · `RMB` aim (rifle) · `R` reload |
 | `1` `2` `3` weapons · `G` dynamite · `E` pick up | `Q` ability · `F` call somebody out · `B` pin on the star |
 | `T` chat · `V` shout wheel · `Tab` the table | `Z` `X` play a card · `H` peek at your role |
 | `Esc` frees the mouse; press it again for settings | |

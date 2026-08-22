@@ -895,8 +895,8 @@ export class Room {
 
     switch (c.id) {
       case 'gunslinger':
-        p.buffs.fireRateMult = 0.55;
-        p.buffs.reloadMult = 0.35;
+        p.buffs.fireRateMult = c.fireMult;
+        p.buffs.reloadMult = c.reloadMult;
         p.buffs.until = t + c.duration;
         break;
       case 'medic': {

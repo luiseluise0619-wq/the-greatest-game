@@ -9,6 +9,7 @@
 
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
+import { WEAPONS, CHARACTERS } from '../../shared/constants.js';
 
 let chromium;
 try {
@@ -27,21 +28,24 @@ const [VW, VH] = (process.env.HNH_VIEWPORT || '1280x760').split('x').map(Number)
 const SHOTS = process.env.HNH_SHOTS || 'test/browser/screenshots';
 mkdirSync(SHOTS, { recursive: true });
 
+const REVOLVER_INTERVAL = WEAPONS.revolver.fireInterval;
+const HAIR_TRIGGER_MULT = CHARACTERS.gunslinger.fireMult;
+
 const CARD_NAMES = {
   barrel: 'rain barrel', poster: 'wanted poster', tracks: 'cover your tracks',
   witness: 'buy a witness', ledger: "dead man's ledger", spyglass: 'long glass',
 };
 
 // The round the server is told to run, and that the checks below budget for.
-const PREP = 40, COMBAT = 40, ENDGAME = 8;
+// Nobody can be shot during the preparation phase, and every check that needs
+// the round to still have this player in it - playing a card, refreshing the
+// page, dropping the socket - has to finish inside it. A round can otherwise
+// be over in half a minute of combat, and there is nothing to reconnect to
+// after that. So: a long wind-up and a short round.
+const PREP = 105, COMBAT = 20, ENDGAME = 8;
 const server = spawn('node', ['server/index.js'], {
   env: {
     ...process.env, PORT: String(PORT), HNH_TELEMETRY: '0',
-    // A long preparation phase on purpose: nobody can die during it, so every
-    // check that needs the round to still exist - reconnecting, playing a card
-    // - is not racing a Sheriff who went down in the first thirty seconds.
-    // Then a short round, so one run still reaches the aftermath screen, which
-    // is the only place the cards that were played are ever named.
     HNH_PREP: String(PREP), HNH_COMBAT: String(COMBAT), HNH_ENDGAME: String(ENDGAME),
     // The aftermath phase has to outlast the checks that run on it. On a
     // two-core runner drawing every pixel on the CPU, a screenshot alone can
@@ -205,6 +209,61 @@ try {
   });
   check(swap.lockedRightAfter && !swap.spentARound, 'the trigger is locked while a gun comes up');
 
+  // None of these guns is a button you hold down. Leaning on the trigger has
+  // to cost one round and then stop, however long the frame loop runs on.
+  const held = await A.evaluate(async () => {
+    const g = window.game;
+    g.self.guns = ['revolver'];
+    g.self.weapon = 'revolver';
+    g.self.mag = 6;
+    g.self.nextFireAt = 0;
+    g.self.swapUntil = 0;
+    let shots = 0;
+    const send = g.send.bind(g);
+    g.send = (m) => { if (m.t === 'shoot') shots++; send(m); };
+    g.wantFire = true;                       // the button goes down and stays down
+    g.tryFire();
+    const held = g.wantFire;
+    await new Promise((r) => setTimeout(r, 1500));   // long enough for a dozen
+    g.wantFire = false;
+    g.send = send;
+    return { shots, held, mag: g.self.mag };
+  });
+  check(held.shots === 1 && !held.held,
+    `holding the trigger fires once and stops (${held.shots} shot(s), ${held.mag} left)`);
+
+  // Hair Trigger is the exception, and it is the whole ability: five seconds
+  // where the gun fires as fast as the server will allow. The client has to
+  // lift its own cooldown by the same amount, or the ability is spent waiting
+  // on a local timer nobody told about it.
+  const hair = await A.evaluate(async ([interval, mult]) => {
+    const g = window.game;
+    g.character = 'gunslinger';
+    g.self.guns = ['revolver'];
+    g.self.weapon = 'revolver';
+    g.self.mag = 6;
+    g.self.nextFireAt = 0;
+    g.self.swapUntil = 0;
+    g.self.buffs = ['fireRateMult'];
+    let shots = 0;
+    const send = g.send.bind(g);
+    g.send = (m) => { if (m.t === 'shoot') shots++; send(m); };
+    const at = performance.now() / 1000;
+    g.wantFire = true;
+    g.tryFire();
+    const gap = g.self.nextFireAt - at;
+    const stillHeld = g.wantFire;
+    await new Promise((r) => setTimeout(r, 1200));
+    g.wantFire = false;
+    g.send = send;
+    g.self.buffs = [];
+    return { shots, stillHeld, gap, want: interval * mult };
+  }, [REVOLVER_INTERVAL, HAIR_TRIGGER_MULT]);
+  check(hair.stillHeld && hair.shots > 1,
+    `Hair Trigger is the one trigger you can lean on (${hair.shots} shots)`);
+  check(Math.abs(hair.gap - hair.want) < 0.02,
+    `Hair Trigger shortens the client's own cooldown too (${hair.gap.toFixed(3)}s of ${hair.want}s)`);
+
   const standing = await A.evaluate(() => document.getElementById('standing').textContent.trim());
   check(/^[1-9]\d* STILL STANDING/.test(standing), `the town knows how many are left ("${standing}")`);
 
@@ -278,8 +337,14 @@ try {
   // Reconnection, before anything slow: the round can be over inside a minute
   // when the Sheriff goes down early, and there is nothing to reconnect to
   // after that.
-  const bState = await B.evaluate(() => ({ inGame: window.game.inGame, role: !!window.game.selfRole }));
+  const bState = await B.evaluate(() => ({
+    inGame: window.game.inGame, role: !!window.game.selfRole, phase: window.game.phase,
+  }));
   check(bState.inGame && bState.role, 'the second player is in the same round');
+  // If this has slipped out of the preparation phase the checks below are
+  // racing a round that can end under them, so say so here rather than let
+  // them fail one at a time somewhere further down.
+  check(bState.phase === 'prep', `there is still a round to reconnect to (phase ${bState.phase})`);
 
   // A refresh mid-round must give the same body back, not a fresh stranger.
   const bBefore = await B.evaluate(() => ({
@@ -313,9 +378,14 @@ try {
     null, { timeout: 10000 },
   ).then(() => true).catch(() => false);
   check(bannerSeen, 'a dropped socket says so on screen');
-  const netBack = await A.waitForFunction(() => window.game.ws.readyState === 1, null, { timeout: 25000 })
-    .then(() => true).catch(() => false);
-  await A.waitForTimeout(900);
+  // Wait for the seat to actually come back, not just for the socket to open:
+  // the client still has to re-announce itself with its token and be handed
+  // the same body, and on a loaded machine that round trip is not instant.
+  const netBack = await A.waitForFunction(
+    (id) => window.game.ws.readyState === 1 && window.game.inGame && window.game.selfId === id,
+    netBefore.id, { timeout: 30000 },
+  ).then(() => true).catch(() => false);
+  await A.waitForTimeout(300);            // let the banner finish going away
   const netAfter = await A.evaluate(() => ({
     id: window.game.selfId, role: window.game.selfRole.role,
     known: window.game.hud.knownRoles.size, kept: window.game.hud.knownRoles.get(-1) || null,
@@ -336,6 +406,10 @@ try {
 
   // Ride the round out: the aftermath screen is where every silent card is
   // finally named, and nothing else in this suite ever reaches it.
+  // Bring this window back in front first: the checks above worked the other
+  // page, and a browser throttles the animation frames of a window nobody is
+  // looking at - which is what this wait is polled on.
+  await A.bringToFront();
   const reachedResults = await A.waitForFunction(
     () => !document.getElementById('results').classList.contains('hidden'),
     // A whole round is prep + combat + endgame, and the checks above have
@@ -373,7 +447,15 @@ try {
     const stillUp = await A.evaluate(() => !document.getElementById('results').classList.contains('hidden'));
     check(stillUp, 'the aftermath screen is still up to press a button on');
     if (stillUp) await A.click('#playAgain');
-    await A.waitForTimeout(900);
+    // Wait for the server's answer, not for the button: the click disables it
+    // on the spot, so waiting on that is waiting for nothing. The count in the
+    // label is the part that had to come back from the room.
+    if (stillUp) {
+      await A.waitForFunction(
+        () => /\d+\/\d+/.test(document.getElementById('playAgain').textContent),
+        null, { timeout: 15000 },
+      ).catch(() => {});
+    }
     const afterReady = await A.evaluate(() => ({
       resultsUp: !document.getElementById('results').classList.contains('hidden'),
       label: document.getElementById('playAgain').textContent.trim(),

@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import MAP from '../../shared/map.js';
 import { moveAndCollide } from '../../shared/collision.js';
 import {
-  PLAYER, WEAPONS, PHASE, VOICE_LINES, ENDGAME, REPLAY, CARD_ORDER, INPUT_RATE, SOCIAL,
+  PLAYER, WEAPONS, CHARACTERS, PHASE, VOICE_LINES, ENDGAME, REPLAY, CARD_ORDER, INPUT_RATE, SOCIAL,
   clamp, stepStamina, canSprint, swapTime,
 } from '../../shared/constants.js';
 import { C, S } from '../../shared/protocol.js';
@@ -55,6 +55,7 @@ class Game {
     this.ring = 0;
     this.lastFootstep = 0;
     this.wantFire = false;
+    this.reloadAskedAt = 0;
     this.ads = false;
 
     // #ABCD in the URL means "put me in that town". Anything else is quick play.
@@ -978,16 +979,32 @@ class Game {
   }
 
   tryFire() {
+    const now = performance.now() / 1000;
     if (!this.canFireLocally()) {
-      if (this.self.alive && this.self.mag <= 0 && this.self.reloading <= 0) this.send({ t: C.RELOAD });
+      // An empty gun reloads itself. This runs every frame while the trigger
+      // is held, and the server needs a round trip to answer, so ask once and
+      // then wait for it rather than shouting sixty times a second.
+      if (this.self.alive && this.self.mag <= 0 && this.self.reloading <= 0 && now >= this.reloadAskedAt) {
+        this.reloadAskedAt = now + 0.5;
+        this.send({ t: C.RELOAD });
+      }
       return;
     }
     const s = this.self;
     const w = WEAPONS[s.weapon];
-    const t = performance.now() / 1000;
+    const t = now;
+    // Hair Trigger is the one thing in this town that fires faster than a hand
+    // can work an action, and the server rations it by the same number.
+    const ch = CHARACTERS[this.character] || {};
+    const hair = (s.buffs || []).includes("fireRateMult");
+    // Every gun here is worked by hand - a hammer thumbed back, a lever thrown,
+    // a breech broken open - so one press is one shot. Holding the button down
+    // keeps the intent alive until the gun is ready for it, and no longer. The
+    // five seconds of Hair Trigger are the exception, and the point of it.
+    if (!w.auto && !hair) this.wantFire = false;
     // Predict locally so the click feels instant; the server still owns the hit.
     s.mag -= 1;
-    s.nextFireAt = t + w.fireInterval;
+    s.nextFireAt = t + w.fireInterval * (hair ? (ch.fireMult ?? 1) : 1);
     this.send({ t: C.SHOOT, dir: this.aimDir(), ads: this.ads });
     this.viewmodel.kick(s.weapon);
     this.worldFlash.intensity = 7;

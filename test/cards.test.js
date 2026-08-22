@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
-import { PHASE, TIMING, CARDS, CARD_ORDER, CARD_DEAL, SOCIAL } from '../shared/constants.js';
+import { PHASE, TIMING, CARDS, CARD_ORDER, CARD_DEAL, SOCIAL, CHARACTERS, WEAPONS } from '../shared/constants.js';
 
 const { Room } = await import('../server/room.js');
 const { BotBrain } = await import('../server/bots.js');
@@ -721,5 +721,46 @@ test('trail groups are shuffled, so a trail is not a seating plan', () => {
     room.beginMatch();
     const groups = [...room.players.values()].map((p) => p.trailGroup);
     assert.equal(new Set(groups).size, groups.length, 'two players share a trail group');
+  } finally { clock.restore(); }
+});
+
+// ---------------------------------------------------------------------------
+// Hair Trigger. The one ability whose whole effect is a number the client has
+// to predict as well as the server, or the five seconds it buys are spent
+// waiting on a local cooldown that nobody lifted.
+// ---------------------------------------------------------------------------
+
+test('Hair Trigger rations shots by the number on the character, and says so', () => {
+  const { room, clock, stub, me } = makeRoom({ bots: 6 });
+  try {
+    intoCombat(room, clock);
+    freezeBots(room);
+    const shooter = me();
+    shooter.character = 'gunslinger';
+    shooter.abilityReadyAt = 0;
+    const c = CHARACTERS.gunslinger;
+
+    room.onAbility(shooter);
+    assert.equal(shooter.buffs.fireRateMult, c.fireMult, 'the server invented its own fire rate');
+    assert.equal(shooter.buffs.reloadMult, c.reloadMult, 'the server invented its own reload speed');
+
+    // The gap the server will hold the player to, measured rather than assumed.
+    const w = WEAPONS[shooter.slot];
+    shooter.nextFireAt = 0;
+    shooter.guns[shooter.slot].mag = w.magSize;
+    room.onShoot(shooter, { dir: [0, 0, -1] });
+    const gap = shooter.nextFireAt - shooter.firedAt;
+    assert.ok(Math.abs(gap - w.fireInterval * c.fireMult) < 1e-6,
+      `the gap between shots was ${gap}, not ${w.fireInterval * c.fireMult}`);
+    assert.ok(gap < w.fireInterval, 'Hair Trigger did not make anything faster');
+
+    // And the client is told which buff it is holding, so it can predict the
+    // same gap instead of throttling the player back to the base rate.
+    stub.reset();
+    room.pushSelf(shooter);
+    const self = stub.last('self');
+    assert.ok(self, 'the player was never told their own state');
+    assert.ok(self.buffs.includes('fireRateMult'), 'the client is never told Hair Trigger is up');
+    assert.ok(!self.buffs.includes('until'), 'the buff list leaks its own bookkeeping');
   } finally { clock.restore(); }
 });

@@ -61,7 +61,7 @@ export const WEAPONS = {
     falloffEnd: 60,
     falloffMin: 0.55,
     recoil: 1.5,
-    auto: false,
+    auto: false,           // read by the client: the trigger is not a button you hold
     swapTime: 0.42,
     noise: 42,               // metres at which the shot can be "heard" by bots
   },
@@ -86,7 +86,7 @@ export const WEAPONS = {
     falloffEnd: 22,
     falloffMin: 0.2,
     recoil: 4.2,
-    auto: false,
+    auto: false,           // read by the client: the trigger is not a button you hold
     swapTime: 0.55,
     noise: 55,
   },
@@ -112,7 +112,7 @@ export const WEAPONS = {
     falloffEnd: 130,
     falloffMin: 0.7,
     recoil: 3.0,
-    auto: false,
+    auto: false,           // read by the client: the trigger is not a button you hold
     swapTime: 0.62,
     ads: true,
     noise: 70,
@@ -202,6 +202,11 @@ export const CHARACTERS = {
     cooldown: 34,
     duration: 5,
     swapMult: 0.5,        // the passive half of Hair Trigger
+    // The active half. Both sides read these: the server rations the shots,
+    // the client has to predict the same rationing or it throttles the ability
+    // it is meant to be delivering.
+    fireMult: 0.55,
+    reloadMult: 0.35,
     hat: '#3a2a20', coat: '#7a4f2a', accent: '#d9b25c',
   },
   medic: {
