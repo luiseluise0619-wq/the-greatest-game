@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 46 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 51 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 ```
 
@@ -319,13 +319,24 @@ agendas:
 
 ---
 
+## Settings
+
+`Esc` (or **SETTINGS** in the lobby) opens mouse sensitivity, invert-Y, field of
+view, volume, mute and a frame-rate readout. It is kept in `localStorage` and
+nothing goes on the wire — the server has no opinion about anybody's
+sensitivity. Every read and write is guarded, so a private window or a browser
+with site data blocked falls back to the defaults instead of failing to start.
+
+---
+
 ## Controls
 
 | | |
 |---|---|
 | `WASD` move · `Shift` sprint · `Ctrl` crouch · `Space` jump | `LMB` fire · `RMB` aim (rifle) · `R` reload |
 | `1` `2` `3` weapons · `G` dynamite · `E` pick up | `Q` ability · `F` call somebody out · `B` pin on the star |
-| `T` chat · `V` shout wheel · `Tab` the table | `Z` `X` play a card · `H` peek at your role · `Esc` free the mouse |
+| `T` chat · `V` shout wheel · `Tab` the table | `Z` `X` play a card · `H` peek at your role |
+| `Esc` frees the mouse; press it again for settings | |
 
 ---
 
@@ -347,6 +358,7 @@ client/     js/main.js    networking, local movement, input, render loop
             js/audio.js   every sound synthesised in WebAudio, no files
             js/hud.js     HUD, feed, role card, your hand, scoreboard, results
             js/cardart.js the printing press: every card face drawn onto a canvas
+            js/settings.js local preferences, guarded against blocked storage
             proof/        /proof/ - the deck at full size, for tuning cardart.js
 ```
 
@@ -388,7 +400,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 46 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 51 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -411,6 +423,11 @@ They are grouped by what they protect:
   Bots are held to the same rules: one check confirms a bot holding the Long
   Glass really does get a name off a shot fired across town, and gets nothing
   from the same shot once the glass runs out.
+- **`test/settings.test.js`** — everything the settings panel stores comes back
+  out of `localStorage`, which anybody can edit by hand, so the part that decides
+  what a stored value is *allowed* to be is pure and tested: no value can push a
+  slider past its own limits, garbage in one field does not take the others with
+  it, and every default is reachable with its own control.
 - **`test/security.test.js`** — what a lying client cannot do: teleport, walk
   through a wall, end up inside geometry, be told about players it cannot see, or
   learn the name of a shooter it could not have seen.

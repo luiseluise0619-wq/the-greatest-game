@@ -19,7 +19,6 @@ export const C = {
   ADD_BOT: 'addBot',
   START: 'start',
   RESTART: 'restart',
-  SETTINGS: 'settings',
 };
 
 // server -> client

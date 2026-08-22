@@ -80,6 +80,22 @@ try {
     null, { timeout: 40000 }).then(() => 6).catch(() => -1);
   check(deck === 6, `the deck is on show in the lobby (${deck} faces)`);
 
+  // Settings: a change has to reach the running game and survive a reload.
+  await A.click('#openSettings');
+  const settingsOpen = await A.evaluate(() => !document.getElementById('settings').classList.contains('hidden'));
+  check(settingsOpen, 'the settings panel opens');
+  await A.evaluate(() => {
+    const el = document.getElementById('setFov');
+    el.value = '99';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const applied = await A.evaluate(() => ({ fov: window.game.camera.fov, label: document.getElementById('setFovVal').textContent }));
+  check(applied.fov === 99 && applied.label === '99', `settings reach the camera live (fov ${applied.fov})`);
+  await A.click('#setClose');
+  await A.evaluate(() => { window.game.settings.reset(); window.game.syncSettingsPanel(); });
+  const afterReset = await A.evaluate(() => window.game.camera.fov);
+  check(afterReset === 76, `reset puts the view back (fov ${afterReset})`);
+
   const code = (await A.textContent('#roomCode')).trim();
   check(/^[A-Z0-9]{4}$/.test(code), `room code issued (${code})`);
   await A.screenshot({ path: `${SHOTS}/01-lobby.png` });

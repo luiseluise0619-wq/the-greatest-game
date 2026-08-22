@@ -148,6 +148,7 @@
 
         <button id="startBtn" class="primary big">DEAL THE ROLES</button>
         <div id="menuStatus" class="muted">connecting…</div>
+        <button id="openSettings" class="ghost wide">SETTINGS</button>
       </section>
 
       <section class="mCol wide">
@@ -177,7 +178,7 @@
             <span><b>E</b> pick up</span><span><b>Q</b> ability</span><span><b>F</b> call out</span>
             <span><b>V</b> shout</span><span><b>T</b> chat</span><span><b>Tab</b> table</span>
             <span><b>H</b> your hand</span><span><b>B</b> pin the star</span><span><b>Z X</b> play a card</span>
-            <span><b>Esc</b> free mouse</span>
+            <span><b>Esc</b> settings</span>
           </div>
         </div>
       </section>
@@ -193,6 +194,49 @@
   <div class="kcSkip">any key to skip</div>
 </div>
 
+<!-- ===================== SETTINGS ===================== -->
+<div id="settings" class="overlay hidden">
+  <div class="panel">
+    <h2>SETTINGS</h2>
+    <p class="muted small">Kept in this browser only. Nothing here is sent anywhere.</p>
+
+    <label class="setRow">
+      <span>Mouse sensitivity</span>
+      <input id="setSens" type="range" />
+      <b id="setSensVal">0.0022</b>
+    </label>
+    <label class="setRow check">
+      <input id="setInvert" type="checkbox" />
+      <span>Invert vertical look</span>
+    </label>
+    <label class="setRow">
+      <span>Field of view</span>
+      <input id="setFov" type="range" />
+      <b id="setFovVal">76</b>
+    </label>
+    <label class="setRow">
+      <span>Volume</span>
+      <input id="setVol" type="range" />
+      <b id="setVolVal">55%</b>
+    </label>
+    <label class="setRow check">
+      <input id="setMute" type="checkbox" />
+      <span>Mute everything</span>
+    </label>
+    <label class="setRow check">
+      <input id="setFps" type="checkbox" />
+      <span>Show frame rate</span>
+    </label>
+
+    <div class="setButtons">
+      <button id="setClose" class="primary">BACK TO THE GAME</button>
+      <button id="setReset" class="ghost">RESET TO DEFAULTS</button>
+    </div>
+    <div class="cardHint dark">Press <b>Esc</b> at any time to open or close this</div>
+  </div>
+</div>
+
+<div id="fpsMeter" class="hidden">0</div>
 <div id="cardPlay" class="hidden"></div>
 <div id="deadBanner" class="hidden"><b>YOU ARE DEAD</b><span>Spectating. The round is still going.</span></div>
 <div id="loading">saddling up…</div>

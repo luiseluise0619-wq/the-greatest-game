@@ -7,6 +7,7 @@ export class GameAudio {
     this.ctx = null;
     this.ready = false;
     this.listener = { x: 0, y: 0, z: 0, yaw: 0 };
+    this.volume = 0.55;
     this.enabled = true;
   }
 
@@ -16,7 +17,7 @@ export class GameAudio {
     if (!AC) return;
     this.ctx = new AC();
     this.master = this.ctx.createGain();
-    this.master.gain.value = 0.55;
+    this.master.gain.value = this.volume ?? 0.55;
     this.master.connect(this.ctx.destination);
 
     // Shared noise buffer (2s of white noise).
@@ -46,6 +47,13 @@ export class GameAudio {
   }
 
   resume() { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); }
+
+  /** Master volume, 0..1. Called by the settings panel; safe before init(). */
+  setVolume(v) {
+    this.volume = Math.max(0, Math.min(1, Number(v) || 0));
+    this.enabled = this.volume > 0;
+    if (this.master) this.master.gain.value = this.volume;
+  }
   setListener(x, y, z, yaw) { this.listener = { x, y, z, yaw }; }
 
   /** Returns {gain, pan} for a world position, or null if far out of range. */

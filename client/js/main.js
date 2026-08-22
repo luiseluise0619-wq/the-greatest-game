@@ -19,6 +19,7 @@ import { GameAudio } from './audio.js';
 import { HUD } from './hud.js';
 import { initCharacterModels } from './charmodels.js';
 import { cardUrl } from './cardart.js';
+import { Settings, LIMITS } from './settings.js';
 
 const $ = (id) => document.getElementById(id);
 const INTERP_DELAY = 0.1;
@@ -34,6 +35,7 @@ class Game {
     this.keys = new Set();
     this.mouse = { dx: 0, dy: 0 };
     this.sensitivity = 0.0022;
+    this.settingsOpen = false;
     this.chatting = false;
     this.voiceOpen = false;
 
@@ -57,12 +59,18 @@ class Game {
     this.joinIntent = parseRoomFromUrl();
     this.roomCode = null;
 
+    // Local preferences. The server has no opinion about anybody's sensitivity,
+    // so none of this goes on the wire.
+    this.settings = new Settings((v) => this.applySettings(v));
+
     this.hud = new HUD(this);
     this.audio = new GameAudio();
     this.initMenu();
     this.connect();          // socket first: the lobby should answer immediately
     this.initThree();        // then the expensive part
     this.initInput();
+    this.initSettingsPanel();
+    this.applySettings(this.settings.values);
 
     this.modelsReady = false;
     modelsLoading.then(() => { this.modelsReady = true; });
@@ -195,9 +203,93 @@ class Game {
       this.send({ t: C.RESTART });
       $('results').classList.add('hidden');
     };
-    $('nameInput').value = localStorage.getItem('hnh_name') || '';
-    $('nameInput').oninput = () => localStorage.setItem('hnh_name', $('nameInput').value);
+    // Guarded: a private window or blocked site data throws on access, and a
+    // remembered name is not worth losing the menu over.
+    try { $('nameInput').value = localStorage.getItem('hnh_name') || ''; } catch { /* fine */ }
+    $('nameInput').oninput = () => {
+      try { localStorage.setItem('hnh_name', $('nameInput').value); } catch { /* fine */ }
+    };
     $('roleCard').onclick = () => this.dismissRoleCard();
+  }
+
+  /** Rolling frame rate, sampled once a second so the readout is legible. */
+  tickFps(now) {
+    this.fpsFrames = (this.fpsFrames || 0) + 1;
+    if (!this.fpsSince) { this.fpsSince = now; return; }
+    if (now - this.fpsSince < 1) return;
+    const fps = Math.round(this.fpsFrames / (now - this.fpsSince));
+    $('fpsMeter').textContent = `${fps} fps`;
+    this.fpsFrames = 0;
+    this.fpsSince = now;
+  }
+
+  // ------------------------------------------------------------- settings
+  /**
+   * Wire the settings panel to the store. Every control writes through
+   * Settings.set, which persists and calls applySettings - so there is exactly
+   * one path from a control to the running game, and reloading gives the same
+   * result as changing it live.
+   */
+  initSettingsPanel() {
+    const v = this.settings.values;
+    const range = (el, lim, key, fmt) => {
+      el.min = String(lim.min); el.max = String(lim.max); el.step = String(lim.step);
+      el.value = String(v[key]);
+      el.oninput = () => {
+        this.settings.set(key, Number(el.value));
+        fmt(this.settings.get(key));
+      };
+      fmt(v[key]);
+    };
+    range($('setSens'), LIMITS.sensitivity, 'sensitivity',
+      (n) => { $('setSensVal').textContent = n.toFixed(4); });
+    range($('setFov'), LIMITS.fov, 'fov',
+      (n) => { $('setFovVal').textContent = String(Math.round(n)); });
+    range($('setVol'), LIMITS.volume, 'volume',
+      (n) => { $('setVolVal').textContent = `${Math.round(n * 100)}%`; });
+
+    const check = (el, key) => {
+      el.checked = !!v[key];
+      el.onchange = () => this.settings.set(key, el.checked);
+    };
+    check($('setInvert'), 'invertY');
+    check($('setMute'), 'muted');
+    check($('setFps'), 'showFps');
+
+    $('setClose').onclick = () => this.showSettings(false);
+    $('setReset').onclick = () => { this.settings.reset(); this.syncSettingsPanel(); };
+    $('openSettings').onclick = () => this.showSettings(true);
+  }
+
+  /** Push the stored values back into the controls, after a reset. */
+  syncSettingsPanel() {
+    const v = this.settings.values;
+    $('setSens').value = String(v.sensitivity);
+    $('setSensVal').textContent = v.sensitivity.toFixed(4);
+    $('setFov').value = String(v.fov);
+    $('setFovVal').textContent = String(v.fov);
+    $('setVol').value = String(v.volume);
+    $('setVolVal').textContent = `${Math.round(v.volume * 100)}%`;
+    $('setInvert').checked = v.invertY;
+    $('setMute').checked = v.muted;
+    $('setFps').checked = v.showFps;
+  }
+
+  applySettings(v) {
+    this.sensitivity = v.sensitivity;
+    if (this.camera && this.camera.fov !== v.fov) {
+      this.camera.fov = v.fov;
+      this.camera.updateProjectionMatrix();
+    }
+    if (this.audio) this.audio.setVolume(v.muted ? 0 : v.volume);
+    $('fpsMeter').classList.toggle('hidden', !v.showFps);
+  }
+
+  showSettings(show) {
+    this.settingsOpen = show;
+    $('settings').classList.toggle('hidden', !show);
+    if (show) document.exitPointerLock?.();
+    else if (this.inGame) this.requestLock();
   }
 
   async copyInvite() {
@@ -624,9 +716,10 @@ class Game {
 
     document.addEventListener('mousemove', (e) => {
       if (document.pointerLockElement !== canvas) return;
-      const sens = this.sensitivity * (this.ads ? 0.55 : 1);
+      const sens = this.sensitivity * (this.ads ? this.settings.get('adsScale') : 1);
+      const invert = this.settings.get('invertY') ? -1 : 1;
       this.self.yaw -= e.movementX * sens;
-      this.self.pitch = clamp(this.self.pitch - e.movementY * sens, -1.52, 1.52);
+      this.self.pitch = clamp(this.self.pitch - e.movementY * sens * invert, -1.52, 1.52);
       this.viewmodel.addSway(e.movementX, e.movementY);
     });
 
@@ -662,6 +755,15 @@ class Game {
       const k = e.code;
       if (this.keys.has(k)) return;
       this.keys.add(k);
+
+      // Escape works everywhere, including the menu. In game the browser eats
+      // the first press to release the pointer lock, so this is the second one.
+      if (k === 'Escape' && !(this.inGame && this.dismissRoleCard())) {
+        e.preventDefault();
+        this.showSettings(!this.settingsOpen);
+        return;
+      }
+      if (this.settingsOpen) return;
 
       if (!this.inGame) return;
       if (this.replay) { this.endReplay(); return; }
@@ -964,6 +1066,8 @@ class Game {
       }
 
       this.audio.setListener(this.camera.position.x, this.camera.position.y, this.camera.position.z, this.self.yaw);
+
+      if (this.settings.get('showFps')) this.tickFps(t);
 
       this.renderer.render(this.scene, this.camera);
       // No first-person gun during a killcam - you are watching, not holding one.
