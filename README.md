@@ -607,7 +607,9 @@ Prototype, deliberately scoped to a vertical slice:
   length and human rounds fill it. Round length is bimodal rather than short —
   see **Design target**.
 - **Desktop only.** Pointer lock and a keyboard; there is no touch control
-  scheme and no attempt at one.
+  scheme and no attempt at one. The overlays do fit and scroll in a short
+  window — the browser suite runs at 800x480 in CI, which is how that got
+  found.
 - **One process, all rooms in memory.** Restarting the server ends every round
   in progress, and it does not scale past one machine. See
   **[DEPLOY.md](DEPLOY.md)** — this is the caveat that will bite you.

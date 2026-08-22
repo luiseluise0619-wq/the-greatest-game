@@ -20,6 +20,10 @@ try {
 }
 
 const PORT = 8100 + Math.floor(Math.random() * 400);
+// Every pixel of this page is drawn on the CPU by swiftshader, so on a small
+// CI runner the window size is the single biggest thing between this finishing
+// in two minutes and ten.
+const [VW, VH] = (process.env.HNH_VIEWPORT || '1280x760').split('x').map(Number);
 const SHOTS = process.env.HNH_SHOTS || 'test/browser/screenshots';
 mkdirSync(SHOTS, { recursive: true });
 
@@ -58,7 +62,7 @@ const check = (ok, label) => {
 };
 
 async function open(url, name) {
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 760 } });
+  const ctx = await browser.newContext({ viewport: { width: VW || 1280, height: VH || 760 } });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => problems.push(`${name}: ${e.message}`));
   page.on('console', (m) => {

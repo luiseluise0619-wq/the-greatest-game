@@ -11,6 +11,7 @@ jobs:
   node:
     name: node ${{ matrix.node }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -28,6 +29,13 @@ jobs:
   browser:
     name: browser end to end
     runs-on: ubuntu-latest
+    # A software-rendered WebGL page on a two-core runner is slow, and a hung
+    # browser is otherwise a six hour job.
+    timeout-minutes: 20
+    env:
+      # Every pixel is drawn on the CPU here. A smaller window is the single
+      # biggest thing that makes this finish.
+      HNH_VIEWPORT: 800x480
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,6 +60,7 @@ jobs:
   balance:
     name: bot balance (informational)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # Bot-vs-bot win shares swing wildly under fifty rounds, so this reports and
     # never fails - it is here to be read when a bot change lands, not to gate.
     continue-on-error: true
