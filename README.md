@@ -2,9 +2,9 @@
 
 [![tests](https://github.com/luiseluise0619-wq/the-greatest-game/actions/workflows/test.yml/badge.svg)](https://github.com/luiseluise0619-wq/the-greatest-game/actions/workflows/test.yml)
 
-A playable prototype of a **Wild West hidden-role FPS**: 6–8 gunhands, one small
-desert town, secret factions, and a round that is won by working out who is who —
-not by having the fastest trigger finger.
+A playable prototype of a **Wild West hidden-role FPS**: a table of 4 through 8
+gunhands (six by default), one small desert town, secret factions, and a round
+that is won by working out who is who — not by having the fastest trigger finger.
 
 Inspired by the *shape* of Western hidden-role board games (a hidden sheriff, a
 gang hunting them, a renegade playing everyone). All characters, names, abilities,
@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 110 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 113 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 ```
@@ -458,7 +458,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 110 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 113 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -517,6 +517,11 @@ They are grouped by what they protect:
   witness counts, and a headline share that is actually between 0 and 1), and it
   never becomes a record of who played and what they said: not one word of chat
   reaches the file, and no name does either unless somebody asked for names.
+- **`test/readme.test.js`** — this file is load-bearing: it is where the design
+  rules are argued for, and people read it instead of the constants. It had
+  already drifted four separate times, so the numbers it quotes are pinned to the
+  constants they came from, every card, character and role has to be written up,
+  and the two places that quote a test count have to agree with each other.
 - **`test/settings.test.js`** — everything the settings panel stores comes back
   out of `localStorage`, which anybody can edit by hand, so the part that decides
   what a stored value is *allowed* to be is pure and tested: no value can push a
