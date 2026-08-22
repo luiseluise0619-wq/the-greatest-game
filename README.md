@@ -552,7 +552,14 @@ Prototype, deliberately scoped to a vertical slice:
   movement path and worth doing only once the game has proven it deserves it.
 - **Bots do not use rooftops or the water tower** — the nav graph is ground-level
   only. Deliberate for now, and it makes verticality a human edge.
-- **No voice chat.** Text chat and the shout wheel stand in for it.
+- **No voice chat.** Text chat and the shout wheel stand in for it — the wheel
+  has a range and a voice, but the words are still canned.
 - Match length with bots only runs shorter than the 10–15 minute target because
   bots find each other faster than people do; the phase timers support the full
-  length and human rounds fill it.
+  length and human rounds fill it. Round length is bimodal rather than short —
+  see **Design target**.
+- **Desktop only.** Pointer lock and a keyboard; there is no touch control
+  scheme and no attempt at one.
+- **One process, all rooms in memory.** Restarting the server ends every round
+  in progress, and it does not scale past one machine. See
+  **[DEPLOY.md](DEPLOY.md)** — this is the caveat that will bite you.
