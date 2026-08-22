@@ -9,7 +9,7 @@ import MAP from '../../shared/map.js';
 import { moveAndCollide } from '../../shared/collision.js';
 import {
   PLAYER, WEAPONS, PHASE, VOICE_LINES, ENDGAME, REPLAY, CARD_ORDER, INPUT_RATE, clamp,
-  stepStamina, canSprint,
+  stepStamina, canSprint, swapTime,
 } from '../../shared/constants.js';
 import { C, S } from '../../shared/protocol.js';
 import { buildWorld, animateWorld } from './world.js';
@@ -584,6 +584,10 @@ class Game {
     // Stamina is simulated on both sides; only resync when they have genuinely
     // drifted, or every packet would jolt the sprint bar.
     if (Number.isFinite(msg.stam) && Math.abs(msg.stam - s.stamina) > 0.6) s.stamina = msg.stam;
+    // The server owns the swap lockout; this is the only place it is told.
+    if (Number.isFinite(msg.swap)) {
+      s.swapUntil = Math.max(s.swapUntil, performance.now() / 1000 + msg.swap);
+    }
     s.reserve = msg.reserve;
     s.reloading = msg.reloading;
 
@@ -864,6 +868,11 @@ class Game {
 
   swapTo(slot) {
     if (!this.self.guns.includes(slot)) { this.audio.deny(); return; }
+    if (this.self.weapon === slot) return;
+    // Start the lockout here rather than waiting for the server to say so.
+    // Without it the first clicks after a swap fired locally - flash, bang, a
+    // round off the counter - and the server threw every one of them away.
+    this.self.swapUntil = performance.now() / 1000 + swapTime(slot, this.character);
     this.send({ t: C.SWAP, slot });
   }
 
@@ -889,7 +898,9 @@ class Game {
   }
 
   tryBadge() {
-    if (this.selfRole?.role !== 'sheriff' || this.self.badge) { this.audio.deny(); return; }
+    // canBadge rather than a role check: the server decides who may pin it on,
+    // and the client should not be the second place that rule is written down.
+    if (!this.selfRole?.canBadge || this.self.badge) { this.audio.deny(); return; }
     this.send({ t: C.BADGE });
   }
 

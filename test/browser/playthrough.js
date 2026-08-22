@@ -37,6 +37,9 @@ const server = spawn('node', ['server/index.js'], {
     // Then a short round, so one run still reaches the aftermath screen, which
     // is the only place the cards that were played are ever named.
     HNH_PREP: '40', HNH_COMBAT: '40', HNH_ENDGAME: '8', HNH_RESULTS: '50',
+    // A public town deals itself in twelve seconds after a second player
+    // arrives, which this suite takes longer than to get through the lobby.
+    HNH_LOBBYCOUNTDOWN: '600',
   },
   stdio: ['ignore', 'ignore', 'pipe'],
 });
@@ -140,6 +143,23 @@ try {
     return { grew: window.game.renderer.info.memory.geometries - warm, protos: fx.lootProtos.size };
   });
   check(churn && churn.grew === 0, `loot churn allocates nothing (${churn ? `+${churn.grew} geometries` : 'no loot'})`);
+
+  // Swapping a weapon has to lock the trigger on the client too, or the first
+  // clicks after a swap flash and bang and the server drops every one of them.
+  const swap = await A.evaluate(async () => {
+    const g = window.game;
+    g.self.guns = ['revolver', 'rifle'];
+    g.self.weapon = 'revolver';
+    g.self.mag = 6;
+    g.self.nextFireAt = 0;
+    g.self.swapUntil = 0;
+    g.swapTo('rifle');
+    const lockedRightAfter = !g.canFireLocally();
+    const before = g.self.mag;
+    g.tryFire();
+    return { lockedRightAfter, spentARound: g.self.mag !== before };
+  });
+  check(swap.lockedRightAfter && !swap.spentARound, 'the trigger is locked while a gun comes up');
 
   const standing = await A.evaluate(() => document.getElementById('standing').textContent.trim());
   check(/^[1-9]\d* STILL STANDING/.test(standing), `the town knows how many are left ("${standing}")`);

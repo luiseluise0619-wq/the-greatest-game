@@ -5,7 +5,7 @@ import MAP, { zoneAt, SPAWNS, LOOT_SPAWNS, NAV_NODES } from '../shared/map.js';
 import { moveAndCollide, raycastWorld, lineOfSight, isBlocked } from '../shared/collision.js';
 import {
   PLAYER, ROLE_TABLE, MIN_PLAYERS, MAX_PLAYERS, rolesForPlayerCount, WEAPONS,
-  stepStamina, canSprint,
+  stepStamina, canSprint, swapTime, CHARACTERS,
 } from '../shared/constants.js';
 
 test('map is well formed', () => {
@@ -154,4 +154,22 @@ test('the sprint budget is a real constraint and always recovers', () => {
     const out = stepStamina(bad, true, 0.05);
     assert.ok(out >= 0 && out <= PLAYER.staminaMax, `stepStamina(${bad}) escaped its range`);
   }
+});
+
+test('the swap lockout is one rule, not two', () => {
+  // The client predicts it and the server enforces it. A client that thought it
+  // was shorter would fire shots the server threw away: a flash, a bang, a round
+  // off the counter, and no bullet anywhere.
+  for (const slot of Object.keys(WEAPONS)) {
+    for (const character of Object.keys(CHARACTERS)) {
+      const t = swapTime(slot, character);
+      assert.ok(t > 0, `${character} bringing up a ${slot} takes no time at all`);
+      assert.ok(t <= WEAPONS[slot].swapTime, `${character} is slower than the gun's own swap time`);
+    }
+  }
+  // Hair Trigger is the only thing that moves it, and it halves it.
+  assert.equal(swapTime('rifle', 'gunslinger'), WEAPONS.rifle.swapTime * 0.5);
+  assert.equal(swapTime('rifle', 'medic'), WEAPONS.rifle.swapTime);
+  // Nonsense in, zero out, rather than NaN into somebody's fire timer.
+  assert.equal(swapTime('trebuchet', 'medic'), 0);
 });

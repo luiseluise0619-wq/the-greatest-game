@@ -201,6 +201,7 @@ export const CHARACTERS = {
     desc: 'Passive: swaps weapons twice as fast. Active: 5s of rapid fire and instant reloads.',
     cooldown: 34,
     duration: 5,
+    swapMult: 0.5,        // the passive half of Hair Trigger
     hat: '#3a2a20', coat: '#7a4f2a', accent: '#d9b25c',
   },
   medic: {
@@ -282,6 +283,18 @@ export const GAMBLER_BOONS = [
 // if any two of them disagree about how long somebody can run, one of them is
 // either cheating or being punished for nothing.
 // ---------------------------------------------------------------------------
+
+/**
+ * How long this character takes to bring that gun up. Shared because the client
+ * predicts the lockout and the server enforces it, and a client that thought it
+ * was shorter would fire a shot the server threw away - a flash, a bang, a round
+ * off the counter, and no bullet.
+ */
+export function swapTime(slot, character) {
+  const w = WEAPONS[slot];
+  if (!w) return 0;
+  return w.swapTime * (CHARACTERS[character]?.swapMult ?? 1);
+}
 
 /** One tick of the sprint budget, in seconds of running left. */
 export function stepStamina(stamina, sprinting, dt) {

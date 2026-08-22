@@ -9,7 +9,7 @@ import {
   PLAYER, WEAPONS, DYNAMITE, WEAPON_ORDER, ROLES, PHASE, TIMING, ENDGAME,
   SOCIAL, HITBOX, CHARACTERS, GAMBLER_BOONS, LOOT_RESPAWN, VOICE_LINES, VISION, REPLAY,
   CARDS, CARD_ORDER, CARD_DEAL,
-  MIN_PLAYERS, MAX_PLAYERS, rolesForPlayerCount, clamp, stepStamina,
+  MIN_PLAYERS, MAX_PLAYERS, rolesForPlayerCount, clamp, stepStamina, swapTime,
 } from '../shared/constants.js';
 import MAP, { zoneAt, SPAWNS, LOOT_SPAWNS } from '../shared/map.js';
 import { raycastWorld, rayPlayerBox, lineOfSight, moveAndCollide } from '../shared/collision.js';
@@ -84,10 +84,8 @@ export class Room {
       token,
       map: MAP.name,
       phase: this.phase,
-      maxPlayers: MAX_PLAYERS,
       code: this.code,
       isPublic: this.isPublic,
-      humans: this.humanCount(),
     };
   }
 
@@ -432,8 +430,7 @@ export class Room {
     if (!p.guns[slot] || p.slot === slot) return;
     p.slot = slot;
     p.reloading = null;
-    const mult = p.character === 'gunslinger' ? 0.5 : 1;
-    p.swapUntil = now() + WEAPONS[slot].swapTime * mult;
+    p.swapUntil = now() + swapTime(slot, p.character);
     this.pushSelf(p);
   }
 
@@ -623,7 +620,6 @@ export class Room {
     if (killer && killer !== victim) killer.kills += 1;
 
     const place = zoneAt(victim.pos.x, victim.pos.z, victim.pos.y);
-    const role = ROLES[victim.role];
 
     // Who actually SAW the shooter? Only they learn the name. Everyone else gets
     // a rumour: a body, a place, and the dead player's role.
@@ -676,8 +672,6 @@ export class Room {
         victim: victim.id,
         victimName: victim.name,
         victimRole: victim.role,
-        roleName: role?.name,
-        roleColor: role?.color,
         killer: saw && killer ? killer.id : null,
         killerName: saw && killer ? killer.name : null,
         witnessed: saw,
@@ -794,7 +788,7 @@ export class Room {
       if (!p.guns[item.type]) {
         p.guns[item.type] = { mag: w.magSize, reserve: Math.round(w.reserve * 0.6) };
         p.slot = item.type;
-        p.swapUntil = now() + w.swapTime;
+        p.swapUntil = now() + swapTime(item.type, p.character);
       } else {
         const g = p.guns[item.type];
         if (g.reserve >= w.reserveMax) took = false;
@@ -1743,7 +1737,6 @@ export class Room {
 
       this.send(viewer.client, {
         t: S.SNAPSHOT,
-        k: this.tick,
         ps: base.filter((e) => visible.has(e.id)),
         dyn: this.dynamites.map((d) => ({ id: d.id, x: r2(d.pos.x), y: r2(d.pos.y), z: r2(d.pos.z) })),
         ring: this.phase === PHASE.ENDGAME ? r2(this.ringRadius || ENDGAME.startRadius) : 0,

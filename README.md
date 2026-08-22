@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 82 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 83 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 ```
 
@@ -445,7 +445,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 82 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 83 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -519,7 +519,9 @@ won by information. The knobs that control that balance, if you want to move it:
 - `SOCIAL.witnessRange` / `witnessFov` in `shared/constants.js` — how much the kill
   feed gives away.
 - `ROLE_TABLE` — faction counts per table size.
-- `TIMING` — phase lengths (or the `HNH_*` env overrides).
+- `TIMING` — phase lengths, including the public-lobby auto-start countdown
+  (or the `HNH_*` env overrides: `HNH_PREP`, `HNH_COMBAT`, `HNH_ENDGAME`,
+  `HNH_RESULTS`, `HNH_LOBBYCOUNTDOWN`).
 
 Balance across 20 headless bot-only rounds currently sits at 11 Outlaw / 7 Law /
 2 Renegade, with the first death about a minute in, and roughly one death in nine

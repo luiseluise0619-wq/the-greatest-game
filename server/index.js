@@ -67,7 +67,7 @@ function resolveRequest(urlPath) {
 if (process.env.HNH_FAST) {
   TIMING.prep = 10; TIMING.combat = 75; TIMING.endgame = 30; TIMING.results = 12;
 }
-for (const key of ['prep', 'combat', 'endgame', 'results']) {
+for (const key of ['prep', 'combat', 'endgame', 'results', 'lobbyCountdown']) {
   const env = process.env[`HNH_${key.toUpperCase()}`];
   if (env && Number.isFinite(Number(env))) TIMING[key] = Number(env);
 }
