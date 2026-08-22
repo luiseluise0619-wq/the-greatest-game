@@ -40,7 +40,12 @@ const server = spawn('node', ['server/index.js'], {
     // - is not racing a Sheriff who went down in the first thirty seconds.
     // Then a short round, so one run still reaches the aftermath screen, which
     // is the only place the cards that were played are ever named.
-    HNH_PREP: '40', HNH_COMBAT: '40', HNH_ENDGAME: '8', HNH_RESULTS: '50',
+    HNH_PREP: '40', HNH_COMBAT: '40', HNH_ENDGAME: '8',
+    // The aftermath phase has to outlast the checks that run on it. On a
+    // two-core runner drawing every pixel on the CPU, a screenshot alone can
+    // take seconds, and a results screen that timed out mid-check took its own
+    // buttons off the page.
+    HNH_RESULTS: '240',
     // A public town deals itself in twelve seconds after a second player
     // arrives, which this suite takes longer than to get through the lobby.
     HNH_LOBBYCOUNTDOWN: '600',
@@ -348,7 +353,9 @@ try {
     // Riding again is a readiness call with two players in the room, so it must
     // hold the screen up rather than dumping this one player into a lobby.
     await A.bringToFront();
-    await A.click('#playAgain');
+    const stillUp = await A.evaluate(() => !document.getElementById('results').classList.contains('hidden'));
+    check(stillUp, 'the aftermath screen is still up to press a button on');
+    if (stillUp) await A.click('#playAgain');
     await A.waitForTimeout(900);
     const afterReady = await A.evaluate(() => ({
       resultsUp: !document.getElementById('results').classList.contains('hidden'),
@@ -356,9 +363,9 @@ try {
       disabled: document.getElementById('playAgain').disabled,
       phase: window.game.phase,
     }));
-    check(afterReady.resultsUp && afterReady.phase === 'results',
+    check(!stillUp || (afterReady.resultsUp && afterReady.phase === 'results'),
       `one of two players cannot start the next round alone (phase ${afterReady.phase})`);
-    check(afterReady.disabled && /1\/2/.test(afterReady.label),
+    check(!stillUp || (afterReady.disabled && /1\/2/.test(afterReady.label)),
       `the button says who is waiting ("${afterReady.label}")`);
   }
 
