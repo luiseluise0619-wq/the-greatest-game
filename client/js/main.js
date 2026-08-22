@@ -339,6 +339,8 @@ class Game {
         this.hud.addFeed('You read the dust. Fresh prints, no names on them.', 'good');
         break;
 
+      case S.CARDS: this.hud.setHand(msg); break;
+
       case S.BADGE:
         this.hud.addFeed(`<b>${escapeHtml(msg.name)}</b> pins on the star.`, 'badge');
         this.audio.blip(700, 0.4, 'triangle', 0.16, 1200);
@@ -657,6 +659,8 @@ class Game {
         case 'KeyG': this.tryThrow(); break;
         case 'KeyF': this.tryAccuse(); break;
         case 'KeyB': this.tryBadge(); break;
+        case 'KeyZ': this.playCard(0); break;
+        case 'KeyX': this.playCard(1); break;
         case 'KeyV': this.voiceOpen = true; this.hud.showVoiceWheel(true); break;
         case 'KeyH': this.peeking = true; this.hud.peekRole(true); break;
         case 'Tab': e.preventDefault(); this.hud.toggleScoreboard(true); break;
@@ -682,6 +686,14 @@ class Game {
   swapTo(slot) {
     if (!this.self.guns.includes(slot)) { this.audio.deny(); return; }
     this.send({ t: C.SWAP, slot });
+  }
+
+  /** Play a card out of the hand. The server owns every rule; this just names one. */
+  playCard(i) {
+    const id = this.hud.hand[i];
+    if (!id || !this.self.alive) { this.audio.deny(); return; }
+    this.send({ t: C.CARD, card: id });
+    this.audio.ability();
   }
 
   tryPickup() {

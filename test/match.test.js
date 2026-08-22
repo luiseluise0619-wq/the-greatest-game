@@ -124,6 +124,7 @@ test('the victim always learns who shot them', () => {
   try {
     room.beginMatch();
     tick(clock, room, 40);
+    freezeBots(room);
     const player = me();
     const killer = [...room.players.values()].find((p) => p.bot && p.alive);
     stub.reset();
@@ -138,9 +139,14 @@ test('a death replay carries only the killer and the victim', () => {
   const { room, clock, stub, me } = makeRoom({ bots: 6, prep: 1 });
   try {
     room.beginMatch();
-    tick(clock, room, 20 * 8);          // fill the history buffer during live fire
+    tick(clock, room, 40);              // into live combat
+    // Freeze the town BEFORE filling the history buffer: a bot that shoots our
+    // player, gets shot itself, or quietly buys a witness during those seconds
+    // leaves nothing to build a killcam out of.
+    freezeBots(room);
     const player = me();
     const killer = [...room.players.values()].find((p) => p.bot && p.alive);
+    tick(clock, room, 20 * 6);
     stub.reset();
     room.applyDamage(player, killer, 999, 'revolver', null);
 

@@ -23,6 +23,11 @@ const PORT = 8100 + Math.floor(Math.random() * 400);
 const SHOTS = process.env.HNH_SHOTS || 'test/browser/screenshots';
 mkdirSync(SHOTS, { recursive: true });
 
+const CARD_NAMES = {
+  barrel: 'rain barrel', poster: 'wanted poster', tracks: 'cover your tracks',
+  witness: 'buy a witness', ledger: "dead man's ledger", spyglass: 'long glass',
+};
+
 const server = spawn('node', ['server/index.js'], {
   env: { ...process.env, PORT: String(PORT), HNH_PREP: '10', HNH_COMBAT: '90', HNH_TELEMETRY: '0' },
   stdio: ['ignore', 'ignore', 'pipe'],
@@ -78,6 +83,9 @@ try {
   check(await A.isVisible('#roleCard'), 'the role card is dealt');
   const intel = (await A.textContent('#roleIntel')).trim();
   check(intel.length > 10, 'the role card carries a lead to pull');
+  const dealt = await A.evaluate(() => [...document.querySelectorAll('#roleCards .handCard h5')].length);
+  check(dealt === 2, `two cards are dealt and readable on the role card (${dealt})`);
+  await A.screenshot({ path: `${SHOTS}/01b-role-card.png` });
 
   await A.click('#roleCard');
   await A.waitForTimeout(1500);
@@ -93,6 +101,32 @@ try {
   check(state.calls > 0, `the town renders (${state.calls} draw calls)`);
   check(state.programs < 45, `shader count stays sane (${state.programs})`);
   await A.screenshot({ path: `${SHOTS}/02-in-game.png` });
+
+  // Play a card: the hand shrinks by one and the card moves into play, all
+  // without a word of it reaching the other player's screen.
+  const handBefore = await A.evaluate(() => window.game.hud.hand.slice());
+  const bFeedBefore = await B.evaluate(() => document.getElementById('feed').textContent);
+  await A.keyboard.press('KeyZ');
+  // Wait for the server's answer rather than a fixed pause: the Wanted Poster
+  // is refused with nobody in the crosshair, and that is a correct outcome too.
+  const spent = await A.waitForFunction(() => window.game.hud.hand.length < 2, null, { timeout: 4000 })
+    .then(() => true).catch(() => false);
+  const handAfter = await A.evaluate(() => ({ hand: window.game.hud.hand.slice(), armed: window.game.hud.armed.slice() }));
+  check(handBefore.length === 2, `hand starts full (${handBefore.length})`);
+  check(spent || handBefore[0] === 'poster',
+    `playing a card spends it (${handAfter.hand.length} left, ${handBefore[0]})`);
+  const chips = await A.evaluate(() => document.querySelectorAll('#handStrip .cardChip').length);
+  check(chips === handAfter.hand.length + handAfter.armed.length, `the hand strip matches the hand (${chips} chips)`);
+  const bFeedAfter = await B.evaluate(() => document.getElementById('feed').textContent.toLowerCase());
+  const aName = await A.evaluate(() => document.getElementById('nameInput').value || 'Stranger');
+  if (handBefore[0] === 'poster') {
+    // The one card that is public by design: pointing the finger has to cost you.
+    check(bFeedAfter.includes(aName.toLowerCase()) || handAfter.hand.length === 2,
+      'the Wanted Poster is announced to the town');
+  } else {
+    const name = CARD_NAMES[handBefore[0]].toLowerCase();
+    check(!bFeedAfter.includes(name), `a silent card stays silent for everyone else (${handBefore[0]})`);
+  }
 
   const bState = await B.evaluate(() => ({ inGame: window.game.inGame, role: !!window.game.selfRole }));
   check(bState.inGame && bState.role, 'the second player is in the same round');

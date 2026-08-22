@@ -53,6 +53,7 @@
 
   <div id="interactPrompt" class="hidden"><b>E</b> <span>pick up</span></div>
   <div id="statusStrip"></div>
+  <div id="handStrip"></div>
   <div id="reloadBar" class="hidden"><i></i></div>
 </div>
 
@@ -71,6 +72,10 @@
       <span>YOU ARE PLAYING</span>
       <p id="roleCharacter"></p>
       <em id="roleAbility"></em>
+    </div>
+    <div class="deckBox">
+      <span>DEALT TO YOU — <b>Z</b> and <b>X</b> to play</span>
+      <div id="roleCards"></div>
     </div>
     <div class="cardHint">Hold <b>H</b> in game to look at this again · click or press <b>Space</b> to take the reins</div>
   </div>
@@ -94,7 +99,7 @@
     <h1 id="resultTitle">THE LAW HOLDS</h1>
     <p id="resultBlurb"></p>
     <div class="resultCols">
-      <table id="resultTable"><thead><tr><th>Gunhand</th><th>Role</th><th>Character</th><th>Kills</th><th>Damage</th><th></th></tr></thead><tbody></tbody></table>
+      <table id="resultTable"><thead><tr><th>Gunhand</th><th>Role</th><th>Character</th><th>Kills</th><th>Cards</th><th>Damage</th><th></th></tr></thead><tbody></tbody></table>
       <div class="timelineWrap">
         <h3>HOW IT WENT</h3>
         <ol id="timeline"></ol>
@@ -157,6 +162,7 @@
             <li><b>Kills only name the killer if somebody watched it happen.</b> Everything else is a rumour and a location.</li>
             <li><b>The dead reveal their role.</b> Every body is evidence — for whoever is still standing.</li>
             <li><b>The Sheriff may pin on the star</b> for real armour and a permanent target. Or stay a stranger.</li>
+            <li><b>Two cards are dealt to you</b> and never shown to anyone. None of them shoot — they edit what the town is allowed to know: who witnessed a kill, whose boots left prints, who wears the star.</li>
           </ul>
           <h3>CONTROLS</h3>
           <div class="keys">
@@ -165,7 +171,8 @@
             <span><b>R</b> reload</span><span><b>1 2 3</b> guns</span><span><b>G</b> dynamite</span>
             <span><b>E</b> pick up</span><span><b>Q</b> ability</span><span><b>F</b> call out</span>
             <span><b>V</b> shout</span><span><b>T</b> chat</span><span><b>Tab</b> table</span>
-            <span><b>H</b> your hand</span><span><b>B</b> pin the star</span><span><b>Esc</b> free mouse</span>
+            <span><b>H</b> your hand</span><span><b>B</b> pin the star</span><span><b>Z X</b> play a card</span>
+            <span><b>Esc</b> free mouse</span>
           </div>
         </div>
       </section>

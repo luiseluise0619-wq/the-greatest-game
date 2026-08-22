@@ -8,6 +8,7 @@
 import {
   PLAYER, WEAPONS, DYNAMITE, WEAPON_ORDER, ROLES, PHASE, TIMING, ENDGAME,
   SOCIAL, HITBOX, CHARACTERS, GAMBLER_BOONS, LOOT_RESPAWN, VOICE_LINES, VISION, REPLAY,
+  CARDS, CARD_ORDER, CARD_DEAL,
   TICK_MS, MIN_PLAYERS, MAX_PLAYERS, rolesForPlayerCount, clamp,
 } from '../shared/constants.js';
 import MAP, { zoneAt, SPAWNS, LOOT_SPAWNS } from '../shared/map.js';
@@ -166,6 +167,14 @@ export class Room {
       abilityKind: null,
       buffs: {},
       badge: false,
+      hand: [],                 // cards still unplayed
+      armed: new Set(),         // cards played and waiting on a trigger
+      cardsPlayed: [],
+      barrelUntil: 0,           // still soaking the rest of one burst
+      noPrintsUntil: 0,
+      glassUntil: 0,
+      glassMarks: new Map(),    // id -> until: shooters the Long Glass has lit up
+      lastCardAt: 0,
       kills: 0,
       damageDealt: 0,
       deaths: 0,
@@ -202,6 +211,7 @@ export class Room {
       case C.ACCUSE: return this.onAccuse(p, msg);
       case C.VOICE: return this.onVoice(p, msg);
       case C.BADGE: return this.onBadge(p);
+      case C.CARD: return this.onCard(p, msg);
       case C.ADD_BOT: return this.onAddBot(p, msg);
       case C.START: return this.onStart(p, msg);
       case C.RESTART: return this.onRestart(p);
@@ -388,6 +398,14 @@ export class Room {
       const named = viewer.id === p.id || this.canSeeCached(viewer, p.id);
       this.send(viewer.client, named ? { ...shot, id: p.id } : shot);
     }
+    // Long Glass: anyone holding it up gets a face put to this shot, wherever
+    // in town it was fired from.
+    for (const viewer of this.players.values()) {
+      if (viewer.id === p.id || t >= (viewer.glassUntil || 0)) continue;
+      if (!viewer.glassMarks) viewer.glassMarks = new Map();
+      viewer.glassMarks.set(p.id, t + CARDS.spyglass.mark);
+    }
+
     this.notifyBots('gunshot', { pos: origin, shooter: p, weapon: w });
     if (g.mag === 0) this.startReload(p);
     this.pushSelf(p);
@@ -441,6 +459,26 @@ export class Room {
     if (this.phase === PHASE.PREP) return;                       // guns are noise only in prep
     if (this.phase !== PHASE.COMBAT && this.phase !== PHASE.ENDGAME) return;
 
+    // Rain Barrel. It absorbs the shot AND the feedback: we return before the
+    // attacker is told anything, so their hitmarker never fires and their
+    // damage number never appears. Believing you hit someone you did not is a
+    // far more useful lie than a few points of armour.
+    if (attacker && attacker !== victim) {
+      const tb = now();
+      if (victim.barrelUntil > tb) return;              // same burst, still soaking
+      if (victim.armed && victim.armed.has('barrel')) {
+        victim.armed.delete('barrel');
+        victim.barrelUntil = tb + CARDS.barrel.soak;
+        this.emit(victim, {
+          t: S.FEED,
+          text: 'The rain barrel takes it. Whoever fired that is certain they missed.',
+          tone: 'good',
+        });
+        this.pushCards(victim);
+        return;
+      }
+    }
+
     let dmg = amount;
     if (victim.badge) dmg *= SOCIAL.badgeDamageResist;
     if (victim.buffs.resist) dmg *= victim.buffs.resist;
@@ -490,7 +528,17 @@ export class Room {
     // Who actually SAW the shooter? Only they learn the name. Everyone else gets
     // a rumour: a body, a place, and the dead player's role.
     const witnesses = new Set();
-    if (killer && killer !== victim) {
+    // Buy a Witness erases the whole chain of custody for one kill: no
+    // bystanders, no killcam, and - the part that makes it worth a card - not
+    // even the victim, who normally always knows who shot them.
+    const bought = !!(killer && killer !== victim && killer.armed && killer.armed.has('witness'));
+    if (bought) {
+      killer.armed.delete('witness');
+      witnesses.add(killer.id);   // the killer obviously still knows
+      this.pushCards(killer);
+      this.emit(killer, { t: S.FEED, text: 'Nobody saw a thing. Money well spent.', tone: 'good' });
+      this.emit(victim, { t: S.FEED, text: 'A shot out of the dark. You never saw the face behind it.', tone: 'bad' });
+    } else if (killer && killer !== victim) {
       witnesses.add(killer.id);
       witnesses.add(victim.id);   // you always know who shot you
       for (const p of this.players.values()) {
@@ -504,6 +552,20 @@ export class Room {
         if (to.x * fwd.x + to.y * fwd.y + to.z * fwd.z < SOCIAL.witnessFov) continue;
         if (!lineOfSight(eye, kc, MAP.solids)) continue;
         witnesses.add(p.id);
+      }
+    }
+
+    // Dead Man's Ledger pays out here, by simply adding its holder to the
+    // witness set - so the name reaches them through the exact same channel a
+    // real sighting would, with no second code path to leak anything extra.
+    // A bought kill leaves nothing to read, so the ledger stays armed.
+    if (!bought && killer && killer !== victim) {
+      for (const p of this.players.values()) {
+        if (!p.alive || witnesses.has(p.id) || !p.armed || !p.armed.has('ledger')) continue;
+        p.armed.delete('ledger');
+        witnesses.add(p.id);
+        this.emit(p, { t: S.FEED, text: 'The ledger writes itself. You know who did that one.', tone: 'good' });
+        this.pushCards(p);
       }
     }
 
@@ -532,11 +594,11 @@ export class Room {
       killerRole: killer && killer !== victim ? killer.role : null,
       cause, place,
     });
-    if (killer && killer !== victim && !victim.bot && victim.client) {
+    if (!bought && killer && killer !== victim && !victim.bot && victim.client) {
       const replay = this.buildReplay(victim, killer, now());
       if (replay) this.emit(victim, replay);
     }
-    telemetry.death(this, victim, killer, cause, witnesses.size, place);
+    telemetry.death(this, victim, killer, cause, bought ? 0 : witnesses.size, place);
     this.notifyBots('kill', { victim, killer, witnesses });
 
     // Drop the good guns where you fell - the body is worth investigating.
@@ -865,6 +927,110 @@ export class Room {
     this.pushSelf(p);
   }
 
+  // -------------------------------------------------------------------------
+  // The Deck
+  //
+  // Two cards a round, and every one of them edits what the town is allowed to
+  // know rather than adding damage. Note what is NOT here: no card is announced
+  // to the room. The Wanted Poster broadcasts because being seen to point the
+  // finger is its cost; the other five are silent on purpose, because a card
+  // everybody watched you play cannot manipulate anybody.
+  // -------------------------------------------------------------------------
+  onCard(p, msg) {
+    const t = now();
+    if (!p.alive) return;
+    if (this.phase !== PHASE.PREP && this.phase !== PHASE.COMBAT && this.phase !== PHASE.ENDGAME) return;
+    if (t - (p.lastCardAt || 0) < SOCIAL.cardCooldown) return;
+
+    const id = String(msg.card || '');
+    const card = CARDS[id];
+    const idx = p.hand.indexOf(id);
+    if (!card || idx < 0) return;
+
+    // Targeted cards resolve against whoever is actually down the barrel. No
+    // menu, no clicking a name on a list: you have to look them in the face.
+    let target = null;
+    if (card.target === 'aim') {
+      target = this.playerInCrosshair(p, card.range);
+      if (!target || !target.alive) {
+        this.emit(p, { t: S.FEED, text: 'Nobody in your sights to put a name to.', tone: 'bad' });
+        return;
+      }
+    }
+
+    p.hand.splice(idx, 1);
+    p.lastCardAt = t;
+    p.cardsPlayed.push(id);
+    telemetry.social(this, 'card');
+
+    switch (id) {
+      case 'barrel':
+      case 'witness':
+      case 'ledger':
+        p.armed.add(id);
+        this.emit(p, { t: S.FEED, text: ARMED_LINE[id], tone: 'good' });
+        break;
+
+      case 'tracks':
+        this.footprints = this.footprints.filter((f) => f.g !== p.trailGroup);
+        p.noPrintsUntil = t + card.duration;
+        this.emit(p, {
+          t: S.FEED,
+          text: 'You sweep the street behind you. Every print you left is gone, and you leave none for a while.',
+          tone: 'good',
+        });
+        break;
+
+      case 'spyglass':
+        p.glassUntil = t + card.duration;
+        if (!p.glassMarks) p.glassMarks = new Map();
+        this.emit(p, {
+          t: S.FEED,
+          text: 'Glass to your eye. For the next few seconds every shot fired in this town has a face on it.',
+          tone: 'good',
+        });
+        break;
+
+      case 'poster': {
+        const star = target.role === 'sheriff';
+        this.broadcast({
+          t: S.FEED,
+          text: `${p.name} nails a wanted poster to the church door with ${target.name}'s name on it.`,
+          tone: 'accuse', from: p.id, target: target.id,
+        });
+        this.emit(p, {
+          t: S.FEED,
+          text: star
+            ? `The poster answers you: ${target.name} wears the star.`
+            : `The poster answers you: ${target.name} does not wear the star.`,
+          tone: star ? 'good' : 'bad',
+        });
+        this.emit(target, {
+          t: S.FEED,
+          text: 'Your name just went up on the church door. Everyone in town can read it.',
+          tone: 'bad',
+        });
+        if (p.bot && p.brain) p.brain.markSheriffness(target.id, star ? 1.4 : -1.4);
+        this.notifyBots('accuse', { from: p, target });
+        break;
+      }
+    }
+
+    this.timeline.push({
+      at: Math.max(0, Math.round(t - (this.stats?.started || t))),
+      type: 'card', who: p.name, card: id, cardName: card.name,
+      target: target ? target.name : null,
+      secret: id !== 'poster',
+    });
+    this.pushCards(p);
+  }
+
+  /** A player's own hand. Never sent to anybody else - that is the whole point. */
+  pushCards(p) {
+    if (p.bot || !p.client) return;
+    this.emit(p, { t: S.CARDS, hand: p.hand.slice(), armed: [...p.armed] });
+  }
+
   notifyBots(kind, data) {
     for (const p of this.players.values()) {
       if (p.bot && p.brain && p.alive) p.brain.onEvent(kind, data);
@@ -924,6 +1090,16 @@ export class Room {
       p.abilityUntil = 0;
       p.revealUntil = 0;
       p.trailGroup = groups[i];
+      // Two cards each, dealt independently, so no two hands are the same and
+      // nobody can reason backwards from what they were given to what you hold.
+      p.hand = shuffle(CARD_ORDER.slice()).slice(0, CARD_DEAL);
+      p.armed = new Set();
+      p.cardsPlayed = [];
+      p.barrelUntil = 0;
+      p.noPrintsUntil = 0;
+      p.glassUntil = 0;
+      p.glassMarks = new Map();
+      p.lastCardAt = 0;
       p.lastHitBy = null;
       p.seenAt = new Map();
       p.lastVisible = null;
@@ -939,6 +1115,7 @@ export class Room {
     for (const p of all) {
       p.intel = this.buildIntel(p, all);
       this.sendRole(p);
+      this.pushCards(p);
     }
 
     telemetry.matchStart(this);
@@ -1035,6 +1212,7 @@ export class Room {
       faction: p.faction, character: p.character,
       characterName: CHARACTERS[p.character]?.role,
       alive: p.alive, kills: p.kills, damage: Math.round(p.damageDealt),
+      cards: (p.cardsPlayed || []).slice(),
       won: p.faction === winner,
     })).sort((a, b) => (b.won - a.won) || (b.kills - a.kills) || (b.damage - a.damage));
 
@@ -1172,7 +1350,7 @@ export class Room {
       if (p.abilityUntil && t >= p.abilityUntil) p.abilityUntil = 0;
 
       // Footprint trail (the Tracker reads these later).
-      if (p.moving && t - p.lastFootprintAt > SOCIAL.footprintInterval) {
+      if (p.moving && t >= (p.noPrintsUntil || 0) && t - p.lastFootprintAt > SOCIAL.footprintInterval) {
         p.lastFootprintAt = t;
         this.footprints.push({ x: p.pos.x, y: p.pos.y, z: p.pos.z, t, g: p.trailGroup });
       }
@@ -1317,6 +1495,16 @@ export class Room {
           if (Math.hypot(o.pos.x - viewer.pos.x, o.pos.z - viewer.pos.z) <= c.radius) reveal.push(o.id);
         }
       }
+      // Long Glass marks ride the same channel as a scout reveal.
+      if (viewer.glassMarks && viewer.glassMarks.size) {
+        for (const [id, until] of viewer.glassMarks) {
+          if (t >= until) { viewer.glassMarks.delete(id); continue; }
+          const o = this.players.get(id);
+          if (!o || !o.alive) continue;
+          if (!reveal) reveal = [];
+          if (!reveal.includes(id)) reveal.push(id);
+        }
+      }
       // Scout reveals punch through the cull, otherwise the ability would do
       // nothing for anyone standing behind a wall.
       const visible = this.visibleTo(viewer, t);
@@ -1366,6 +1554,12 @@ export class Room {
     });
   }
 }
+
+const ARMED_LINE = {
+  barrel: 'You roll the rain barrel into place. The next shot that finds you finds water instead.',
+  witness: 'The money changes hands. Your next kill never happened.',
+  ledger: 'The ledger is open. The next man to die in this town writes a name in it for you.',
+};
 
 function lootWire(l) {
   return { id: l.id, x: r2(l.x), y: r2(l.y), z: r2(l.z), type: l.type };

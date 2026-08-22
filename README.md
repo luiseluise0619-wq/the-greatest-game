@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 28 checks: map, collision, match rules, information rules, anti-cheat
+npm test               # 43 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 ```
 
@@ -46,7 +46,7 @@ counts.
 | Phase | Length | What happens |
 |---|---|---|
 | Lobby | — | Pick a character, set the table size, deal |
-| Preparation | 45s | Roles dealt, guns holstered, everybody loots and sizes each other up |
+| Preparation | 45s | Roles and two cards dealt, guns holstered, everybody loots and sizes each other up |
 | The Round | 11 min | Live fire. Factions try to complete their objective |
 | Dust Storm | 90s | A storm closes on the town square and forces the last fight |
 | Aftermath | 22s | Every role revealed, then back to the lobby |
@@ -123,6 +123,51 @@ everyone, and the bots weigh it by how much they already trust you.
 Other channels: all-chat (`T`), a quick shout wheel (`V`, then a number), and the
 Tracker's footprints — which are deliberately colourless, so you can see that
 *somebody* walked through the alley but not who.
+
+---
+
+## The Deck
+
+Two cards are dealt to you at the start of every round, face down, and nobody is
+ever told what anybody else is holding. Press `Z` or `X` to play one.
+
+**None of them shoot.** That is the whole design rule: shooting, healing and
+blowing a hole in a wall are FPS verbs and they stay on the mouse. A card that
+dealt damage would just be a worse gun. Every card in this deck bends the
+*information rules* above instead — who witnessed what, whose name gets attached
+to a shot, whose boots left prints, who wears the star.
+
+| Card | What it does |
+|---|---|
+| **Rain Barrel** | The next bullet that finds you does nothing — and the shooter gets **no hitmarker and no damage number**. They will swear to the town that they hit you. |
+| **Wanted Poster** | Nail the name of whoever is in your sights to the church door. The whole town is told *you* did it. In return you alone learn whether they wear the star. |
+| **Cover Your Tracks** | Sweeps away every footprint you have left in this town and leaves none for 75s. A Tracker who reads the dust finds an empty street where you were standing. |
+| **Buy a Witness** | Your next kill names nobody: no witnesses, no name in anyone's feed, no killcam — and **not even the body** finds out who did it. |
+| **Dead Man's Ledger** | The next death anywhere in town, you privately learn who pulled the trigger. Beaten by Buy a Witness: an erased kill leaves nothing to read. |
+| **Long Glass** | For 12s, anyone who fires a shot anywhere in town is outlined for you for three seconds. Gunfire stops being a noise and starts being a name. |
+
+Five of the six are **completely silent** — no feed line, no animation anybody
+else can see, nothing on the wire for another client to sniff. The Wanted Poster
+is the exception, and its broadcast is its cost: pointing the finger in public is
+supposed to hurt.
+
+The payoff comes at sundown. The results screen names every card that was played
+and by whom, which is where the round's real story usually turns up — *that* is
+why nobody saw who shot you in the stable.
+
+Implementation notes worth knowing:
+
+- Buy a Witness resolves inside `killPlayer()` by leaving the witness set empty
+  rather than by adding a second code path, so there is nothing extra that could
+  leak.
+- Dead Man's Ledger pays out by adding its holder to that same witness set — the
+  name reaches them through the exact channel a real sighting would.
+- Bots hold and play cards too, on readable motives: the one who vanished from
+  the dust swept it, the one who swears they hit you was shooting at a barrel.
+
+These six cards, their names and their effects are original to this project.
+Hidden-role structure is a mechanic; a card set is expression, so this expression
+is ours.
 
 ---
 
@@ -255,7 +300,7 @@ agendas:
 |---|---|
 | `WASD` move · `Shift` sprint · `Ctrl` crouch · `Space` jump | `LMB` fire · `RMB` aim (rifle) · `R` reload |
 | `1` `2` `3` weapons · `G` dynamite · `E` pick up | `Q` ability · `F` call somebody out · `B` pin on the star |
-| `T` chat · `V` shout wheel · `Tab` the table | `H` peek at your hand · `Esc` free the mouse |
+| `T` chat · `V` shout wheel · `Tab` the table | `Z` `X` play a card · `H` peek at your role · `Esc` free the mouse |
 
 ---
 
@@ -275,7 +320,7 @@ client/     js/main.js    networking, local movement, input, render loop
             js/viewmodel.js  first-person guns and their animations
             js/effects.js tracers, impacts, dynamite, footprints, pickups
             js/audio.js   every sound synthesised in WebAudio, no files
-            js/hud.js     HUD, feed, role card, scoreboard, results
+            js/hud.js     HUD, feed, role card, your hand, scoreboard, results
 ```
 
 **Authority split.** Movement is simulated on the client and speed-clamped by the
@@ -284,8 +329,9 @@ round — hit resolution, damage, deaths, roles, and *who is told what* — is r
 on the server and never trusted to a client.
 
 Bots run inside the server and go through the exact same `onShoot` / `onSwap` /
-`onPickup` entry points as human players, so there is one combat implementation and
-bots cannot do anything a player could not.
+`onPickup` / `onCard` entry points as human players, so there is one combat
+implementation, one rule set for the deck, and bots cannot do anything a player
+could not.
 
 ---
 
@@ -310,7 +356,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 28 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 43 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -321,6 +367,13 @@ They are grouped by what they protect:
   preparation, each faction's win condition fires, and the information rules
   hold: an unwitnessed kill names nobody, the victim always learns their killer,
   a death replay carries only two people, and the dead cannot talk to the living.
+- **`test/cards.test.js`** — the deck. Mostly assertions about *absent*
+  information: a Rain Barrel that must swallow the shooter's hitmarker as well as
+  the bullet, a bought kill that reaches neither the town, the victim nor the
+  killcam, a ledger that stays armed because there was nothing to read, a Wanted
+  Poster whose answer never leaves the player who nailed it up, and a Long Glass
+  mark that punches through the visibility cull and then fades. Plus a guard rail
+  on the design rule itself: no card description may mention damage or healing.
 - **`test/security.test.js`** — what a lying client cannot do: teleport, walk
   through a wall, end up inside geometry, be told about players it cannot see, or
   learn the name of a shooter it could not have seen.
@@ -344,8 +397,11 @@ won by information. The knobs that control that balance, if you want to move it:
 - `ROLE_TABLE` — faction counts per table size.
 - `TIMING` — phase lengths (or the `HNH_*` env overrides).
 
-Balance across 14 headless bot-only rounds currently sits at roughly 5 Law / 8
-Outlaw / 1 Renegade wins, with the first death around a minute in.
+Balance across 12 headless bot-only rounds currently sits at roughly 3 Law / 7
+Outlaw / 2 Renegade wins, with the first death around a minute in. Bots play
+about a third of the cards they are dealt; running the same sim with hands
+emptied moves neither the win split nor the round length outside the noise, which
+is what you want from a layer that adds information rather than firepower.
 
 ---
 
@@ -353,7 +409,7 @@ Outlaw / 1 Renegade wins, with the first death around a minute in.
 
 Prototype, deliberately scoped to a vertical slice:
 
-- **One map**, three guns, six characters, one game mode.
+- **One map**, three guns, six characters, six cards, one game mode.
 - **Movement is client-simulated and server-validated.** The client integrates
   its own movement for a crisp feel; the server treats the position it reports as
   a *target* and walks it through the real geometry, so no client gets through a

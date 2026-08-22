@@ -30,10 +30,18 @@ export function stubClient() {
 /**
  * Stop bot AI so anybody the test positions by hand stays there. Without this,
  * tests that place players and then tick are flaky - the bots simply walk off.
+ * Also takes their cards away: a bot quietly playing Buy a Witness mid-test
+ * changes what the rest of the room is told, which is exactly what these tests
+ * are trying to measure.
  */
 export function freezeBots(room) {
   for (const p of room.players.values()) {
-    if (p.bot) { p.brain = null; p.moving = false; p.vel = { x: 0, y: 0, z: 0 }; }
+    if (!p.bot) continue;
+    p.brain = null;
+    p.moving = false;
+    p.vel = { x: 0, y: 0, z: 0 };
+    p.hand = [];
+    if (p.armed) p.armed.clear();
   }
 }
 

@@ -2,7 +2,7 @@
 // Deliberately sparse in game - health, ammo, cooldown, one objective line.
 // Roles are never on screen unless somebody has died or you asked to see yours.
 
-import { CHARACTERS, CHARACTER_ORDER, ROLES, VOICE_LINES, WEAPONS, PHASE } from '../../shared/constants.js';
+import { CHARACTERS, CHARACTER_ORDER, ROLES, VOICE_LINES, WEAPONS, PHASE, CARDS } from '../../shared/constants.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -20,6 +20,8 @@ export class HUD {
     this.knownRoles = new Map();     // id -> role, learned only from bodies
     this.roster = new Map();         // id -> {name, bot, alive, kills}
     this.selfRole = null;
+    this.hand = [];
+    this.armed = [];
     this.feedLines = [];
     this.chatLines = [];
     this.buildCharacterGrid();
@@ -185,6 +187,43 @@ export class HUD {
     $('dustOverlay').style.opacity = (s.buffs || []).includes('dust') ? '1' : '0';
   }
 
+  // ------------------------------------------------------------------ cards
+  /**
+   * Your hand, and only ever your hand. The server never tells anybody what
+   * anybody else is holding, so there is nothing here to accidentally render.
+   */
+  setHand(msg) {
+    this.hand = msg.hand || [];
+    this.armed = msg.armed || [];
+    const keys = ['Z', 'X'];
+    const chips = [
+      ...this.hand.map((id, i) => {
+        const c = CARDS[id];
+        return `<div class="cardChip" title="${escapeHtml(c.desc)}"><b>${keys[i] || '·'}</b><span>${c.short}</span></div>`;
+      }),
+      ...this.armed.map((id) => {
+        const c = CARDS[id];
+        return `<div class="cardChip live" title="${escapeHtml(c.desc)}"><b>●</b><span>${c.short}</span></div>`;
+      }),
+    ];
+    $('handStrip').innerHTML = chips.join('');
+    this.renderRoleCards();
+  }
+
+  renderRoleCards() {
+    const box = $('roleCards');
+    if (!box) return;
+    if (!this.hand.length && !this.armed.length) { box.innerHTML = ''; return; }
+    const keys = ['Z', 'X'];
+    box.innerHTML = this.hand.map((id, i) => {
+      const c = CARDS[id];
+      return `<div class="handCard"><h5>${escapeHtml(c.name)}<em>${keys[i] || ''}</em></h5><p>${escapeHtml(c.desc)}</p><i>${escapeHtml(c.flavour)}</i></div>`;
+    }).join('') + this.armed.map((id) => {
+      const c = CARDS[id];
+      return `<div class="handCard live"><h5>${escapeHtml(c.name)}<em>IN PLAY</em></h5><p>${escapeHtml(c.desc)}</p></div>`;
+    }).join('');
+  }
+
   showKillcam(msg) {
     $('kcKiller').textContent = msg.killerName;
     $('kcWhere').textContent = msg.place ? `— ${msg.place}` : '';
@@ -346,6 +385,7 @@ export class HUD {
         <td class="role" style="color:${r.color}">${r.roleName}</td>
         <td>${r.characterName || ''}</td>
         <td>${r.kills}</td>
+        <td>${(r.cards || []).map((c) => `<span class="crd">${escapeHtml(CARDS[c]?.short || c)}</span>`).join(' ') || '<span class="muted">—</span>'}</td>
         <td>${r.damage}</td>
         <td>${r.won ? '<span class="wonTag">WON</span>' : '<span class="lostTag">lost</span>'}</td>`;
       tb.appendChild(tr);
@@ -377,6 +417,14 @@ export class HUD {
           body = `<b>${escapeHtml(e.killer)}</b> <span class="rle" style="color:${kr?.color}">${kr?.name || ''}</span> killed ${who} in ${e.place}`;
         } else body = `${who} died in ${e.place}`;
         li.className = 'death';
+      } else if (e.type === 'card') {
+        // The payoff for every silent card in the round: the aftermath screen
+        // is the first and only place the town finds out what was played.
+        const name = escapeHtml(e.cardName || e.card);
+        body = e.target
+          ? `<b>${escapeHtml(e.who)}</b> played <span class="crd">${name}</span> on <b>${escapeHtml(e.target)}</b>`
+          : `<b>${escapeHtml(e.who)}</b> played <span class="crd">${name}</span>${e.secret ? ' — nobody knew' : ''}`;
+        li.className = 'card';
       } else if (e.type === 'badge') {
         body = `<b>${escapeHtml(e.who)}</b> pinned on the star`;
         li.className = 'badge';
@@ -397,6 +445,10 @@ export class HUD {
   newMatch() {
     this.knownRoles.clear();
     this.roster.clear();
+    this.hand = []; this.armed = [];
+    $('handStrip').innerHTML = '';
+    const box = $('roleCards');
+    if (box) box.innerHTML = '';
   }
 
   setResultCountdown(s) {

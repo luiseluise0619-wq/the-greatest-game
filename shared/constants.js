@@ -270,6 +270,60 @@ export const GAMBLER_BOONS = [
 ];
 
 // ---------------------------------------------------------------------------
+// The Deck. Six cards, two dealt to every player at the start of a round.
+//
+// Design rule, and the reason the set looks like this: a card must never be a
+// second way to do something a gun already does. Shooting, healing, blowing a
+// hole in a wall - those are FPS verbs and they stay on the mouse. Cards only
+// ever bend the INFORMATION rules: who witnessed what, whose name gets attached
+// to a shot, whose footprints exist, who wears the star. Every one of these
+// hooks a system that already runs in this game.
+//
+// All six are our own design and our own names. Nothing here is lifted from a
+// published card game - the hidden-role structure is a mechanic, but the cards
+// are the expression, so the expression is ours.
+// ---------------------------------------------------------------------------
+export const CARDS = {
+  barrel: {
+    id: 'barrel', name: 'Rain Barrel', short: 'BARREL', target: 'none', kind: 'armed',
+    desc: 'Arms until spent. The next bullet that finds you does nothing at all - and the shooter gets no hitmarker, no blood, no confirmation. They will swear to the town that they hit you.',
+    flavour: 'Half a barrel of rainwater stops more lead than most men believe.',
+    soak: 0.25,        // seconds: soaks the rest of the same burst, not just one pellet
+  },
+  poster: {
+    id: 'poster', name: 'Wanted Poster', short: 'POSTER', target: 'aim', kind: 'instant',
+    range: 70,
+    desc: 'Nail the name of whoever is in your sights to the church door. The whole town is told that you did it. In return you alone learn whether that person wears the star.',
+    flavour: 'Ink is cheap. Being the one holding the hammer is not.',
+  },
+  tracks: {
+    id: 'tracks', name: 'Cover Your Tracks', short: 'TRACKS', target: 'none', kind: 'timed',
+    duration: 75,
+    desc: 'Sweeps away every footprint you have left in this town, and you leave none for 75 seconds. A Tracker who reads the dust after this finds an empty street where you were standing.',
+    flavour: 'A dragged blanket and a little patience.',
+  },
+  witness: {
+    id: 'witness', name: 'Buy a Witness', short: 'WITNESS', target: 'none', kind: 'armed',
+    desc: 'Arms until spent. Your next kill names nobody: no witnesses, no name in anyone\'s feed, no killcam. Not even the body finds out who did it.',
+    flavour: 'Everybody in this town has a price. Most of them are cheap.',
+  },
+  ledger: {
+    id: 'ledger', name: 'Dead Man\'s Ledger', short: 'LEDGER', target: 'none', kind: 'armed',
+    desc: 'Arms until spent. The next death anywhere in town, you privately learn who pulled the trigger - even from the other end of the street. Beaten by Buy a Witness: an erased kill leaves nothing to read.',
+    flavour: 'The undertaker writes everything down. He just does not read it aloud.',
+  },
+  spyglass: {
+    id: 'spyglass', name: 'Long Glass', short: 'GLASS', target: 'none', kind: 'timed',
+    duration: 12, mark: 3.2,
+    desc: 'For 12 seconds, anyone who fires a shot anywhere in town is outlined for you for three seconds - through walls, across the whole map. Gunfire stops being a noise and starts being a name.',
+    flavour: 'A cracked brass spyglass off a dead surveyor.',
+  },
+};
+
+export const CARD_ORDER = ['barrel', 'poster', 'tracks', 'witness', 'ledger', 'spyglass'];
+export const CARD_DEAL = 2;          // cards in hand at the start of a round
+
+// ---------------------------------------------------------------------------
 // Match structure
 // ---------------------------------------------------------------------------
 export const PHASE = {
@@ -308,6 +362,7 @@ export const SOCIAL = {
   // The Sheriff may pin on the star for a permanent buff and a permanent target.
   badgeHealthBonus: 45,
   badgeDamageResist: 0.85,
+  cardCooldown: 1.6,
   footprintInterval: 0.55,
   footprintTtl: 24,
 };

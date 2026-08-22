@@ -5,7 +5,7 @@
 // on somebody they have decided to trust, and to shout about it afterwards.
 // Everything below is built around a per-bot suspicion table plus a faction goal.
 
-import { PLAYER, WEAPONS, CHARACTERS, PHASE, clamp } from '../shared/constants.js';
+import { PLAYER, WEAPONS, CHARACTERS, CARDS, PHASE, clamp } from '../shared/constants.js';
 import MAP, { NAV_NODES, zoneAt } from '../shared/map.js';
 import { moveAndCollide, lineOfSight } from '../shared/collision.js';
 
@@ -156,6 +156,7 @@ export class BotBrain {
     this.nextThink = 0;
     this.nextPerceive = 0;
     this.nextChatAt = rnd(25, 70);
+    this.nextCardAt = rnd(8, 40);
     this.reactionUntil = 0;
     this.fleeUntil = 0;
     this.burstRestUntil = 0;
@@ -515,6 +516,7 @@ export class BotBrain {
     this.move(t, dt, visibleTarget);
     if (fighting) this.fight(t, visibleTarget);
     this.useAbility(t, visibleTarget);
+    this.playCards(t, visibleTarget);
     this.tryLoot(t);
     this.social(t, dt);
 
@@ -870,6 +872,37 @@ export class BotBrain {
         break;
     }
     if (want) this.room.onAbility(me);
+  }
+
+  /**
+   * Bots hold two cards like everyone else, and play them for reasons a human
+   * could read off their behaviour afterwards: the one who vanished from the
+   * dust had swept it, the one who swore they hit you was shooting at a barrel.
+   * They go through Room.onCard, so every rule is enforced in exactly one place.
+   */
+  playCards(t, target) {
+    const me = this.self;
+    if (!me.hand || !me.hand.length) return;
+    if (t < this.nextCardAt) return;
+    this.nextCardAt = t + rnd(2.5, 6);
+    const has = (id) => me.hand.includes(id);
+    const play = (id) => { this.room.onCard(me, { card: id }); return true; };
+
+    if (has('barrel') && me.health < me.maxHealth * 0.5) return play('barrel');
+    if (has('witness') && target && this.wantsDead(target) > 0.9 && this.canSee(target)) return play('witness');
+    if (has('tracks') && (this.state === 'flee' || me.kills > 0) && Math.random() < 0.3) return play('tracks');
+    if (has('spyglass') && (this.state === 'investigate' || this.state === 'hunt') && Math.random() < 0.25) return play('spyglass');
+    if (has('ledger') && this.room.phase === PHASE.COMBAT && Math.random() < 0.08) return play('ledger');
+    if (has('poster')) {
+      // Nailing up a poster is a thing you do to somebody's face, so it needs
+      // them in the crosshair - which for a bot means someone they are already
+      // squaring up to and already do not trust.
+      const aimed = this.room.playerInCrosshair(me, CARDS.poster.range);
+      if (aimed && aimed.alive && this.susOf(aimed.id) > 0.45) return play('poster');
+    }
+    // Nobody should ride into the storm holding a card they never used.
+    if (this.room.phase === PHASE.ENDGAME && Math.random() < 0.2) return play(pick(me.hand));
+    return false;
   }
 
   social(t, dt) {

@@ -308,6 +308,35 @@ button.big { width: 100%; padding: 14px; font-size: 15px; letter-spacing: .22em;
 #hud.replay #bottomRight,
 #hud.replay #crosshair,
 #hud.replay #statusStrip { opacity: 0; }
+/* ---- The Deck: your hand, bottom centre, deliberately small ------------- */
+#handStrip { position: absolute; left: 50%; bottom: 62px; transform: translateX(-50%); display: flex; gap: 7px; }
+.cardChip { display: flex; align-items: center; gap: 7px; padding: 4px 10px 4px 5px;
+  background: rgba(18,14,11,.62); border: 1px solid rgba(184,165,134,.34);
+  font-size: 10px; letter-spacing: .13em; color: #cbbfa6; }
+.cardChip b { display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; background: rgba(184,165,134,.16); border: 1px solid rgba(184,165,134,.42);
+  font-size: 9px; color: #e8dcc0; }
+.cardChip.live { border-color: rgba(232,193,90,.6); color: var(--gold); }
+.cardChip.live b { color: var(--gold); border-color: rgba(232,193,90,.6); background: rgba(232,193,90,.16); }
+#hud.replay #handStrip { opacity: 0; transition: opacity .25s; }
+
+.deckBox { margin-top: 12px; border-top: 1px solid rgba(60,42,26,.25); padding-top: 9px; }
+.deckBox > span { font-size: 9px; letter-spacing: .28em; color: #7a5f3c; }
+.deckBox > span b { color: #6b2f22; }
+#roleCards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 7px; }
+.handCard { border: 1px solid rgba(60,42,26,.3); background: rgba(60,42,26,.06); padding: 7px 9px; }
+.handCard.live { border-color: rgba(150,100,30,.55); background: rgba(180,130,40,.1); }
+.handCard h5 { margin: 0 0 4px; font-size: 11.5px; letter-spacing: .08em; color: #3c2a1a;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.handCard h5 em { font-style: normal; font-size: 9px; letter-spacing: .18em; color: #8a6a44; }
+.handCard p { margin: 0; font-size: 11px; line-height: 1.45; color: #4a3a2a; }
+.handCard i { display: block; margin-top: 4px; font-size: 10px; color: #8a7358; }
+@media (max-width: 620px) { #roleCards { grid-template-columns: 1fr; } }
+
+.crd { font-size: 9.5px; letter-spacing: .12em; padding: 1px 5px; border: 1px solid rgba(184,165,134,.4);
+  color: #c9bb9d; white-space: nowrap; }
+#timeline li.card { border-left-color: rgba(184,165,134,.55); }
+
 #hud #topbar, #hud #bottomLeft, #hud #bottomRight,
 #hud #crosshair, #hud #statusStrip { transition: opacity .25s; }
 
