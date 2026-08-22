@@ -155,10 +155,10 @@ the payoff for a whole round of not being able to see them.
 health and 15% damage resistance, but every Outlaw in town now has a name and a
 face. Going loud is usually the Sheriff's strongest and most dangerous play.
 
-**Sprint is five seconds long.** It refills at about a fifth of the rate it
-drains and you need a second of it banked before you can start running again, so
-you cannot outrun the man behind you indefinitely and you cannot cross town
-without arriving winded. The same budget is shared by the client's own
+**Sprint is five seconds long.** It drains at one second per second and comes
+back at 0.9, and you need 1.2s of it banked before you can start running again —
+so a long chase is about a fifth walking, and you cannot cross town without
+arriving winded. The same budget is shared by the client's own
 integration, the bots, and the server validating your movement — one rule, in
 `stepStamina`, so no two of them can disagree about how long anybody can run.
 
@@ -251,7 +251,7 @@ Six, one active ability each. All original.
 |---|---|---|
 | **Gunslinger** — Cassidy "Quickhand" Vane | Hair Trigger | Passive: double-speed weapon swaps. Active: 5s of rapid fire and near-instant reloads |
 | **Sawbones** — Doc Marisol Vega | Field Dressing | Heal the player in your sights for 45 (or yourself for 30). A public, costly statement of trust |
-| **Lookout** — Wren Ashcroft | Bird Call | 4s: anyone *moving* within 38m glows through walls. Hold still and you stay hidden |
+| **Lookout** — Wren Ashcroft | Bird Call | Passive: boots that carry barely half as far as anybody's. Active: 4s where anyone *moving* within 38m glows through walls — hold still and you stay hidden |
 | **Duelist** — Silas Redgrave | Called Shot | 6s of near-perfect accuracy and +20% damage |
 | **Gambler** — Odette "Aces" Fontaine | Draw a Card | One random boon: speed, armour, full ammo, a damage streak, a dust cloud — or a bust |
 | **Tracker** — Nahele Cross | Read the Dust | Reveals the last 12s of *everyone's* footprints for 8s |
@@ -316,7 +316,9 @@ Three, plus dynamite. Limited ammo, real reloads, hit reactions, no modern gear.
 
 Everybody spawns with a revolver. Everything else is found in the world and drops
 when you die. **You cannot fire while sprinting**, which is the movement cost that
-keeps sprinting from being free.
+keeps sprinting from being free — and the trigger stays locked while a gun is
+coming up after a swap, on the client as well as the server, so the two never
+disagree about whether a shot happened.
 
 ---
 
@@ -358,7 +360,14 @@ agendas:
   where most rounds' first shot comes from, and it is often wrong.
 - **Deputies shadow** whoever they believe wears the star and answer anyone who
   goes for them. **Sheriff bots** sometimes pin on the badge and go loud.
-  **Renegade bots** hold back early and turn on everyone when the crowd thins.
+  **Renegade bots** are the least trigger-happy men in town — every fight they
+  are not in is one they do not have to win — and they will not go near whoever
+  they think wears the star until the crowd has thinned, because keeping the
+  round alive is the whole of their plan.
+- **They have ears.** Boots carry to a bot on the same ranges they carry to a
+  player, so crouching past one is worth something — and a bot treats a footstep
+  as a rough area to wander towards rather than a name to walk at, which is what
+  separates it from a gunshot.
 - They **break off losing fights**, fire in bursts with real reaction times and
   aim error that decays as they track you, take a beat after a kill, accuse people,
   chat, and get things wrong. Skill, paranoia, aggression and chattiness are rolled
