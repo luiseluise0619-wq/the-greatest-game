@@ -135,56 +135,9 @@ try {
   check(state.programs < 45, `shader count stays sane (${state.programs})`);
   await A.screenshot({ path: `${SHOTS}/02-in-game.png` });
 
-  // Play a card: the hand shrinks by one and the card moves into play, all
-  // without a word of it reaching the other player's screen.
-  const handBefore = await A.evaluate(() => window.game.hud.hand.slice());
-  const bFeedBefore = await B.evaluate(() => document.getElementById('feed').textContent);
-  // Wait for the server's answer rather than a fixed pause: the Wanted Poster
-  // is refused with nobody in the crosshair, and that is a correct outcome too.
-  // Two attempts, because a keypress can land while the page is mid-frame and
-  // this browser renders in software.
-  let spent = false;
-  for (let attempt = 0; attempt < 3 && !spent; attempt++) {
-    // Reading B's feed a moment ago left the other window in front, and a
-    // background window quietly drops key events.
-    await A.bringToFront();
-    await A.keyboard.press('KeyZ');
-    spent = await A.waitForFunction(() => window.game.hud.hand.length < 2, null, { timeout: 9000 })
-      .then(() => true).catch(() => false);
-  }
-  const handAfter = await A.evaluate(() => ({ hand: window.game.hud.hand.slice(), armed: window.game.hud.armed.slice() }));
-  check(handBefore.length === 2, `hand starts full (${handBefore.length})`);
-  check(spent || handBefore[0] === 'poster',
-    `playing a card spends it (${handAfter.hand.length} left, ${handBefore[0]})`);
-  const chips = await A.evaluate(() => document.querySelectorAll('#handStrip .cardChip').length);
-  check(chips === handAfter.hand.length + handAfter.armed.length, `the hand strip matches the hand (${chips} chips)`);
-  // The flourish is a 1.7s animation, which this browser cannot be relied on to
-  // still be showing by the time the next round trip lands - so ask the HUD what
-  // it held up rather than racing its own animation.
-  const flourish = await A.evaluate(() => ({
-    played: window.game.hud.lastFlourish || null,
-    img: !!document.querySelector('#cardPlay img'),
-  }));
-  check(!spent || (flourish.played === handBefore[0] && flourish.img),
-    `the played card is held up on screen (${flourish.played})`);
-  await A.screenshot({ path: `${SHOTS}/03-card-played.png` });
-  const bFeedAfter = await B.evaluate(() => document.getElementById('feed').textContent.toLowerCase());
-  const aName = await A.evaluate(() => document.getElementById('nameInput').value || 'Stranger');
-  if (handBefore[0] === 'poster') {
-    // The one card that is public by design: pointing the finger has to cost you.
-    check(bFeedAfter.includes(aName.toLowerCase()) || handAfter.hand.length === 2,
-      'the Wanted Poster is announced to the town');
-  } else {
-    const name = CARD_NAMES[handBefore[0]].toLowerCase();
-    check(!bFeedAfter.includes(name), `a silent card stays silent for everyone else (${handBefore[0]})`);
-  }
-
-  // Nothing in the hand may still be face down once the deal is over - the
-  // strip is re-rendered on every change and it must never re-deal the backs.
-  const faceDown = await A.evaluate(() => [...document.querySelectorAll('#handStrip .cardChip img')]
-    .filter((i) => i.dataset.face && i.src !== i.dataset.face).length);
-  check(faceDown === 0, `no card is left face down (${faceDown})`);
-
+  // Reconnection, before anything slow: the round can be over inside a minute
+  // when the Sheriff goes down early, and there is nothing to reconnect to
+  // after that.
   const bState = await B.evaluate(() => ({ inGame: window.game.inGame, role: !!window.game.selfRole }));
   check(bState.inGame && bState.role, 'the second player is in the same round');
 
@@ -234,6 +187,57 @@ try {
   check(netAfter.known === netBefore.known, 'reconnecting keeps what the player had worked out');
   check(!netAfter.cardUp, 'reconnecting does not shove the role card back on screen');
   check(!netAfter.banner, 'the reconnecting banner goes away again');
+
+
+  // Play a card: the hand shrinks by one and the card moves into play, all
+  // without a word of it reaching the other player's screen.
+  const handBefore = await A.evaluate(() => window.game.hud.hand.slice());
+  const bFeedBefore = await B.evaluate(() => document.getElementById('feed').textContent);
+  // Wait for the server's answer rather than a fixed pause: the Wanted Poster
+  // is refused with nobody in the crosshair, and that is a correct outcome too.
+  // Two attempts, because a keypress can land while the page is mid-frame and
+  // this browser renders in software.
+  let spent = false;
+  for (let attempt = 0; attempt < 3 && !spent; attempt++) {
+    // Reading B's feed a moment ago left the other window in front, and a
+    // background window quietly drops key events.
+    await A.bringToFront();
+    await A.keyboard.press('KeyZ');
+    spent = await A.waitForFunction(() => window.game.hud.hand.length < 2, null, { timeout: 9000 })
+      .then(() => true).catch(() => false);
+  }
+  const handAfter = await A.evaluate(() => ({ hand: window.game.hud.hand.slice(), armed: window.game.hud.armed.slice() }));
+  check(handBefore.length === 2, `hand starts full (${handBefore.length})`);
+  check(spent || handBefore[0] === 'poster',
+    `playing a card spends it (${handAfter.hand.length} left, ${handBefore[0]})`);
+  const chips = await A.evaluate(() => document.querySelectorAll('#handStrip .cardChip').length);
+  check(chips === handAfter.hand.length + handAfter.armed.length, `the hand strip matches the hand (${chips} chips)`);
+  // The flourish is a 1.7s animation, which this browser cannot be relied on to
+  // still be showing by the time the next round trip lands - so ask the HUD what
+  // it held up rather than racing its own animation.
+  const flourish = await A.evaluate(() => ({
+    played: window.game.hud.lastFlourish || null,
+    img: !!document.querySelector('#cardPlay img'),
+  }));
+  check(!spent || (flourish.played === handBefore[0] && flourish.img),
+    `the played card is held up on screen (${flourish.played})`);
+  await A.screenshot({ path: `${SHOTS}/03-card-played.png` });
+  const bFeedAfter = await B.evaluate(() => document.getElementById('feed').textContent.toLowerCase());
+  const aName = await A.evaluate(() => document.getElementById('nameInput').value || 'Stranger');
+  if (handBefore[0] === 'poster') {
+    // The one card that is public by design: pointing the finger has to cost you.
+    check(bFeedAfter.includes(aName.toLowerCase()) || handAfter.hand.length === 2,
+      'the Wanted Poster is announced to the town');
+  } else {
+    const name = CARD_NAMES[handBefore[0]].toLowerCase();
+    check(!bFeedAfter.includes(name), `a silent card stays silent for everyone else (${handBefore[0]})`);
+  }
+
+  // Nothing in the hand may still be face down once the deal is over - the
+  // strip is re-rendered on every change and it must never re-deal the backs.
+  const faceDown = await A.evaluate(() => [...document.querySelectorAll('#handStrip .cardChip img')]
+    .filter((i) => i.dataset.face && i.src !== i.dataset.face).length);
+  check(faceDown === 0, `no card is left face down (${faceDown})`);
 
   // Ride the round out: the aftermath screen is where every silent card is
   // finally named, and nothing else in this suite ever reaches it.

@@ -107,19 +107,19 @@ export class Room {
       telemetry.sessionEnd(p, now() - (p.joinedAt || now()));
       if (this.phase === PHASE.LOBBY || this.phase === PHASE.RESULTS) {
         this.players.delete(p.id);
-      } else if (p.alive) {
-        // Mid-match, the body stays: standing in the street, silent, and every
-        // bit as shootable as it was. Come back inside the grace and it is
-        // yours again; do not, and it falls over where it stands, because a
-        // vanishing player would take the round's evidence with them.
+      } else {
+        // Mid-match nobody is removed. A living body stays standing in the
+        // street, silent and every bit as shootable as it was; come back inside
+        // the grace and it is yours again, do not and it falls over where it
+        // stands. A dead one stays dead and stays in the round's account -
+        // deleting it would take a role off the aftermath screen and orphan the
+        // token of a spectator who was only reloading. toLobby sweeps both.
         p.connected = false;
         p.client = null;
         p.disconnectedAt = now();
         p.moving = false;
         p.sprint = false;
         p.vel = { x: 0, y: 0, z: 0 };
-      } else {
-        this.players.delete(p.id);
       }
       this.pushLobby();
     }
@@ -806,7 +806,15 @@ export class Room {
     item.active = false;
     item.respawnAt = item.dropped ? 0 : now() + LOOT_RESPAWN;
     if (item.dropped) item.remove = true;
-    this.broadcast({ t: S.PICKED, id: item.id, by: p.id, type: item.type });
+    // Same rule as a gunshot: the item is gone for everybody - walk into the
+    // store and the coach gun is not there any more - but only somebody who
+    // could see it happen learns whose hands it went into.
+    const gone = { t: S.PICKED, id: item.id, type: item.type };
+    for (const o of this.players.values()) {
+      if (o.bot || !o.client) continue;
+      const named = o.id === p.id || this.canSeeCached(o, p.id);
+      this.send(o.client, named ? { ...gone, by: p.id } : gone);
+    }
     this.pushSelf(p);
   }
 
@@ -906,7 +914,19 @@ export class Room {
       }
     }
 
-    this.broadcast(payload);
+    // An ability is a physical thing somebody did, so it goes to the people who
+    // could watch them do it and nobody else. Broadcasting it named every
+    // Scout, Medic and Gambler in town the moment they used it, through walls,
+    // to everybody - which is the exact leak the snapshot cull exists to close.
+    // The private half of the payload (which boon the Gambler drew) never
+    // leaves the player who drew it.
+    const { boon, label, ...seenByOthers } = payload;
+    for (const viewer of this.players.values()) {
+      if (viewer.bot || !viewer.client) continue;
+      if (viewer.id === p.id) { this.send(viewer.client, payload); continue; }
+      if (!this.canSeeCached(viewer, p.id)) continue;
+      this.send(viewer.client, seenByOthers);
+    }
     this.pushSelf(p);
   }
 

@@ -401,3 +401,35 @@ test('reclaiming a seat wins the race against the old socket', () => {
     assert.equal(player.client, again.client);
   } finally { clock.restore(); }
 });
+
+test('a dead spectator who reloads keeps their seat and their row', () => {
+  const { room, clock, stub, me } = makeRoom({ bots: 6, prep: 1 });
+  try {
+    room.beginMatch();
+    tick(clock, room, 40);
+    freezeBots(room);
+    const player = me();
+    const token = player.token;
+    const role = player.role;
+    const killer = [...room.players.values()].find((p) => p.bot && p.alive && p !== player);
+    room.applyDamage(player, killer, 999, 'revolver', null);
+    assert.equal(player.alive, false);
+    const before = room.players.size;
+
+    // Spectating, and they reload the page.
+    room.removeConnection(stub.client);
+    assert.equal(room.players.size, before, 'a dead player vanished from the round');
+
+    const again = stubClient();
+    room.addConnection(again.client);
+    room.handleMessage(again.client, { t: 'join', name: 'Tester', token });
+    assert.equal(again.client.playerId, player.id, 'a dead player could not reclaim their seat');
+    assert.equal(again.last('self').alive, false, 'they came back alive');
+
+    // And they are still in the account of the round.
+    room.endMatch('law', 'test');
+    const rows = again.last('results').rows;
+    assert.ok(rows.some((r) => r.name === player.name && r.role === role),
+      'the aftermath screen forgot a player who died and reloaded');
+  } finally { clock.restore(); }
+});

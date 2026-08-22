@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 74 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 78 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 ```
 
@@ -96,6 +96,13 @@ tells everyone what you are not.
 
 **Bodies stay where they fell**, so a corpse in the mine means something happened
 in the mine.
+
+**Nothing physical is announced with a name on it unless somebody watched it.**
+Shots, footsteps, abilities and pickups all follow the same rule: the world tells
+you what happened and where — the coach gun is gone from the store, somebody just
+used something, boots in the alley — and attaches a name only for the people who
+had eyes on it. The Gambler's boon is more private still: which card they drew
+never leaves them until it does something you can see.
 
 **You are only told about players you can actually see.** The server runs a
 line-of-sight check per viewer per tick and simply does not send the positions of
@@ -431,7 +438,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 74 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 78 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -473,7 +480,8 @@ They are grouped by what they protect:
   it, and every default is reachable with its own control.
 - **`test/security.test.js`** — what a lying client cannot do: teleport, walk
   through a wall, end up inside geometry, buy speed by flooding input packets,
-  sprint past the end of its own tank,
+  sprint past the end of its own tank, learn who used an ability or picked
+  something up across town,
   be told about players it cannot see, or learn the name of a shooter it could
   not have seen. One check runs the other way and makes sure an honest sprint at
   30Hz is never clamped.

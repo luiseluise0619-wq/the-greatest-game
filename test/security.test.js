@@ -240,3 +240,66 @@ test('resting refills the tank', () => {
     assert.ok(me.stamina > 2, `three seconds of standing still gave back ${me.stamina.toFixed(2)}s`);
   } finally { clock.restore(); }
 });
+
+test('an ability used out of sight does not name the player who used it', () => {
+  const { room, clock, stub, me } = liveRoom({ bots: 8 });
+  try {
+    const watcher = me;
+    const actor = [...room.players.values()].find((p) => p.bot && p.alive);
+    // Shut in the mine; the ability happens across town.
+    watcher.pos = { x: 58, y: 0, z: -18 };
+    actor.pos = { x: -26, y: 0, z: 18 };
+    tick(clock, room, 20);                    // past VISION.memory
+    assert.equal(room.visibleTo(watcher, Date.now() / 1000).has(actor.id), false,
+      'test setup: the actor is visible anyway');
+
+    stub.reset();
+    actor.abilityReadyAt = 0;
+    actor.character = 'scout';
+    room.onAbility(actor);
+    assert.equal(stub.of('ability').length, 0, 'an unseen ability was announced');
+    assert.equal(JSON.stringify(stub.sent).includes(`"id":${actor.id}`), false);
+  } finally { clock.restore(); }
+});
+
+test('an ability you can watch happen does name them, minus the private half', () => {
+  const { room, clock, stub, me } = liveRoom({ bots: 8 });
+  try {
+    const watcher = me;
+    const actor = [...room.players.values()].find((p) => p.bot && p.alive);
+    watcher.pos = { x: 0, y: 0, z: 0 };
+    watcher.yaw = 0;
+    actor.pos = { x: 0, y: 0, z: -5 };
+    tick(clock, room, 2);
+    stub.reset();
+    actor.abilityReadyAt = 0;
+    actor.character = 'gambler';
+    room.onAbility(actor);
+
+    const seen = stub.last('ability');
+    assert.ok(seen, 'an ability in plain sight was withheld');
+    assert.equal(seen.id, actor.id);
+    // Which card the Gambler drew is their business until it does something.
+    assert.equal(seen.boon, undefined, "somebody else learned the Gambler's boon");
+    assert.equal(seen.label, undefined);
+  } finally { clock.restore(); }
+});
+
+test('a pickup out of sight does not say whose hands it went into', () => {
+  const { room, clock, stub, me } = liveRoom({ bots: 8 });
+  try {
+    const watcher = me;
+    const taker = [...room.players.values()].find((p) => p.bot && p.alive);
+    watcher.pos = { x: 58, y: 0, z: -18 };
+    const item = room.loot.find((l) => l.active);
+    taker.pos = { x: item.x, y: item.y - 0.9, z: item.z };
+    tick(clock, room, 20);
+
+    stub.reset();
+    room.onPickup(taker, { id: item.id });
+    const picked = stub.last('picked');
+    assert.ok(picked, 'the item vanishing should still reach everybody');
+    assert.equal(picked.id, item.id);
+    assert.equal(picked.by, undefined, 'an unseen pickup named the player who made it');
+  } finally { clock.restore(); }
+});
