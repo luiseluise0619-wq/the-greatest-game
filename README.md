@@ -1,5 +1,7 @@
 # HIGH NOON HOLLOW
 
+[![tests](https://github.com/luiseluise0619-wq/the-greatest-game/actions/workflows/test.yml/badge.svg)](https://github.com/luiseluise0619-wq/the-greatest-game/actions/workflows/test.yml)
+
 A playable prototype of a **Wild West hidden-role FPS**: 6–8 gunhands, one small
 desert town, secret factions, and a round that is won by working out who is who —
 not by having the fastest trigger finger.
