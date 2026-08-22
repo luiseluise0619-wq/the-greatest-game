@@ -178,6 +178,7 @@ export class Room {
       abilityKind: null,
       buffs: {},
       badge: false,
+      wantsAgain: false,
       hand: [],                 // cards still unplayed
       armed: new Set(),         // cards played and waiting on a trigger
       cardsPlayed: [],
@@ -336,9 +337,32 @@ export class Room {
     this.beginMatch();
   }
 
+  /**
+   * "Ride again" used to dump everybody back to the lobby, where somebody then
+   * had to press deal - so the button lied about what it did, and the countdown
+   * next to it lied too. It is a readiness call now: the moment every human
+   * still connected has pressed it, the next round starts. Alone with bots that
+   * is instant, which is what it always should have been.
+   */
   onRestart(p) {
     if (this.phase !== PHASE.RESULTS) return;
-    this.toLobby();
+    if (p.wantsAgain) return;
+    p.wantsAgain = true;
+
+    const humans = [...this.players.values()].filter((o) => !o.bot && o.connected);
+    const ready = humans.filter((o) => o.wantsAgain).length;
+    if (humans.length > 1) {
+      this.broadcast({
+        t: S.FEED,
+        text: `${p.name} is ready to ride again (${ready}/${humans.length}).`,
+        tone: 'system',
+      });
+    }
+    this.broadcast({ t: S.READY, ready, of: humans.length });
+    if (ready >= humans.length) {
+      this.toLobby();
+      this.beginMatch();
+    }
   }
 
   onInput(p, msg) {
@@ -1206,6 +1230,7 @@ export class Room {
       p.health = p.maxHealth;
       p.armour = 0;
       p.badge = false;
+      p.wantsAgain = false;
       p.kills = 0; p.deaths = 0; p.damageDealt = 0;
       p.guns = { revolver: { mag: WEAPONS.revolver.magSize, reserve: WEAPONS.revolver.reserve } };
       p.slot = 'revolver';
@@ -1384,6 +1409,7 @@ export class Room {
     for (const [id, p] of [...this.players]) {
       if (p.bot || !p.connected) { this.players.delete(id); continue; }
       p.alive = false;
+      p.wantsAgain = false;
       p.role = null; p.faction = null; p.intel = null; p.badge = false;
     }
     this.pushLobby();

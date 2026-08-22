@@ -566,6 +566,7 @@ export class HUD {
       tb.appendChild(tr);
     }
     this.renderTimeline(msg.timeline || []);
+    this.resetReady();
     $('hud').classList.add('resultsUp');
     $('results').classList.remove('hidden');
   }
@@ -633,7 +634,22 @@ export class HUD {
   }
 
   setResultCountdown(s) {
-    $('resultCountdown').textContent = s > 0 ? `next round in ${s}s` : '';
+    // What actually happens when this runs out is the lobby, not a new round -
+    // a new round needs everybody to say they want one.
+    $('resultCountdown').textContent = s > 0 ? `back to the lobby in ${s}s` : '';
+  }
+
+  /** How many of the living have asked to go again. */
+  setReady(msg) {
+    const btn = $('playAgain');
+    if (!msg || msg.of <= 1) return;
+    btn.textContent = `RIDE AGAIN — ${msg.ready}/${msg.of}`;
+  }
+
+  /** Called when the results screen opens, before anybody has said anything. */
+  resetReady() {
+    $('playAgain').textContent = 'RIDE AGAIN';
+    $('playAgain').disabled = false;
   }
 
   showVoiceWheel(show) { $('voiceWheel').classList.toggle('hidden', !show); }

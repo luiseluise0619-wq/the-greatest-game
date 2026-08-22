@@ -202,8 +202,10 @@ class Game {
     $('botPlus').onclick = () => this.send({ t: C.ADD_BOT });
     $('botMinus').onclick = () => this.send({ t: C.ADD_BOT, remove: true });
     $('playAgain').onclick = () => {
+      // Do not hide the results: with other people in the room this is a
+      // readiness call, and the screen has to stay up while we wait for them.
       this.send({ t: C.RESTART });
-      $('results').classList.add('hidden');
+      $('playAgain').disabled = true;
     };
     // Guarded: a private window or blocked site data throws on access, and a
     // remembered name is not worth losing the menu over.
@@ -521,6 +523,7 @@ class Game {
 
       case S.REPLAY: this.startReplay(msg); break;
       case S.RESULTS: this.endReplay(); this.hud.showResults(msg); break;
+      case S.READY: this.hud.setReady(msg); break;
       case S.SOUND: if (msg.sound === 'bell') this.audio.bell(); break;
       case S.ERROR:
         this.hud.setStatus(msg.msg);

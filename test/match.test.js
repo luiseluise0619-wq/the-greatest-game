@@ -464,3 +464,48 @@ test('a pickup that cannot happen says why', () => {
     assert.equal(stub.of('feed').filter((f) => f.deny).length, 0);
   } finally { clock.restore(); }
 });
+
+test('riding again waits for everybody, and is instant on your own', () => {
+  const { room, clock, stub, me } = makeRoom({ bots: 6, prep: 1, combat: 2 });
+  try {
+    room.beginMatch();
+    const first = room.matchNumber;
+    room.endMatch('law', 'test');
+    assert.equal(room.phase, PHASE.RESULTS);
+
+    // Alone with bots: pressing it deals immediately.
+    room.onRestart(me());
+    assert.equal(room.phase, PHASE.PREP, 'the only human said go and nothing happened');
+    assert.equal(room.matchNumber, first + 1);
+  } finally { clock.restore(); }
+});
+
+test('one player cannot drag the whole town into the next round', () => {
+  const { room, clock, me } = makeRoom({ bots: 6, prep: 1, combat: 2 });
+  try {
+    const other = stubClient();
+    room.addConnection(other.client);
+    room.handleMessage(other.client, { t: 'join', name: 'Second' });
+    room.beginMatch();
+    const first = room.matchNumber;
+    room.endMatch('law', 'test');
+
+    const a = me();
+    const b = [...room.players.values()].find((p) => p.name === 'Second');
+    room.onRestart(a);
+    assert.equal(room.phase, PHASE.RESULTS, 'one of two players restarted the round for both');
+    assert.equal(other.last('ready').ready, 1);
+    assert.equal(other.last('ready').of, 2);
+
+    // Pressing it twice is not two votes.
+    room.onRestart(a);
+    assert.equal(room.phase, PHASE.RESULTS, 'the same player voted twice');
+
+    room.onRestart(b);
+    assert.equal(room.phase, PHASE.PREP, 'everybody was ready and nothing happened');
+    assert.equal(room.matchNumber, first + 1);
+    // ...and the readiness does not survive into the next round's results.
+    assert.equal(a.wantsAgain, false);
+    assert.equal(b.wantsAgain, false);
+  } finally { clock.restore(); }
+});

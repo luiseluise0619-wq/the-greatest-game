@@ -340,6 +340,22 @@ try {
     check(after.timelineCards >= 1, `the timeline names them (${after.timelineCards})`);
     check(handAway && after.hudClass.includes('resultsUp'), 'the hand is put away for the aftermath');
     await A.screenshot({ path: `${SHOTS}/04-aftermath.png` });
+
+    // Riding again is a readiness call with two players in the room, so it must
+    // hold the screen up rather than dumping this one player into a lobby.
+    await A.bringToFront();
+    await A.click('#playAgain');
+    await A.waitForTimeout(900);
+    const afterReady = await A.evaluate(() => ({
+      resultsUp: !document.getElementById('results').classList.contains('hidden'),
+      label: document.getElementById('playAgain').textContent.trim(),
+      disabled: document.getElementById('playAgain').disabled,
+      phase: window.game.phase,
+    }));
+    check(afterReady.resultsUp && afterReady.phase === 'results',
+      `one of two players cannot start the next round alone (phase ${afterReady.phase})`);
+    check(afterReady.disabled && /1\/2/.test(afterReady.label),
+      `the button says who is waiting ("${afterReady.label}")`);
   }
 
   check(serverErrors.length === 0, `server stayed quiet${serverErrors.length ? `: ${serverErrors[0]}` : ''}`);

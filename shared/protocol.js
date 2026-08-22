@@ -42,6 +42,7 @@ export const S = {
   STEP: 'step',
   BADGE: 'badge',
   CARDS: 'cards',
+  READY: 'ready',
   RESULTS: 'results',
   ERROR: 'error',
   SOUND: 'sound',
