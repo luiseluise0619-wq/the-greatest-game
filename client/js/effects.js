@@ -29,6 +29,12 @@ export class Effects {
     });
 
     this.lootRingGeo = new THREE.RingGeometry(0.3, 0.42, 16);
+    // One built object per loot type, cloned per pickup. Loot respawns for the
+    // whole session and is dropped by every body, so building fresh geometry
+    // and materials each time - and removing them from the scene without
+    // disposing - leaked a little of the GPU on every crate anybody picked up.
+    // A clone shares both, which also collapses the draw calls.
+    this.lootProtos = new Map();
 
     // Fixed pool of muzzle lights. Attaching one to every player made the
     // scene's light count vary as players were culled, which recompiles every
@@ -144,41 +150,51 @@ export class Effects {
   }
 
   makeLoot(it) {
-    const g = new THREE.Group();
+    const g = this.lootProto(it.type).clone();
     g.position.set(it.x, it.y, it.z);
     g.userData = { type: it.type, base: it.y };
+    this.scene.add(g);
+    return g;
+  }
 
+  /** The built shape for a loot type, made once and cloned from then on. */
+  lootProto(type) {
+    const cached = this.lootProtos.get(type);
+    if (cached) return cached;
+
+    const g = new THREE.Group();
     const metal = new THREE.MeshLambertMaterial({ color: 0x4a423a });
     const wood = new THREE.MeshLambertMaterial({ color: 0x7a5632 });
     const brass = new THREE.MeshLambertMaterial({ color: 0xc9a24a });
 
-    if (it.type === 'shotgun') {
+    if (type === 'shotgun') {
       const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.72), metal);
       barrel.position.z = -0.12;
       const stock = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.14, 0.34), wood);
       stock.position.set(0, -0.03, 0.3);
       g.add(barrel, stock);
-    } else if (it.type === 'rifle') {
+    } else if (type === 'rifle') {
       const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.95), metal);
       const stock = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.16, 0.4), wood);
       stock.position.set(0, -0.04, 0.42);
       const lever = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.13, 0.1), brass);
       lever.position.set(0, -0.09, 0.16);
       g.add(barrel, stock, lever);
-    } else if (it.type === 'ammo') {
+    } else if (type === 'ammo') {
       const crate = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.28, 0.3), wood);
       const strap = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.06, 0.32), brass);
       strap.position.y = 0.06;
       g.add(crate, strap);
-    } else if (it.type === 'whiskey') {
+    } else if (type === 'whiskey') {
       const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 0.3, 8), new THREE.MeshLambertMaterial({ color: 0x8a5a1e }));
       const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 0.14, 8), new THREE.MeshLambertMaterial({ color: 0x6b4415 }));
       neck.position.y = 0.21;
       g.add(bottle, neck);
-    } else if (it.type === 'dynamite') {
+    } else if (type === 'dynamite') {
       const red = new THREE.MeshLambertMaterial({ color: 0xa8332a });
+      const stickGeo = new THREE.CylinderGeometry(0.055, 0.055, 0.3, 7);
       for (let i = 0; i < 3; i++) {
-        const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.3, 7), red);
+        const stick = new THREE.Mesh(stickGeo, red);
         stick.position.set((i - 1) * 0.1, 0, 0);
         g.add(stick);
       }
@@ -194,7 +210,7 @@ export class Effects {
     ring.position.y = -0.18;
     g.add(ring);
 
-    this.scene.add(g);
+    this.lootProtos.set(type, g);
     return g;
   }
 

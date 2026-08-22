@@ -713,6 +713,7 @@ class Game {
     this.views.clear();
     this.self.alive = true;
     this.self.vel.set(0, 0, 0);
+    this.self.stamina = PLAYER.staminaMax;
     this.audio.init();
     this.audio.resume();
     // No pointer lock yet - the role card is up and the player needs a cursor.
@@ -720,7 +721,6 @@ class Game {
 
   exitToResults() {
     document.exitPointerLock?.();
-    this.self.stamina = PLAYER.staminaMax;
     this.hud.setDead(false);
   }
 

@@ -127,6 +127,20 @@ try {
   await A.waitForTimeout(1500);
   check(!(await A.isVisible('#roleCard')), 'the role card dismisses');
 
+  // Loot respawns for the whole session and every body drops more of it, so
+  // churning it must not cost GPU memory each time.
+  const churn = await A.evaluate(() => {
+    const fx = window.game.effects;
+    const items = (window.game.lastSelfMsg?.loot || []).slice();
+    if (!items.length) return null;
+    const cycle = () => { for (let i = 0; i < 20; i++) { fx.syncLoot([]); fx.syncLoot(items); } };
+    cycle();                                    // first pass builds the prototypes
+    const warm = window.game.renderer.info.memory.geometries;
+    cycle();
+    return { grew: window.game.renderer.info.memory.geometries - warm, protos: fx.lootProtos.size };
+  });
+  check(churn && churn.grew === 0, `loot churn allocates nothing (${churn ? `+${churn.grew} geometries` : 'no loot'})`);
+
   const standing = await A.evaluate(() => document.getElementById('standing').textContent.trim());
   check(/^[1-9]\d* STILL STANDING/.test(standing), `the town knows how many are left ("${standing}")`);
 
