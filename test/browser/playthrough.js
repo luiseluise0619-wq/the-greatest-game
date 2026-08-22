@@ -32,6 +32,8 @@ const CARD_NAMES = {
   witness: 'buy a witness', ledger: "dead man's ledger", spyglass: 'long glass',
 };
 
+// The round the server is told to run, and that the checks below budget for.
+const PREP = 40, COMBAT = 40, ENDGAME = 8;
 const server = spawn('node', ['server/index.js'], {
   env: {
     ...process.env, PORT: String(PORT), HNH_TELEMETRY: '0',
@@ -40,7 +42,7 @@ const server = spawn('node', ['server/index.js'], {
     // - is not racing a Sheriff who went down in the first thirty seconds.
     // Then a short round, so one run still reaches the aftermath screen, which
     // is the only place the cards that were played are ever named.
-    HNH_PREP: '40', HNH_COMBAT: '40', HNH_ENDGAME: '8',
+    HNH_PREP: String(PREP), HNH_COMBAT: String(COMBAT), HNH_ENDGAME: String(ENDGAME),
     // The aftermath phase has to outlast the checks that run on it. On a
     // two-core runner drawing every pixel on the CPU, a screenshot alone can
     // take seconds, and a results screen that timed out mid-check took its own
@@ -217,6 +219,62 @@ try {
   check(state.programs < 45, `shader count stays sane (${state.programs})`);
   await A.screenshot({ path: `${SHOTS}/02-in-game.png` });
 
+  // Play a card: the hand shrinks by one and the card moves into play, all
+  // without a word of it reaching the other player's screen. This goes first,
+  // while the prep phase is certainly still running and nobody has been shot:
+  // a dead player's keypress is refused, and correctly so.
+  const ready = await A.evaluate(() => ({ alive: window.game.self?.alive, hand: window.game.hud.hand.length }));
+  check(ready.alive && ready.hand === 2, `the player is alive with a full hand to play from (${ready.hand})`);
+  const handBefore = await A.evaluate(() => window.game.hud.hand.slice());
+  // The Wanted Poster is refused with nobody in the crosshair, and that is a
+  // correct outcome - so play the other card if the poster came up first,
+  // rather than spending the whole budget on a press that is meant to fail.
+  const slot = handBefore[0] === 'poster' && handBefore[1] && handBefore[1] !== 'poster' ? 1 : 0;
+  const played = handBefore[slot];
+  // Wait for the server's answer rather than a fixed pause. Three attempts,
+  // because a keypress can land while the page is mid-frame and this browser
+  // renders in software.
+  let spent = false;
+  for (let attempt = 0; attempt < 3 && !spent; attempt++) {
+    // A background window quietly drops key events, and the other page has had
+    // the focus at some point before this.
+    await A.bringToFront();
+    await A.keyboard.press(slot === 0 ? 'KeyZ' : 'KeyX');
+    spent = await A.waitForFunction(() => window.game.hud.hand.length < 2, null, { timeout: 9000 })
+      .then(() => true).catch(() => false);
+  }
+  const handAfter = await A.evaluate(() => ({ hand: window.game.hud.hand.slice(), armed: window.game.hud.armed.slice() }));
+  check(spent || played === 'poster',
+    `playing a card spends it (${handAfter.hand.length} left, ${played})`);
+  const chips = await A.evaluate(() => document.querySelectorAll('#handStrip .cardChip').length);
+  check(chips === handAfter.hand.length + handAfter.armed.length, `the hand strip matches the hand (${chips} chips)`);
+  // The flourish is a 1.7s animation, which this browser cannot be relied on to
+  // still be showing by the time the next round trip lands - so ask the HUD what
+  // it held up rather than racing its own animation.
+  const flourish = await A.evaluate(() => ({
+    played: window.game.hud.lastFlourish || null,
+    img: !!document.querySelector('#cardPlay img'),
+  }));
+  check(!spent || (flourish.played === played && flourish.img),
+    `the played card is held up on screen (${flourish.played})`);
+  await A.screenshot({ path: `${SHOTS}/03-card-played.png` });
+  const bFeedAfter = await B.evaluate(() => document.getElementById('feed').textContent.toLowerCase());
+  const aName = await A.evaluate(() => document.getElementById('nameInput').value || 'Stranger');
+  if (played === 'poster') {
+    // The one card that is public by design: pointing the finger has to cost you.
+    check(bFeedAfter.includes(aName.toLowerCase()) || handAfter.hand.length === 2,
+      'the Wanted Poster is announced to the town');
+  } else {
+    const name = CARD_NAMES[played].toLowerCase();
+    check(!bFeedAfter.includes(name), `a silent card stays silent for everyone else (${played})`);
+  }
+
+  // Nothing in the hand may still be face down once the deal is over - the
+  // strip is re-rendered on every change and it must never re-deal the backs.
+  const faceDown = await A.evaluate(() => [...document.querySelectorAll('#handStrip .cardChip img')]
+    .filter((i) => i.dataset.face && i.src !== i.dataset.face).length);
+  check(faceDown === 0, `no card is left face down (${faceDown})`);
+
   // Reconnection, before anything slow: the round can be over inside a minute
   // when the Sheriff goes down early, and there is nothing to reconnect to
   // after that.
@@ -259,75 +317,34 @@ try {
     .then(() => true).catch(() => false);
   await A.waitForTimeout(900);
   const netAfter = await A.evaluate(() => ({
-    id: window.game.selfId, role: window.game.selfRole.role, known: window.game.hud.knownRoles.size,
+    id: window.game.selfId, role: window.game.selfRole.role,
+    known: window.game.hud.knownRoles.size, kept: window.game.hud.knownRoles.get(-1) || null,
     banner: !document.getElementById('netBanner').classList.contains('hidden'),
     cardUp: !document.getElementById('roleCard').classList.contains('hidden'),
     inGame: window.game.inGame,
   }));
   check(netBack && netAfter.inGame && netAfter.id === netBefore.id && netAfter.role === netBefore.role,
     `a dropped socket reconnects into the same seat (${netAfter.role})`);
-  check(netAfter.known === netBefore.known, 'reconnecting keeps what the player had worked out');
+  // Not a size comparison: the round is live underneath this, and a player who
+  // works out one more role while the socket is down has learned something,
+  // not lost something. What must survive is the entry that was already there.
+  check(netAfter.kept === 'outlaw' && netAfter.known >= netBefore.known,
+    `reconnecting keeps what the player had worked out (${netBefore.known} -> ${netAfter.known})`);
   check(!netAfter.cardUp, 'reconnecting does not shove the role card back on screen');
   check(!netAfter.banner, 'the reconnecting banner goes away again');
 
-
-  // Play a card: the hand shrinks by one and the card moves into play, all
-  // without a word of it reaching the other player's screen.
-  const handBefore = await A.evaluate(() => window.game.hud.hand.slice());
-  const bFeedBefore = await B.evaluate(() => document.getElementById('feed').textContent);
-  // Wait for the server's answer rather than a fixed pause: the Wanted Poster
-  // is refused with nobody in the crosshair, and that is a correct outcome too.
-  // Two attempts, because a keypress can land while the page is mid-frame and
-  // this browser renders in software.
-  let spent = false;
-  for (let attempt = 0; attempt < 3 && !spent; attempt++) {
-    // Reading B's feed a moment ago left the other window in front, and a
-    // background window quietly drops key events.
-    await A.bringToFront();
-    await A.keyboard.press('KeyZ');
-    spent = await A.waitForFunction(() => window.game.hud.hand.length < 2, null, { timeout: 9000 })
-      .then(() => true).catch(() => false);
-  }
-  const handAfter = await A.evaluate(() => ({ hand: window.game.hud.hand.slice(), armed: window.game.hud.armed.slice() }));
-  check(handBefore.length === 2, `hand starts full (${handBefore.length})`);
-  check(spent || handBefore[0] === 'poster',
-    `playing a card spends it (${handAfter.hand.length} left, ${handBefore[0]})`);
-  const chips = await A.evaluate(() => document.querySelectorAll('#handStrip .cardChip').length);
-  check(chips === handAfter.hand.length + handAfter.armed.length, `the hand strip matches the hand (${chips} chips)`);
-  // The flourish is a 1.7s animation, which this browser cannot be relied on to
-  // still be showing by the time the next round trip lands - so ask the HUD what
-  // it held up rather than racing its own animation.
-  const flourish = await A.evaluate(() => ({
-    played: window.game.hud.lastFlourish || null,
-    img: !!document.querySelector('#cardPlay img'),
-  }));
-  check(!spent || (flourish.played === handBefore[0] && flourish.img),
-    `the played card is held up on screen (${flourish.played})`);
-  await A.screenshot({ path: `${SHOTS}/03-card-played.png` });
-  const bFeedAfter = await B.evaluate(() => document.getElementById('feed').textContent.toLowerCase());
-  const aName = await A.evaluate(() => document.getElementById('nameInput').value || 'Stranger');
-  if (handBefore[0] === 'poster') {
-    // The one card that is public by design: pointing the finger has to cost you.
-    check(bFeedAfter.includes(aName.toLowerCase()) || handAfter.hand.length === 2,
-      'the Wanted Poster is announced to the town');
-  } else {
-    const name = CARD_NAMES[handBefore[0]].toLowerCase();
-    check(!bFeedAfter.includes(name), `a silent card stays silent for everyone else (${handBefore[0]})`);
-  }
-
-  // Nothing in the hand may still be face down once the deal is over - the
-  // strip is re-rendered on every change and it must never re-deal the backs.
-  const faceDown = await A.evaluate(() => [...document.querySelectorAll('#handStrip .cardChip img')]
-    .filter((i) => i.dataset.face && i.src !== i.dataset.face).length);
-  check(faceDown === 0, `no card is left face down (${faceDown})`);
 
   // Ride the round out: the aftermath screen is where every silent card is
   // finally named, and nothing else in this suite ever reaches it.
   const reachedResults = await A.waitForFunction(
     () => !document.getElementById('results').classList.contains('hidden'),
-    null, { timeout: 90000 },
+    // A whole round is prep + combat + endgame, and the checks above have
+    // already eaten some of it - but not reliably a known amount, so this
+    // waits out a full round from here rather than the remainder of one.
+    null, { timeout: (PREP + COMBAT + ENDGAME + 20) * 1000 },
   ).then(() => true).catch(() => false);
-  check(reachedResults, 'the round reaches the aftermath screen');
+  const endPhase = await A.evaluate(() => window.game.phase || '?');
+  check(reachedResults, `the round reaches the aftermath screen (phase ${endPhase})`);
   if (reachedResults) {
     // Wait for the fade rather than sleeping through it: this page renders in
     // software here, so a 250ms transition can take a couple of seconds of
