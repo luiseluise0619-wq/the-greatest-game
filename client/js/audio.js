@@ -198,6 +198,35 @@ export class GameAudio {
     this.blip(140, 0.2, 'sawtooth', 0.09, 70);
   }
 
+  /**
+   * Somebody else's boots. Positional and anonymous - the server sends a place
+   * and a gait, never a name, so this is deliberately just a direction and a
+   * distance in your ears.
+   */
+  footstepAt(pos, sprint, range = 26) {
+    if (!this.ready || !this.enabled) return;
+    const sp = this.spatial(pos, range);
+    if (!sp) return;
+    const t = this.ctx.currentTime;
+    const g = this.chain(sp.pan, 0.7);
+    const vol = (sprint ? 0.12 : 0.075) * sp.gain;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0004, t + 0.1);
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = (pos.y ?? 0) > 0.05 ? 520 : 950;   // boardwalk vs dirt
+    bp.Q.value = 1.1;
+    // Distance eats the top end, which is most of what tells you how far away
+    // something is without looking.
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 900 + 2600 * sp.gain;
+    const src = this.ctx.createGain();
+    src.connect(bp); bp.connect(lp); lp.connect(g);
+    src.gain.value = 1;
+    this.noise(0.11, src);
+  }
+
   footstep(sprint, surfaceY) {
     if (!this.ready || !this.enabled) return;
     const t = this.ctx.currentTime;

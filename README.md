@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 63 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 68 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 ```
 
@@ -32,6 +32,11 @@ the URL — it carries the code as `#ABCD` — and whoever opens it lands in you
 lobby. **NEW** opens a private town only the code can reach, **JOIN** takes you
 to somebody else's, and quick play always fills the busiest waiting lobby rather
 than scattering four people across four empty towns.
+
+A public town also **deals itself in**: the moment a second person turns up the
+button starts counting down and the round begins on its own, so nobody has to
+work out that somebody has to press it. A private room never does — you made it
+to wait for the people you invited.
 
 Bots fill whatever seats are left, so a round works with one human or eight.
 
@@ -99,6 +104,13 @@ a proximity floor so somebody pressed against you is never invisible. A gunshot
 from an unseen shooter arrives with its tracer and its noise but **no name
 attached**. Without this the entire information design would be decoration: any
 modified client could read every position out of the network tab.
+
+**You can hear boots.** Everyone within earshot gets a step sound with a place
+and a gait attached and **no name on it** — the same deal as a gunshot. The
+position carries a little slop, so it is a direction rather than a pin. Running
+carries about 30m, walking 22m, and crouching drops it to 9m, which is the
+counterplay. The Lookout's boots carry barely half as far as anybody's, which is
+that character's whole passive.
 
 **The dead talk only to the dead.** Dying does not turn you into a spotter for
 whoever is still alive.
@@ -408,7 +420,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 63 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 68 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -421,8 +433,12 @@ They are grouped by what they protect:
   not inside it, and the information rules hold: an unwitnessed kill names
   nobody, the victim always learns their killer, a death replay carries only two
   people, and the dead cannot talk to the living.
-- **`test/cards.test.js`** — the deck. Mostly assertions about *absent*
-  information: a Rain Barrel that must swallow the shooter's hitmarker as well as
+- **`test/cards.test.js`** — the deck, and the footstep channel it sits next to:
+  a step is heard nearby, never carries a name, lands a little off where the
+  walker really is, does not carry across town, dies when they crouch, and comes
+  at the pace of a gait rather than of the tick rate. The rest is assertions
+  about *absent*
+  information — a Rain Barrel that must swallow the shooter's hitmarker as well as
   the bullet, a bought kill that reaches neither the town, the victim nor the
   killcam, a ledger that stays armed because there was nothing to read, a Wanted
   Poster whose answer never leaves the player who nailed it up, and a Long Glass

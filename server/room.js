@@ -59,6 +59,7 @@ export class Room {
     this.timeline = [];     // the round's public account, shown on the results screen
     this.results = null;
     this.matchNumber = 0;
+    this.lobbyStartAt = 0;      // public rooms deal themselves in - see stepLobby
     this.lastTime = now();
     this.botFillTarget = 6;
     this.resetLoot();
@@ -183,6 +184,7 @@ export class Room {
       lastHitBy: null,
       lastHitAt: 0,
       lastFootprintAt: 0,
+      lastStepAt: 0,
       lastChatAt: 0,
       lastAccuseAt: 0,
       lastInputAt: now(),
@@ -1080,6 +1082,7 @@ export class Room {
   // -------------------------------------------------------------------------
   beginMatch() {
     this.matchNumber += 1;
+    this.lobbyStartAt = 0;
     this.results = null;
     this.dynamites = [];
     this.footprints = [];
@@ -1277,6 +1280,7 @@ export class Room {
   toLobby() {
     this.phase = PHASE.LOBBY;
     this.phaseEndsAt = 0;
+    this.lobbyStartAt = 0;
     for (const [id, p] of [...this.players]) {
       if (p.bot || !p.connected) { this.players.delete(id); continue; }
       p.alive = false;
@@ -1293,6 +1297,7 @@ export class Room {
     this.broadcast({
       t: S.LOBBY, players: list, botTarget: this.botFillTarget,
       min: MIN_PLAYERS, max: MAX_PLAYERS, phase: this.phase,
+      startsIn: this.lobbyStartAt ? Math.max(0, Math.ceil(this.lobbyStartAt - now())) : 0,
     });
   }
 
@@ -1316,9 +1321,35 @@ export class Room {
       if (t >= this.phaseEndsAt) this.advancePhase();
     } else if (this.phase === PHASE.RESULTS) {
       if (t >= this.phaseEndsAt) this.toLobby();
+    } else if (this.phase === PHASE.LOBBY) {
+      this.stepLobby(t);
     }
 
     this.sendSnapshots(t);
+  }
+
+  /**
+   * A public town deals itself in. Strangers dropping into a lobby should not
+   * have to work out that somebody has to press the button, and the second
+   * person to arrive is the signal that a real round is possible. A private
+   * room never does this: you made it to wait for the people you invited.
+   */
+  stepLobby(t) {
+    if (!this.isPublic) return;
+    const humans = this.humanCount();
+    if (humans < 2) {
+      if (this.lobbyStartAt) { this.lobbyStartAt = 0; this.pushLobby(); }
+      return;
+    }
+    if (!this.lobbyStartAt) {
+      this.lobbyStartAt = t + TIMING.lobbyCountdown;
+      this.pushLobby();
+      return;
+    }
+    if (t >= this.lobbyStartAt) {
+      this.lobbyStartAt = 0;
+      this.beginMatch();
+    }
   }
 
   advancePhase() {
@@ -1401,9 +1432,48 @@ export class Room {
         p.lastFootprintAt = t;
         this.footprints.push({ x: p.pos.x, y: p.pos.y, z: p.pos.z, t, g: p.trailGroup });
       }
+
+      this.stepSound(p, t);
     }
     const cutoff = t - SOCIAL.footprintTtl;
     if (this.footprints.length > 900) this.footprints = this.footprints.filter((f) => f.t >= cutoff);
+  }
+
+  /**
+   * Boots on boards. This is the one information channel the game had missing:
+   * you could see people and you could hear their guns, but somebody walking
+   * past on the other side of a wall made no sound at all.
+   *
+   * Built exactly like a gunshot, and for the same reason - a step is sent to
+   * everyone in earshot with a position and NO identity. You learn that
+   * somebody is in the alley. You do not learn who, and the position carries a
+   * little slop so it is a direction rather than a pin. Crouching is the
+   * counterplay, and the Lookout's boots carry barely half as far as anyone's.
+   */
+  stepSound(p, t) {
+    if (!p.moving || !p.alive) return;
+    const gait = p.crouch ? 'crouch' : p.sprint ? 'sprint' : 'walk';
+    if (t - (p.lastStepAt || 0) < SOCIAL.stepInterval[gait]) return;
+    p.lastStepAt = t;
+
+    const quiet = CHARACTERS[p.character]?.stepQuiet ?? 1;
+    const range = SOCIAL.stepRange[gait] * quiet;
+    const fuzz = SOCIAL.stepFuzz;
+
+    for (const o of this.players.values()) {
+      if (o.bot || !o.client || o.id === p.id) continue;
+      // The dead hear the whole town - they have nothing left to do with it.
+      const heard = !o.alive || Math.hypot(o.pos.x - p.pos.x, o.pos.z - p.pos.z) <= range;
+      if (!heard) continue;
+      this.send(o.client, {
+        t: S.STEP,
+        x: r2(p.pos.x + rnd(-fuzz, fuzz)),
+        y: r2(p.pos.y),
+        z: r2(p.pos.z + rnd(-fuzz, fuzz)),
+        s: gait === 'sprint' ? 1 : 0,
+        r: r2(range),
+      });
+    }
   }
 
   stepBots(t, dt) {

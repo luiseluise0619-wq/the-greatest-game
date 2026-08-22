@@ -309,6 +309,8 @@ button {
 }
 button:hover { background: rgba(200,180,140,.26); border-color: var(--gold); }
 button.primary { background: rgba(232,193,90,.2); border-color: rgba(232,193,90,.6); color: var(--gold); }
+button.counting { animation: countPulse 1s ease-in-out infinite; }
+@keyframes countPulse { 50% { background: rgba(232,193,90,.36); } }
 button.primary:hover { background: rgba(232,193,90,.34); }
 button.big { width: 100%; padding: 14px; font-size: 15px; letter-spacing: .22em; margin-top: 18px; }
 #menuStatus { margin-top: 10px; text-align: center; }

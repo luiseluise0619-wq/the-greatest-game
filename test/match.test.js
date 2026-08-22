@@ -243,3 +243,62 @@ test('a Sheriff who walks out during preparation settles it at the bell', () => 
     assert.equal(room.results.winner, 'outlaw');
   } finally { clock.restore(); }
 });
+
+test('a public town deals itself in once a second person turns up', () => {
+  TIMING.prep = 3; TIMING.combat = 400; TIMING.endgame = 30; TIMING.results = 5;
+  TIMING.lobbyCountdown = 4;
+  const clock = fakeClock();
+  const room = new Room({ code: 'PUB', isPublic: true });
+  room.botFillTarget = 6;
+  room.resetClock();
+  try {
+    const a = stubClient();
+    room.addConnection(a.client);
+    room.handleMessage(a.client, { t: 'join', name: 'First' });
+
+    // One person is not a round. They may be waiting for friends.
+    tick(clock, room, 200);
+    assert.equal(room.phase, PHASE.LOBBY, 'a lone player got dealt in against their will');
+    assert.equal(room.lobbyStartAt, 0);
+
+    const b = stubClient();
+    room.addConnection(b.client);
+    room.handleMessage(b.client, { t: 'join', name: 'Second' });
+    tick(clock, room, 1);
+    assert.ok(room.lobbyStartAt > 0, 'a second arrival should start the clock');
+    const told = b.last('lobby');
+    assert.ok(told.startsIn > 0 && told.startsIn <= 4, `the client was told ${told.startsIn}s`);
+
+    tick(clock, room, 40);                    // two seconds: not yet
+    assert.equal(room.phase, PHASE.LOBBY);
+
+    // Second player leaves: the clock stops rather than dealing one human in.
+    room.removeConnection(b.client);
+    tick(clock, room, 1);
+    assert.equal(room.lobbyStartAt, 0, 'the countdown outlived the player who started it');
+
+    const c = stubClient();
+    room.addConnection(c.client);
+    room.handleMessage(c.client, { t: 'join', name: 'Third' });
+    tick(clock, room, 120);                   // six seconds, past the four
+    assert.equal(room.phase, PHASE.PREP, 'the town never dealt itself in');
+  } finally { clock.restore(); }
+});
+
+test('a private town waits for whoever you invited', () => {
+  TIMING.prep = 3; TIMING.lobbyCountdown = 2;
+  const clock = fakeClock();
+  const room = new Room({ code: 'PRIV', isPublic: false });
+  room.botFillTarget = 6;
+  room.resetClock();
+  try {
+    for (const name of ['A', 'B', 'C']) {
+      const s = stubClient();
+      room.addConnection(s.client);
+      room.handleMessage(s.client, { t: 'join', name });
+    }
+    tick(clock, room, 200);
+    assert.equal(room.phase, PHASE.LOBBY, 'a private room started without being asked');
+    assert.equal(room.lobbyStartAt, 0);
+  } finally { clock.restore(); }
+});

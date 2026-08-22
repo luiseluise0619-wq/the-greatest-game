@@ -451,3 +451,84 @@ test('the deck is our own: no card deals damage or heals', () => {
       `${id} looks like a combat card - the deck only edits information`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Boots. Not a card, but the same information rule: physical and anonymous.
+// ---------------------------------------------------------------------------
+
+test('a step is heard nearby, and never carries a name', () => {
+  const { room, clock, stub, me } = makeRoom({ bots: 6 });
+  try {
+    intoCombat(room, clock);
+    const listener = me();
+    const walker = [...room.players.values()].find((p) => p.bot && p.alive);
+    listener.pos = { x: 0, y: 0, z: 0 };
+    walker.pos = { x: 8, y: 0, z: 0 };
+    walker.moving = true;
+    walker.crouch = false;
+    walker.sprint = false;
+    walker.lastStepAt = 0;
+
+    stub.reset();
+    room.stepSound(walker, Date.now() / 1000);
+    const steps = stub.of('step');
+    assert.equal(steps.length, 1, 'a walker 8m away should be audible');
+    assert.equal(steps[0].id, undefined, 'a step named the person who took it');
+    assert.equal(steps[0].n, undefined);
+    // A place, but a loose one - a direction, not a pin.
+    const off = Math.hypot(steps[0].x - walker.pos.x, steps[0].z - walker.pos.z);
+    assert.ok(off > 0, 'the step position was exact');
+    assert.ok(off <= SOCIAL.stepFuzz * 1.5, `the step landed ${off.toFixed(1)}m from the walker`);
+  } finally { clock.restore(); }
+});
+
+test('boots do not carry across town, and crouching kills them', () => {
+  const { room, clock, stub, me } = makeRoom({ bots: 6 });
+  try {
+    intoCombat(room, clock);
+    const listener = me();
+    const walker = [...room.players.values()].find((p) => p.bot && p.alive);
+    listener.pos = { x: 0, y: 0, z: 0 };
+    walker.moving = true;
+
+    const stepsAt = (dist, opts = {}) => {
+      walker.pos = { x: dist, y: 0, z: 0 };
+      walker.crouch = !!opts.crouch;
+      walker.sprint = !!opts.sprint;
+      walker.character = opts.character || 'gunslinger';
+      walker.lastStepAt = 0;
+      stub.reset();
+      room.stepSound(walker, Date.now() / 1000);
+      return stub.of('step').length;
+    };
+
+    assert.equal(stepsAt(60), 0, 'a walker 60m away was audible');
+    assert.equal(stepsAt(15), 1, 'a walker 15m away was not');
+    assert.equal(stepsAt(28, { sprint: true }), 1, 'running should carry further than walking');
+    assert.equal(stepsAt(28), 0, 'walking carried as far as running');
+    assert.equal(stepsAt(15, { crouch: true }), 0, 'crouching is the counterplay and it did nothing');
+    // The Lookout's whole passive.
+    assert.equal(stepsAt(15, { character: 'scout' }), 0, "the Lookout's boots carry as far as anyone's");
+    assert.equal(stepsAt(11, { character: 'scout' }), 1, 'the Lookout went completely silent');
+  } finally { clock.restore(); }
+});
+
+test('a step is paced by the gait, not by the tick rate', () => {
+  const { room, clock, stub, me } = makeRoom({ bots: 6 });
+  try {
+    intoCombat(room, clock);
+    const listener = me();
+    const walker = [...room.players.values()].find((p) => p.bot && p.alive);
+    listener.pos = { x: 0, y: 0, z: 0 };
+    walker.pos = { x: 6, y: 0, z: 0 };
+    walker.moving = true;
+    walker.lastStepAt = 0;
+    stub.reset();
+    // Two seconds of ticks. At the walking cadence that is four or five steps,
+    // not the forty ticks that went past.
+    for (let i = 0; i < 40; i++) { clock.advance(50); room.stepSound(walker, Date.now() / 1000); }
+    const n = stub.of('step').length;
+    const expected = 2 / SOCIAL.stepInterval.walk;
+    assert.ok(Math.abs(n - expected) <= 1.5, `${n} steps in two seconds, expected about ${expected.toFixed(1)}`);
+  } finally { clock.restore(); }
+});

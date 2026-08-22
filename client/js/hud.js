@@ -25,6 +25,7 @@ export class HUD {
     this.knownRoles = new Map();     // id -> role, learned only from bodies
     this.roster = new Map();         // id -> {name, bot, alive, kills}
     this.selfRole = null;
+    this.autoStartAt = 0;
     this.hand = [];
     this.armed = [];
     this.feedLines = [];
@@ -122,6 +123,23 @@ export class HUD {
     const humans = msg.players.filter((p) => !p.bot).length;
     const bots = Math.max(0, msg.botTarget - humans);
     $('botBreak').textContent = `${humans} human · ${bots} bot${bots === 1 ? '' : 's'}`;
+
+    // A public town deals itself in once a second person turns up. Count it
+    // down locally rather than making the server push a packet a second.
+    this.autoStartAt = msg.startsIn > 0 ? performance.now() / 1000 + msg.startsIn : 0;
+    this.tickAutoStart();
+  }
+
+  tickAutoStart() {
+    const btn = $('startBtn');
+    if (!this.autoStartAt) {
+      btn.textContent = 'DEAL THE ROLES';
+      btn.classList.remove('counting');
+      return;
+    }
+    const left = Math.max(0, Math.ceil(this.autoStartAt - performance.now() / 1000));
+    btn.textContent = left > 0 ? `DEAL THE ROLES — ${left}s` : 'DEALING…';
+    btn.classList.add('counting');
   }
 
   setStatus(text) { $('menuStatus').textContent = text; }

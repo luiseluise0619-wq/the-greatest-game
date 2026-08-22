@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import MAP from '../../shared/map.js';
 import { moveAndCollide } from '../../shared/collision.js';
 import {
-  PLAYER, WEAPONS, PHASE, VOICE_LINES, ENDGAME, REPLAY, CARD_ORDER, clamp,
+  PLAYER, WEAPONS, PHASE, VOICE_LINES, ENDGAME, REPLAY, CARD_ORDER, INPUT_RATE, clamp,
   stepStamina, canSprint,
 } from '../../shared/constants.js';
 import { C, S } from '../../shared/protocol.js';
@@ -452,6 +452,12 @@ class Game {
       case S.PICKED:
         this.effects.removeLoot(msg.id);
         if (msg.by === this.selfId) this.audio.pickup();
+        break;
+
+      case S.STEP:
+        // Boots somewhere in town. No id on this message by design: you get a
+        // direction and a distance, and you work out the rest yourself.
+        this.audio.footstepAt({ x: msg.x, y: msg.y, z: msg.z }, !!msg.s, msg.r || 26);
         break;
 
       case S.FOOTPRINTS:
@@ -1044,7 +1050,7 @@ class Game {
       if (this.replay) this.updateReplay(dt, t);
 
       inputAcc += dt;
-      if (inputAcc > 1 / 30) { inputAcc = 0; this.sendInput(); }
+      if (inputAcc > 1 / INPUT_RATE) { inputAcc = 0; this.sendInput(); }
 
       const renderTime = t - INTERP_DELAY;
       if (!this.replay) for (const [, v] of this.views) v.update(renderTime, dt, this.camera);
@@ -1069,6 +1075,8 @@ class Game {
       if (this.inGame && this.self.alive) {
         this.hud.interact(this.effects.nearestLoot(this.camera.position, 2.6));
       } else this.hud.interact(null);
+
+      if (!this.inGame && this.phase === PHASE.LOBBY) this.hud.tickAutoStart();
 
       if (this.inGame) {
         this.hud.setTimer(this.phaseLeft);

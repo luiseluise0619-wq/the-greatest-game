@@ -145,6 +145,9 @@ try {
   // this browser renders in software.
   let spent = false;
   for (let attempt = 0; attempt < 3 && !spent; attempt++) {
+    // Reading B's feed a moment ago left the other window in front, and a
+    // background window quietly drops key events.
+    await A.bringToFront();
     await A.keyboard.press('KeyZ');
     spent = await A.waitForFunction(() => window.game.hud.hand.length < 2, null, { timeout: 9000 })
       .then(() => true).catch(() => false);

@@ -1,10 +1,9 @@
 // Shared tuning constants. Imported by both the Node server and the browser client.
 // Everything gameplay-relevant lives here so the two stay in lockstep.
 
-export const TICK_RATE = 20;                 // server simulation ticks per second
+export const TICK_RATE = 20;                 // server simulation ticks, and snapshots, per second
 export const TICK_MS = 1000 / TICK_RATE;
 export const INPUT_RATE = 30;                // client -> server movement updates per second
-export const SNAPSHOT_RATE = 20;             // server -> client world updates per second
 
 // ---------------------------------------------------------------------------
 // Player physics
@@ -222,12 +221,12 @@ export const CHARACTERS = {
     name: 'Wren Ashcroft',
     role: 'Lookout',
     ability: 'Bird Call',
-    desc: 'For 4s, anyone moving within 38m glows through walls. Movement only - crouch-holders stay hidden.',
+    desc: 'Passive: boots that carry barely half as far. Active: for 4s, anyone moving within 38m glows through walls - movement only, crouch-holders stay hidden.',
     cooldown: 30,
     duration: 4,
     radius: 38,
     hat: '#4a5a3a', coat: '#59683f', accent: '#c8b280',
-    passive: 'Quieter footsteps.',
+    stepQuiet: 0.55,     // how far this one's boots carry, against everyone else's
   },
   duelist: {
     id: 'duelist',
@@ -401,6 +400,11 @@ export const SOCIAL = {
   badgeHealthBonus: 45,
   badgeDamageResist: 0.85,
   cardCooldown: 1.6,
+  // Boots. Everyone in earshot hears a step and gets a direction; nobody is ever
+  // told whose it was. Same deal as a gunshot: physical, and anonymous.
+  stepInterval: { sprint: 0.31, walk: 0.44, crouch: 0.62 },
+  stepRange: { sprint: 30, walk: 22, crouch: 9 },
+  stepFuzz: 0.7,               // metres of slop, so a step is a direction not a pin
   footprintInterval: 0.55,
   footprintTtl: 24,
 };

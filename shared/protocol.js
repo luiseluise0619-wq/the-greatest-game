@@ -40,6 +40,7 @@ export const S = {
   LOOT: 'loot',
   PICKED: 'picked',
   FOOTPRINTS: 'prints',
+  STEP: 'step',
   BADGE: 'badge',
   CARDS: 'cards',
   RESULTS: 'results',
