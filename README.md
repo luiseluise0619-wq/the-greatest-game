@@ -119,6 +119,10 @@ again, with your role, your hand, your health and your position intact. Nobody
 comes back for it and it falls over where it stands, because a player who simply
 vanished would take the round's evidence with them.
 
+A dropped socket **reconnects on its own**, backing off across that window, and
+lands you back in your own boots without putting the role card in front of you
+mid-fight — and without forgetting the bodies you had already identified.
+
 **The dead talk only to the dead.** Dying does not turn you into a spotter for
 whoever is still alive.
 

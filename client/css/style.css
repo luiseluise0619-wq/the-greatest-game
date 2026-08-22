@@ -222,6 +222,14 @@ button.wide { width: 100%; margin-top: 12px; }
 .cardHint.dark { color: rgba(232,217,189,.4); margin-top: 14px; }
 .cardHint.dark b { background: rgba(200,180,140,.18); color: var(--sand); }
 
+#netBanner {
+  position: fixed; left: 50%; top: 12%; transform: translateX(-50%); z-index: 46;
+  pointer-events: none; font-size: 12px; letter-spacing: .3em;
+  color: #f0d9a8; background: rgba(140, 40, 30, .88); padding: 6px 16px;
+  animation: netPulse 1.2s ease-in-out infinite;
+}
+@keyframes netPulse { 50% { opacity: .45; } }
+
 #fpsMeter {
   position: fixed; right: 8px; top: 6px; z-index: 45; pointer-events: none;
   font-size: 11px; letter-spacing: .1em; color: rgba(232,217,189,.55);

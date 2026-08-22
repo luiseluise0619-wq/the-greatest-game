@@ -25,6 +25,7 @@ export class HUD {
     this.knownRoles = new Map();     // id -> role, learned only from bodies
     this.roster = new Map();         // id -> {name, bot, alive, kills}
     this.selfRole = null;
+    this.matchNumber = null;
     this.autoStartAt = 0;
     this.hand = [];
     this.armed = [];
@@ -144,6 +145,13 @@ export class HUD {
 
   setStatus(text) { $('menuStatus').textContent = text; }
 
+  /** A banner in game, because the menu status line is not on screen there. */
+  setReconnecting(on, attempt = 0) {
+    const el = $('netBanner');
+    el.classList.toggle('hidden', !on);
+    if (on) el.textContent = `RECONNECTING${attempt > 1 ? ` (${attempt})` : ''}…`;
+  }
+
   setRoom(msg) {
     $('roomCode').textContent = msg.code || '····';
     const kind = !msg.code ? 'finding a town…'
@@ -159,8 +167,14 @@ export class HUD {
   }
 
   // ------------------------------------------------------------- role card
-  showRoleCard(msg) {
-    this.newMatch();
+  /** Take a role, without necessarily putting the card in front of anybody. */
+  setRole(msg) {
+    // A reconnect mid-round carries the same match number, and everything this
+    // player has worked out about the dead stays worked out.
+    if (msg.match !== this.matchNumber) {
+      this.newMatch();
+      this.matchNumber = msg.match;
+    }
     this.selfRole = msg;
     const c = CHARACTERS[msg.character];
     $('roleName').textContent = msg.roleName.toUpperCase();
@@ -171,8 +185,12 @@ export class HUD {
     $('roleIntel').textContent = msg.intel || 'Nothing. You are working blind.';
     $('roleCharacter').textContent = `${c.role} — ${c.name}`;
     $('roleAbility').textContent = `${c.ability}: ${c.desc}`;
-    $('roleCard').classList.remove('hidden');
     this.setObjective(msg.objective);
+  }
+
+  showRoleCard(msg) {
+    this.setRole(msg);
+    $('roleCard').classList.remove('hidden');
   }
 
   peekRole(show) {

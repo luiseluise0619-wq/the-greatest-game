@@ -208,6 +208,33 @@ try {
   check(bBack && JSON.stringify(bAfter.hand) === JSON.stringify(bBefore.hand),
     'the hand comes back with it');
 
+  // A socket that drops mid-round must come back on its own, into the same
+  // seat, without shoving the role card back in the player's face.
+  const netBefore = await A.evaluate(() => {
+    window.game.hud.knownRoles.set(-1, 'outlaw');    // something learned, to check it survives
+    return { id: window.game.selfId, role: window.game.selfRole.role, known: window.game.hud.knownRoles.size };
+  });
+  await A.evaluate(() => window.game.ws.close());
+  const bannerSeen = await A.waitForFunction(
+    () => !document.getElementById('netBanner').classList.contains('hidden'),
+    null, { timeout: 10000 },
+  ).then(() => true).catch(() => false);
+  check(bannerSeen, 'a dropped socket says so on screen');
+  const netBack = await A.waitForFunction(() => window.game.ws.readyState === 1, null, { timeout: 25000 })
+    .then(() => true).catch(() => false);
+  await A.waitForTimeout(900);
+  const netAfter = await A.evaluate(() => ({
+    id: window.game.selfId, role: window.game.selfRole.role, known: window.game.hud.knownRoles.size,
+    banner: !document.getElementById('netBanner').classList.contains('hidden'),
+    cardUp: !document.getElementById('roleCard').classList.contains('hidden'),
+    inGame: window.game.inGame,
+  }));
+  check(netBack && netAfter.inGame && netAfter.id === netBefore.id && netAfter.role === netBefore.role,
+    `a dropped socket reconnects into the same seat (${netAfter.role})`);
+  check(netAfter.known === netBefore.known, 'reconnecting keeps what the player had worked out');
+  check(!netAfter.cardUp, 'reconnecting does not shove the role card back on screen');
+  check(!netAfter.banner, 'the reconnecting banner goes away again');
+
   // Ride the round out: the aftermath screen is where every silent card is
   // finally named, and nothing else in this suite ever reaches it.
   const reachedResults = await A.waitForFunction(

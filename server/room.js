@@ -310,7 +310,7 @@ export class Room {
     client.playerId = p.id;
 
     this.send(client, this.welcomeMsg(p.id, p.token));
-    if (p.role) this.sendRole(p);       // also snaps the camera back to the body
+    if (p.role) this.sendRole(p, { resumed: true });   // also snaps the camera to the body
     this.pushCards(p);
     this.sendPhaseTo(client);
     this.pushSelf(p);
@@ -1262,11 +1262,16 @@ export class Room {
     return { kind: 'none', text: 'Nobody knows your face. Keep it that way, or pin on the star and dare them.' };
   }
 
-  sendRole(p) {
+  sendRole(p, opts = {}) {
     if (p.bot) return;
     const r = ROLES[p.role];
     this.emit(p, {
       t: S.ROLE,
+      // The client forgets what it has learned when the match number changes,
+      // so a reconnect mid-round has to carry the same one - otherwise coming
+      // back would quietly wipe every body you had already identified.
+      match: this.matchNumber,
+      resumed: !!opts.resumed,
       role: p.role,
       roleName: r.name,
       faction: p.faction,

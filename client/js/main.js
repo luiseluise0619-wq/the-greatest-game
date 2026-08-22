@@ -319,7 +319,9 @@ class Game {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     this.ws = new WebSocket(`${proto}://${location.host}`);
     this.ws.onopen = () => {
+      this.retries = 0;
       this.hud.setStatus('connected — pick a gunhand and deal the roles');
+      this.hud.setReconnecting(false);
       this.warmWorld();
       this.send({
         t: C.JOIN,
@@ -331,15 +333,37 @@ class Game {
         ...this.joinIntent,
       });
     };
-    this.ws.onclose = () => {
+    this.ws.onclose = (e) => {
       if (this.switching) return;               // we closed it on purpose
-      this.hud.setStatus('connection lost — refresh, your body is still standing');
+      if (e && e.code === 4000) return;         // another tab took this seat
+      this.scheduleReconnect();
     };
-    this.ws.onerror = () => this.hud.setStatus('connection error');
+    this.ws.onerror = () => { /* onclose follows and does the work */ };
     this.ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       this.onMessage(msg);
     };
+  }
+
+  /**
+   * A dropped socket is usually a blip, and the server keeps your body standing
+   * for SOCIAL.reconnectGrace seconds. Retry inside that window, backing off,
+   * and let the join token put you back in your own boots. Past it there is
+   * nothing to come back to and the honest thing is to say so.
+   */
+  scheduleReconnect() {
+    this.retries = (this.retries || 0) + 1;
+    const waits = [0.6, 1.2, 2.5, 5, 9];
+    const wait = waits[Math.min(this.retries - 1, waits.length - 1)];
+    if (this.retries > waits.length) {
+      this.hud.setReconnecting(false);
+      this.hud.setStatus('connection lost — refresh to ride again');
+      return;
+    }
+    this.hud.setReconnecting(true, this.retries);
+    this.hud.setStatus(`connection lost — reconnecting (${this.retries})…`);
+    clearTimeout(this._reconnect);
+    this._reconnect = setTimeout(() => this.connect(), wait * 1000);
   }
 
   send(msg) {
@@ -393,7 +417,10 @@ class Game {
           this.self.yaw = msg.yaw ?? 0;
           this.self.pitch = 0;
         }
-        this.hud.showRoleCard(msg);
+        // Coming back mid-round should not shove the role card in your face
+        // while somebody is shooting at you.
+        if (msg.resumed) this.hud.setRole(msg);
+        else this.hud.showRoleCard(msg);
         break;
 
       case S.PHASE:
