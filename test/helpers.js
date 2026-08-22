@@ -1,6 +1,18 @@
 // Shared test scaffolding: a fake clock so a 13 minute round runs in
 // milliseconds, and a socket stub that records what a client would be sent.
 
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+// Point the playtest log somewhere disposable before anything imports it.
+// Every test file pulls this in first, and a static import is evaluated before
+// the module body that dynamically imports the server - so this lands in time.
+// Without it, running the suite dribbles fake rounds into a real data/ file.
+if (!process.env.HNH_TELEMETRY_DIR) {
+  process.env.HNH_TELEMETRY_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'hnh-test-'));
+}
+
 export function fakeClock() {
   const real = Date.now;
   let t = 1_700_000_000_000;
