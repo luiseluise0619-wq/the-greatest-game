@@ -108,7 +108,7 @@ html, body {
 .chatLine.dead { color: #8a8078; }
 .chatLine.fade { opacity: 0; transition: opacity 1s; }
 
-#healthWrap { display: flex; align-items: center; gap: 10px; }
+#healthWrap { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 #healthBar {
   position: relative; width: 210px; height: 12px;
   background: rgba(12,9,6,.72); border: 1px solid rgba(200,180,140,.3);
@@ -143,6 +143,18 @@ html, body {
   font-size: 13px; letter-spacing: .1em; background: rgba(12,9,6,.6); padding: 5px 12px;
 }
 #interactPrompt b { background: var(--tin); color: var(--ink); padding: 1px 6px; margin-right: 6px; }
+
+#staminaBar {
+  flex: 0 0 210px; width: 210px; height: 3px; margin: 4px 0 0;
+  background: rgba(12, 9, 6, .6); border: 1px solid rgba(200, 180, 140, .22);
+  transition: opacity .35s;
+}
+#staminaBar.spent { opacity: 0; }
+#staminaBar i {
+  display: block; height: 100%; width: 100%; transform-origin: 0 50%;
+  background: var(--tin); transition: transform .06s linear, background .2s;
+}
+#staminaBar.empty i { background: var(--rust); }
 
 #statusStrip { position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%); display: flex; gap: 8px; }
 .statusChip { font-size: 10.5px; letter-spacing: .12em; padding: 3px 9px; background: rgba(232,193,90,.18); border: 1px solid rgba(232,193,90,.5); color: var(--gold); }

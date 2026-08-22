@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 60 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 63 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 ```
 
@@ -116,6 +116,13 @@ next to the table of who everyone really was.
 **The Sheriff may pin on the star** (`B`). It is public and permanent: +45 max
 health and 15% damage resistance, but every Outlaw in town now has a name and a
 face. Going loud is usually the Sheriff's strongest and most dangerous play.
+
+**Sprint is five seconds long.** It refills at about a fifth of the rate it
+drains and you need a second of it banked before you can start running again, so
+you cannot outrun the man behind you indefinitely and you cannot cross town
+without arriving winded. The same budget is shared by the client's own
+integration, the bots, and the server validating your movement — one rule, in
+`stepStamina`, so no two of them can disagree about how long anybody can run.
 
 **You can call somebody out** (`F` while looking at them). It broadcasts to
 everyone, and the bots weigh it by how much they already trust you.
@@ -333,7 +340,7 @@ with site data blocked falls back to the defaults instead of failing to start.
 
 | | |
 |---|---|
-| `WASD` move · `Shift` sprint · `Ctrl` crouch · `Space` jump | `LMB` fire · `RMB` aim (rifle) · `R` reload |
+| `WASD` move · `Shift` sprint (5s of it) · `Ctrl` crouch · `Space` jump | `LMB` fire · `RMB` aim (rifle) · `R` reload |
 | `1` `2` `3` weapons · `G` dynamite · `E` pick up | `Q` ability · `F` call somebody out · `B` pin on the star |
 | `T` chat · `V` shout wheel · `Tab` the table | `Z` `X` play a card · `H` peek at your role |
 | `Esc` frees the mouse; press it again for settings | |
@@ -401,7 +408,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 60 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 63 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -433,6 +440,7 @@ They are grouped by what they protect:
   it, and every default is reachable with its own control.
 - **`test/security.test.js`** — what a lying client cannot do: teleport, walk
   through a wall, end up inside geometry, buy speed by flooding input packets,
+  sprint past the end of its own tank,
   be told about players it cannot see, or learn the name of a shooter it could
   not have seen. One check runs the other way and makes sure an honest sprint at
   30Hz is never clamped.

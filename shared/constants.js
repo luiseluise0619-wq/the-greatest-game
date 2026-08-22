@@ -27,6 +27,7 @@ export const PLAYER = {
   stepHeight: 0.62,
   staminaMax: 5.0,          // seconds of sprint
   staminaRegen: 0.9,        // per second
+  staminaResume: 1.2,       // seconds you must bank before you can run again
   // Server-side sanity clamp: how far a client may claim to have moved per second.
   maxServerSpeed: 12.5,
   // Jitter slack for the server's speed clamp, as a BUDGET rather than a per
@@ -273,6 +274,32 @@ export const GAMBLER_BOONS = [
   { id: 'dust', label: 'DUST DEVIL - harder to see', dust: true, duration: 7 },
   { id: 'bust', label: 'BUSTED - the deck was cold', duration: 0 },
 ];
+
+// ---------------------------------------------------------------------------
+// Sprint budget
+//
+// Shared, because three different things move a player - the client's own
+// integration, the bot brains, and the server validating an input packet - and
+// if any two of them disagree about how long somebody can run, one of them is
+// either cheating or being punished for nothing.
+// ---------------------------------------------------------------------------
+
+/** One tick of the sprint budget, in seconds of running left. */
+export function stepStamina(stamina, sprinting, dt) {
+  const cur = Number.isFinite(stamina) ? stamina : PLAYER.staminaMax;
+  const next = sprinting ? cur - dt : cur + dt * PLAYER.staminaRegen;
+  return clamp(next, 0, PLAYER.staminaMax);
+}
+
+/**
+ * Whether a run may start or continue. Emptying the tank means walking until
+ * you have banked a little back, so the answer is not simply "stamina > 0" -
+ * otherwise an empty player stutters between running and walking every frame.
+ */
+export function canSprint(stamina, alreadySprinting) {
+  const cur = Number.isFinite(stamina) ? stamina : PLAYER.staminaMax;
+  return alreadySprinting ? cur > 0 : cur >= PLAYER.staminaResume;
+}
 
 // ---------------------------------------------------------------------------
 // The Deck. Six cards, two dealt to every player at the start of a round.

@@ -9,6 +9,7 @@ import MAP from '../../shared/map.js';
 import { moveAndCollide } from '../../shared/collision.js';
 import {
   PLAYER, WEAPONS, PHASE, VOICE_LINES, ENDGAME, REPLAY, CARD_ORDER, clamp,
+  stepStamina, canSprint,
 } from '../../shared/constants.js';
 import { C, S } from '../../shared/protocol.js';
 import { buildWorld, animateWorld } from './world.js';
@@ -44,6 +45,7 @@ class Game {
       vel: new THREE.Vector3(),
       yaw: 0, pitch: 0,
       crouch: false, sprint: false, grounded: true, moving: false,
+      stamina: PLAYER.staminaMax,
       alive: false, hp: 100, maxHp: 100,
       weapon: 'revolver', mag: 6, reserve: 30, guns: ['revolver'], dyn: 0,
       reloading: 0, swapUntil: 0, nextFireAt: 0, cd: 0, active: 0, badge: false,
@@ -535,6 +537,9 @@ class Game {
     // Trust the server on ammo, but never let a late packet un-fire a shot the
     // player has already seen leave the barrel.
     if (msg.mag <= s.mag || performance.now() / 1000 > s.nextFireAt) s.mag = msg.mag;
+    // Stamina is simulated on both sides; only resync when they have genuinely
+    // drifted, or every packet would jolt the sprint bar.
+    if (Number.isFinite(msg.stam) && Math.abs(msg.stam - s.stamina) > 0.6) s.stamina = msg.stam;
     s.reserve = msg.reserve;
     s.reloading = msg.reloading;
 
@@ -545,7 +550,7 @@ class Game {
       this.viewmodel.startReload(WEAPONS[msg.weapon].reloadTime);
       this.playReloadClicks(WEAPONS[msg.weapon]);
     }
-    this.hud.setSelf({ ...msg, hp: s.hp });
+    this.hud.setSelf({ ...msg, hp: s.hp, stam: s.stamina });
     this.hud.setDead(!msg.alive);
   }
 
@@ -671,6 +676,7 @@ class Game {
 
   exitToResults() {
     document.exitPointerLock?.();
+    this.self.stamina = PLAYER.staminaMax;
     this.hud.setDead(false);
   }
 
@@ -905,7 +911,7 @@ class Game {
     this.worldFlash.intensity = 7;
     this.audio.gunshot(s.weapon, this.self.pos);
     this.recoilKick = (this.recoilKick || 0) + w.recoil * 0.0032;
-    this.hud.setSelf({ ...this.lastSelfMsg, mag: s.mag, reserve: s.reserve, hp: s.hp, maxHp: s.maxHp, weapon: s.weapon, guns: s.guns, dyn: s.dyn, cd: s.cd, cdMax: s.cdMax, active: s.active, armour: s.armour || 0, reloading: 0, badge: s.badge, buffs: s.buffs });
+    this.hud.setSelf({ ...this.lastSelfMsg, stam: s.stamina, mag: s.mag, reserve: s.reserve, hp: s.hp, maxHp: s.maxHp, weapon: s.weapon, guns: s.guns, dyn: s.dyn, cd: s.cd, cdMax: s.cdMax, active: s.active, armour: s.armour || 0, reloading: 0, badge: s.badge, buffs: s.buffs });
   }
 
   // ------------------------------------------------------------- movement
@@ -926,10 +932,14 @@ class Game {
     if (wanted) wish.normalize();
 
     s.crouch = this.keys.has('ControlLeft') || this.keys.has('ControlRight') || this.keys.has('KeyC');
-    s.sprint = (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight')) && !s.crouch && wanted && !this.ads;
+    const wantSprint = (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'))
+      && !s.crouch && wanted && !this.ads;
+    // The same budget the server keeps, run locally so the feel is immediate.
+    s.sprint = wantSprint && canSprint(s.stamina, s.sprint);
     s.moving = wanted;
 
     if (!s.alive) return this.updateSpectator(dt, wish, wanted);
+    s.stamina = stepStamina(s.stamina, s.sprint, dt);
 
     let speed = s.crouch ? PLAYER.crouchSpeed : s.sprint ? PLAYER.sprintSpeed : PLAYER.walkSpeed;
     if ((s.buffs || []).includes('speedMult')) speed *= 1.35;

@@ -189,6 +189,16 @@ export class HUD {
     $('armourFill').style.width = `${Math.min(100, (s.armour / 45) * 100)}%`;
     $('armourFill').style.display = s.armour > 0 ? 'block' : 'none';
 
+    // The sprint bar only exists while you are spending it. A permanent second
+    // bar under the health would say "manage this", and it is not that kind of
+    // resource - it is a reason you cannot outrun the man behind you forever.
+    const stam = Number.isFinite(s.stam) ? s.stam : (s.stamMax || 5);
+    const stamMax = s.stamMax || 5;
+    const stamPct = Math.max(0, Math.min(1, stam / stamMax));
+    $('staminaBar').classList.toggle('spent', stamPct >= 0.999);
+    $('staminaBar').classList.toggle('empty', stam <= 0.02);
+    $('staminaFill').style.transform = `scaleX(${stamPct})`;
+
     const w = WEAPONS[s.weapon];
     $('weaponName').textContent = w ? w.short : '';
     $('mag').textContent = s.mag;

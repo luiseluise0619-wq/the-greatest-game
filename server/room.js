@@ -10,6 +10,7 @@ import {
   SOCIAL, HITBOX, CHARACTERS, GAMBLER_BOONS, LOOT_RESPAWN, VOICE_LINES, VISION, REPLAY,
   CARDS, CARD_ORDER, CARD_DEAL,
   TICK_MS, MIN_PLAYERS, MAX_PLAYERS, rolesForPlayerCount, clamp,
+  stepStamina, canSprint,
 } from '../shared/constants.js';
 import MAP, { zoneAt, SPAWNS, LOOT_SPAWNS } from '../shared/map.js';
 import { raycastWorld, rayPlayerBox, lineOfSight, moveAndCollide } from '../shared/collision.js';
@@ -186,6 +187,7 @@ export class Room {
       lastAccuseAt: 0,
       lastInputAt: now(),
       moveSlack: PLAYER.serverSlack,   // see onInput: jitter budget, not per packet
+      stamina: PLAYER.staminaMax,
       revealUntil: 0,
       trailGroup: 0,
       brain: null,
@@ -318,6 +320,21 @@ export class Room {
       p.moveSlack = 0;
     } else {
       p.moveSlack -= Math.max(0, dist - fair);
+    }
+
+    // Sprint budget, measured from what the player actually did rather than the
+    // flag they sent - a client that simply never admits to sprinting should not
+    // get free running out of it. The cap is horizontal only, so a fall still
+    // gets the full 3D allowance above.
+    const boost = p.buffs.speedMult || 1;
+    const horiz = Math.hypot(dx, dz);
+    const running = horiz / dt > PLAYER.walkSpeed * boost * 1.12;
+    p.stamina = stepStamina(p.stamina, running, dt);
+    const topSpeed = (p.stamina > 0 ? PLAYER.sprintSpeed : PLAYER.walkSpeed) * boost * 1.3;
+    const horizCap = topSpeed * dt + PLAYER.serverSlack;
+    if (horiz > horizCap) {
+      const k = horizCap / horiz;
+      dx *= k; dz *= k;
     }
 
     // 2. Walk the move through the actual world instead of taking the client's
@@ -1124,6 +1141,7 @@ export class Room {
       p.lastCardAt = 0;
       p.lastHitBy = null;
       p.moveSlack = PLAYER.serverSlack;
+      p.stamina = PLAYER.staminaMax;
       p.seenAt = new Map();
       p.lastVisible = null;
       const s = SPAWNS[spawnOrder[i % SPAWNS.length]];
@@ -1578,6 +1596,8 @@ export class Room {
       active: p.abilityUntil > t ? r2(p.abilityUntil - t) : 0,
       alive: p.alive,
       badge: p.badge,
+      stam: r2(p.stamina ?? PLAYER.staminaMax),
+      stamMax: PLAYER.staminaMax,
       buffs: Object.keys(p.buffs).filter((k) => k !== 'until'),
       loot: this.loot.filter((l) => l.active).map(lootWire),
     });

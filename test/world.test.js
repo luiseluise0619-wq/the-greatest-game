@@ -3,7 +3,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import MAP, { zoneAt, SPAWNS, LOOT_SPAWNS, NAV_NODES } from '../shared/map.js';
 import { moveAndCollide, raycastWorld, lineOfSight, isBlocked } from '../shared/collision.js';
-import { PLAYER, ROLE_TABLE, MIN_PLAYERS, MAX_PLAYERS, rolesForPlayerCount, WEAPONS } from '../shared/constants.js';
+import {
+  PLAYER, ROLE_TABLE, MIN_PLAYERS, MAX_PLAYERS, rolesForPlayerCount, WEAPONS,
+  stepStamina, canSprint,
+} from '../shared/constants.js';
 
 test('map is well formed', () => {
   assert.ok(MAP.solids.length > 300, 'town should have real geometry');
@@ -120,5 +123,35 @@ test('every weapon is internally consistent', () => {
     assert.ok(w.range >= w.falloffStart, `${id} falls off past its own range`);
     assert.ok(w.fireInterval > 0 && w.reloadTime > 0);
     assert.ok(w.pellets >= 1);
+  }
+});
+
+test('the sprint budget is a real constraint and always recovers', () => {
+  // A tank that empties in less than a couple of seconds is a nuisance rather
+  // than a decision, and one that refills faster than it drains is not a budget.
+  assert.ok(PLAYER.staminaMax >= 3, 'a sprint shorter than three seconds is just a stutter');
+  assert.ok(PLAYER.staminaRegen > 0 && PLAYER.staminaRegen < 1,
+    'stamina must come back, but slower than it goes');
+  assert.ok(PLAYER.staminaResume > 0 && PLAYER.staminaResume < PLAYER.staminaMax,
+    'the resume threshold has to be reachable');
+
+  // Drain it flat out at 60Hz, then walk it back.
+  let s = PLAYER.staminaMax;
+  let ticks = 0;
+  while (s > 0 && ticks < 10000) { s = stepStamina(s, true, 1 / 60); ticks += 1; }
+  assert.ok(Math.abs(ticks / 60 - PLAYER.staminaMax) < 0.1,
+    `a full tank lasted ${(ticks / 60).toFixed(2)}s instead of ${PLAYER.staminaMax}s`);
+  assert.equal(canSprint(s, true), false, 'an empty tank kept running');
+  assert.equal(canSprint(s, false), false, 'an empty tank could start a new run');
+
+  ticks = 0;
+  while (!canSprint(s, false) && ticks < 10000) { s = stepStamina(s, false, 1 / 60); ticks += 1; }
+  assert.ok(ticks < 10000, 'stamina never recovered enough to run again');
+  assert.ok(s <= PLAYER.staminaMax, 'stamina overfilled');
+
+  // And it never goes out of range whatever it is handed.
+  for (const bad of [undefined, null, NaN, -50, 1e9]) {
+    const out = stepStamina(bad, true, 0.05);
+    assert.ok(out >= 0 && out <= PLAYER.staminaMax, `stepStamina(${bad}) escaped its range`);
   }
 });

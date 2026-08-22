@@ -5,7 +5,9 @@
 // on somebody they have decided to trust, and to shout about it afterwards.
 // Everything below is built around a per-bot suspicion table plus a faction goal.
 
-import { PLAYER, WEAPONS, CHARACTERS, CARDS, PHASE, clamp } from '../shared/constants.js';
+import {
+  PLAYER, WEAPONS, CHARACTERS, CARDS, PHASE, clamp, stepStamina, canSprint,
+} from '../shared/constants.js';
 import MAP, { NAV_NODES, zoneAt } from '../shared/map.js';
 import { moveAndCollide, lineOfSight } from '../shared/collision.js';
 
@@ -730,6 +732,11 @@ export class BotBrain {
     }
 
     if (this.state === 'hunt' || this.state === 'ring' || this.state === 'flee' || this.state === 'escort') sprint = true;
+
+    // Same sprint budget as a player. Without this a bot outruns anybody it is
+    // chasing for the whole round, which is both unfair and unreadable.
+    sprint = sprint && canSprint(me.stamina, me.sprint);
+    me.stamina = stepStamina(me.stamina, sprint && !!desired, dt);
 
     let vx = 0, vz = 0;
     if (desired) {

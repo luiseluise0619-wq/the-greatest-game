@@ -200,3 +200,43 @@ test('the jitter budget still lets an honest client through', () => {
     assert.ok(moved > asked * 0.97, `an honest sprint was clamped: asked ${asked.toFixed(1)}m, got ${moved.toFixed(1)}m`);
   } finally { clock.restore(); }
 });
+
+test('a sprint runs out, and the clamp comes down with it', () => {
+  const { room, clock, me } = liveRoom();
+  try {
+    me.pos = { x: 0, y: 0, z: 0 };
+    me.moveSlack = PLAYER.serverSlack;
+    me.stamina = PLAYER.staminaMax;
+
+    // Ask to sprint flat out, at the real 30Hz, for eight seconds - three more
+    // than the tank holds.
+    const step = PLAYER.sprintSpeed / 30;
+    const marks = [];
+    for (let i = 0; i < 30 * 8; i++) {
+      const before = me.pos.x;
+      clock.advance(1000 / 30);
+      room.onInput(me, { pos: { x: me.pos.x + step, y: 0, z: me.pos.z }, yaw: 0, pitch: 0 });
+      marks.push({ t: i / 30, gained: me.pos.x - before });
+    }
+
+    const early = marks.slice(15, 60).reduce((n, m) => n + m.gained, 0) / 45 * 30;
+    const late = marks.slice(210, 240).reduce((n, m) => n + m.gained, 0) / 30 * 30;
+    assert.ok(early > PLAYER.walkSpeed * 1.2, `a fresh sprint was clamped to ${early.toFixed(1)} m/s`);
+    assert.ok(late < PLAYER.sprintSpeed * 0.95,
+      `still sprinting at ${late.toFixed(1)} m/s after eight seconds on a five second tank`);
+    assert.equal(me.stamina, 0, 'the tank never emptied');
+  } finally { clock.restore(); }
+});
+
+test('resting refills the tank', () => {
+  const { room, clock, me } = liveRoom();
+  try {
+    me.pos = { x: 0, y: 0, z: 0 };
+    me.stamina = 0;
+    for (let i = 0; i < 30 * 3; i++) {
+      clock.advance(1000 / 30);
+      room.onInput(me, { pos: { x: me.pos.x, y: 0, z: me.pos.z }, yaw: 0, pitch: 0 });
+    }
+    assert.ok(me.stamina > 2, `three seconds of standing still gave back ${me.stamina.toFixed(2)}s`);
+  } finally { clock.restore(); }
+});
