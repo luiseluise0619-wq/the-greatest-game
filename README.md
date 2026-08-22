@@ -507,6 +507,12 @@ They are grouped by what they protect:
   a flood does not, an idle socket cannot save up more than one burst, and a
   stream at exactly the limit is never refused.
 
+Both suites run in CI on every push (`.github/workflows/test.yml`) across Node
+18, 20 and 22, with the browser check on its own runner and the screenshots kept
+as artifacts. A third job prints the bot balance and is allowed to fail — it is
+there to be read when a bot change lands, not to gate anything, because win
+shares under fifty rounds say whatever they like.
+
 `npm run test:browser` drives a real Chromium through a whole round with two
 players — lobby, room codes, the deck printed face up, the role card, the hand
 dealt and a card played, and on to the aftermath screen where the round's cards
