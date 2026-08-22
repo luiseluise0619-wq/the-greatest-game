@@ -396,6 +396,8 @@ export const SOCIAL = {
   accuseCooldown: 8,
   chatCooldown: 0.6,
   voiceCooldown: 2.5,
+  // A shout is a shout, not a broadcast: you call across the street, not the map.
+  shoutRange: 38,
   // The Sheriff may pin on the star for a permanent buff and a permanent target.
   badgeHealthBonus: 45,
   badgeDamageResist: 0.85,

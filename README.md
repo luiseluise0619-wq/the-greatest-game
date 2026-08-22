@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 78 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 79 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 ```
 
@@ -157,8 +157,10 @@ integration, the bots, and the server validating your movement — one rule, in
 **You can call somebody out** (`F` while looking at them). It broadcasts to
 everyone, and the bots weigh it by how much they already trust you.
 
-Other channels: all-chat (`T`), a quick shout wheel (`V`, then a number), and the
-Tracker's footprints — which are deliberately colourless, so you can see that
+Other channels: all-chat (`T`) reaches the whole town; the **shout wheel** (`V`,
+then a number) reaches about 38m and arrives with a voice and a direction, so you
+hear somebody call out from the alley before you read what they said. And the
+Tracker's footprints, which are deliberately colourless — you can see that
 *somebody* walked through the alley but not who.
 
 ---
@@ -438,7 +440,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 78 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 79 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -481,7 +483,7 @@ They are grouped by what they protect:
 - **`test/security.test.js`** — what a lying client cannot do: teleport, walk
   through a wall, end up inside geometry, buy speed by flooding input packets,
   sprint past the end of its own tank, learn who used an ability or picked
-  something up across town,
+  something up across town, hear a shout from the far side of the map,
   be told about players it cannot see, or learn the name of a shooter it could
   not have seen. One check runs the other way and makes sure an honest sprint at
   30Hz is never clamped.

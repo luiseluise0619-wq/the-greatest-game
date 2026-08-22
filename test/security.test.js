@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
-import { TIMING, PLAYER, VISION } from '../shared/constants.js';
+import { TIMING, PLAYER, VISION, SOCIAL, VOICE_LINES } from '../shared/constants.js';
 import MAP from '../shared/map.js';
 import { isBlocked } from '../shared/collision.js';
 
@@ -301,5 +301,30 @@ test('a pickup out of sight does not say whose hands it went into', () => {
     assert.ok(picked, 'the item vanishing should still reach everybody');
     assert.equal(picked.id, item.id);
     assert.equal(picked.by, undefined, 'an unseen pickup named the player who made it');
+  } finally { clock.restore(); }
+});
+
+test('a shout carries across the street, not across the map', () => {
+  const { room, clock, stub, me } = liveRoom({ bots: 8 });
+  try {
+    const listener = me;
+    const shouter = [...room.players.values()].find((p) => p.bot && p.alive);
+    listener.pos = { x: 0, y: 0, z: 0 };
+
+    const shoutFrom = (dist) => {
+      shouter.pos = { x: dist, y: 0, z: 0 };
+      shouter.lastChatAt = 0;
+      stub.reset();
+      room.onVoice(shouter, { line: VOICE_LINES[0].id });
+      return stub.of('chat').length;
+    };
+
+    assert.equal(shoutFrom(10), 1, 'a shout from across the street went unheard');
+    assert.equal(shoutFrom(SOCIAL.shoutRange - 2), 1);
+    assert.equal(shoutFrom(SOCIAL.shoutRange + 20), 0, 'a shout carried across the whole map');
+
+    // The dead hear everything - they have nothing better to do.
+    listener.alive = false;
+    assert.equal(shoutFrom(120), 1, 'the dead should hear the whole town');
   } finally { clock.restore(); }
 });

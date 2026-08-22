@@ -465,7 +465,11 @@ class Game {
         break;
 
       case S.FEED: this.hud.addFeed(escapeHtml(msg.text), msg.tone); break;
-      case S.CHAT: this.hud.addChat(msg); break;
+      case S.CHAT:
+        this.hud.addChat(msg);
+        // A shout has a direction; typed chat does not.
+        if (msg.voice) this.audio.shout({ x: msg.x, y: msg.y, z: msg.z }, msg.id === this.selfId);
+        break;
 
       case S.ABILITY: this.onAbilityEvent(msg); break;
 

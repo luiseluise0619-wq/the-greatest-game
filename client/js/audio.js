@@ -199,6 +199,44 @@ export class GameAudio {
   }
 
   /**
+   * A shout across the street. There is no speech synthesis here and there is
+   * not going to be: two formant bands over a sawtooth, with a falling pitch,
+   * reads as a human voice at a distance well enough to make you turn round -
+   * which is the entire job. The words arrive in the chat log; this is the part
+   * that tells you where they came from.
+   */
+  shout(pos, self = false) {
+    if (!this.ready || !this.enabled) return;
+    const sp = self ? { gain: 0.55, pan: 0, dist: 0 } : this.spatial(pos, 70);
+    if (!sp) return;
+    const t = this.ctx.currentTime;
+    const out = this.chain(sp.pan, 1.2);
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.exponentialRampToValueAtTime(0.16 * Math.max(0.25, sp.gain), t + 0.05);
+    out.gain.setValueAtTime(0.16 * Math.max(0.25, sp.gain), t + 0.22);
+    out.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(190, t);
+    osc.frequency.linearRampToValueAtTime(240, t + 0.09);
+    osc.frequency.linearRampToValueAtTime(135, t + 0.4);
+
+    // Two vowel-ish resonances. Distance rolls the upper one off first.
+    for (const [freq, q, gain] of [[720, 7, 1], [1180 * (0.6 + sp.gain * 0.4), 9, 0.7]]) {
+      const f = this.ctx.createBiquadFilter();
+      f.type = 'bandpass';
+      f.frequency.value = freq;
+      f.Q.value = q;
+      const g = this.ctx.createGain();
+      g.gain.value = gain;
+      osc.connect(f); f.connect(g); g.connect(out);
+    }
+    osc.start(t);
+    osc.stop(t + 0.45);
+  }
+
+  /**
    * Somebody else's boots. Positional and anonymous - the server sends a place
    * and a gait, never a name, so this is deliberately just a direction and a
    * distance in your ears.

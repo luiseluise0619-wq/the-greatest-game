@@ -1004,10 +1004,17 @@ export class Room {
     p.lastChatAt = t;
     const line = VOICE_LINES.find((v) => v.id === msg.line);
     if (!line || !p.alive) return;
-    this.broadcast({
+    // A shout carries as far as a shout carries. This is the whole difference
+    // between the wheel and all-chat: T reaches the town, V reaches the street.
+    // The dead hear everything, having nothing better to do.
+    const shout = {
       t: S.CHAT, from: p.name, id: p.id, text: line.text, voice: true,
       x: r2(p.pos.x), y: r2(p.pos.y), z: r2(p.pos.z),
-    });
+    };
+    this.broadcast(shout, (o) => (
+      o.id === p.id || !o.alive
+      || Math.hypot(o.pos.x - p.pos.x, o.pos.z - p.pos.z) <= SOCIAL.shoutRange
+    ));
     this.notifyBots('voice', { from: p, line: line.id });
   }
 
