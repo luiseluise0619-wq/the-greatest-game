@@ -1358,7 +1358,17 @@ export class Room {
       won: p.faction === winner,
     })).sort((a, b) => (b.won - a.won) || (b.kills - a.kills) || (b.damage - a.damage));
 
-    this.results = { winner, blurb, rows, timeline: this.timeline.slice(-24) };
+    // The account of the round. Cards and badges are always kept: they are the
+    // whole payoff of a deck nobody could see being played, and a busy round
+    // would otherwise push the early ones off the end of a plain tail slice.
+    const recent = new Set(
+      this.timeline.filter((e) => e.type !== 'card' && e.type !== 'badge').slice(-20),
+    );
+    const timeline = this.timeline
+      .filter((e) => e.type === 'card' || e.type === 'badge' || recent.has(e))
+      .slice(-40);
+
+    this.results = { winner, blurb, rows, timeline };
     telemetry.matchEnd(this, winner, blurb);
     this.setPhase(PHASE.RESULTS);
     this.broadcast({

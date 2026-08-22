@@ -536,6 +536,7 @@ class Game {
     this.phaseLeft = msg.left;
     this.ring = msg.ring;
     this.hud.updateRoster(msg.ps);
+    this.hud.setStanding(msg.aliveCount);
 
     const seen = new Set();
     for (const p of msg.ps) {

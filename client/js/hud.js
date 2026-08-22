@@ -26,6 +26,7 @@ export class HUD {
     this.roster = new Map();         // id -> {name, bot, alive, kills}
     this.selfRole = null;
     this.matchNumber = null;
+    this.standing = null;
     this.autoStartAt = 0;
     this.hand = [];
     this.armed = [];
@@ -203,11 +204,25 @@ export class HUD {
   // ------------------------------------------------------------- hud state
   setPhase(msg) {
     $('phaseLabel').textContent = PHASE_LABEL[msg.phase] || msg.phase.toUpperCase();
+    this.setStanding(msg.alive, msg.total);
     if (msg.phase === PHASE.PREP) {
       this.setObjective('Guns are holstered. Find weapons, find people, decide who you like.');
     } else if (this.selfRole) {
       this.setObjective(this.selfRole.objective);
     }
+  }
+
+  /** The one number a hidden-role round turns on. */
+  setStanding(n, total) {
+    if (!Number.isFinite(n)) return;
+    const el = $('standing');
+    if (this.standing != null && n < this.standing) {
+      el.classList.remove('dropped');
+      void el.offsetWidth;
+      el.classList.add('dropped');
+    }
+    this.standing = n;
+    el.innerHTML = `<b>${n}</b> STILL STANDING${Number.isFinite(total) && total > n ? ` <span class="muted">of ${total}</span>` : ''}`;
   }
 
   setTimer(seconds) {

@@ -551,7 +551,13 @@ test('bots have ears, so crouching past one is worth something', () => {
       walker.sprint = false;
       walker.lastStepAt = 0;
       listener.brain.noise = null;
-      for (let i = 0; i < 12; i++) room.stepSound(walker, Date.now() / 1000);
+      // Advance between steps: the step timer would swallow all but the first,
+      // and one step is a coin flip by design.
+      for (let i = 0; i < 14; i++) {
+        clock.advance(500);
+        walker.lastStepAt = 0;
+        room.stepSound(walker, Date.now() / 1000);
+      }
       return listener.brain.noise;
     };
 
@@ -584,8 +590,39 @@ test('gunfire outranks boots as a lead', () => {
 
     walker.pos = { x: -8, y: 0, z: 0 };
     walker.moving = true; walker.crouch = false; walker.sprint = false;
-    walker.lastStepAt = 0;
-    for (let i = 0; i < 12; i++) room.stepSound(walker, Date.now() / 1000);
+    for (let i = 0; i < 14; i++) {
+      clock.advance(200);
+      walker.lastStepAt = 0;
+      room.stepSound(walker, Date.now() / 1000);
+    }
     assert.equal(listener.brain.noise.x, fromShot.x, 'footsteps overwrote a fresh gunshot lead');
+  } finally { clock.restore(); }
+});
+
+test('a busy round cannot push the cards off its own account', () => {
+  const { room, clock, stub, me } = makeRoom({ bots: 8 });
+  try {
+    intoCombat(room, clock);
+    const p = me();
+    give(room, p, 'witness');
+
+    // Forty accusations later - which a chatty lobby of bots manages easily.
+    const others = [...room.players.values()].filter((o) => o !== p && o.alive);
+    for (let i = 0; i < 40; i++) {
+      const from = others[i % others.length];
+      const target = others[(i + 1) % others.length];
+      from.lastAccuseAt = 0;
+      room.onAccuse(from, { target: target.id });
+    }
+    assert.ok(room.timeline.length > 24, 'test setup: not enough noise');
+
+    room.endMatch('law', 'test');
+    const timeline = stub.last('results').timeline;
+    const card = timeline.find((e) => e.type === 'card' && e.who === p.name);
+    assert.ok(card, 'the round forgot the card that was played in it');
+    assert.equal(card.card, 'witness');
+    assert.ok(timeline.length <= 40, `the account ran to ${timeline.length} entries`);
+    // The recent noise is still there too.
+    assert.ok(timeline.some((e) => e.type === 'accuse'), 'the account dropped everything else');
   } finally { clock.restore(); }
 });

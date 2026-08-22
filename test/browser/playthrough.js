@@ -31,9 +31,12 @@ const CARD_NAMES = {
 const server = spawn('node', ['server/index.js'], {
   env: {
     ...process.env, PORT: String(PORT), HNH_TELEMETRY: '0',
-    // Short enough that one run reaches the aftermath screen, which is the
-    // only place the round's cards are ever named.
-    HNH_PREP: '5', HNH_COMBAT: '70', HNH_ENDGAME: '8', HNH_RESULTS: '45',
+    // A long preparation phase on purpose: nobody can die during it, so every
+    // check that needs the round to still exist - reconnecting, playing a card
+    // - is not racing a Sheriff who went down in the first thirty seconds.
+    // Then a short round, so one run still reaches the aftermath screen, which
+    // is the only place the cards that were played are ever named.
+    HNH_PREP: '40', HNH_COMBAT: '40', HNH_ENDGAME: '8', HNH_RESULTS: '50',
   },
   stdio: ['ignore', 'ignore', 'pipe'],
 });
@@ -123,6 +126,9 @@ try {
   await A.click('#roleCard');
   await A.waitForTimeout(1500);
   check(!(await A.isVisible('#roleCard')), 'the role card dismisses');
+
+  const standing = await A.evaluate(() => document.getElementById('standing').textContent.trim());
+  check(/^[1-9]\d* STILL STANDING/.test(standing), `the town knows how many are left ("${standing}")`);
 
   const state = await A.evaluate(() => ({
     inGame: window.game.inGame,

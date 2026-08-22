@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 81 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 82 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 ```
 
@@ -47,6 +47,9 @@ counts.
 ---
 
 ## The round
+
+The topbar carries the one number the whole genre turns on: **how many are still
+standing**, updated every tick, flashing when it drops.
 
 | Phase | Length | What happens |
 |---|---|---|
@@ -140,8 +143,10 @@ bystander they walked past, which is exactly what the visibility cull exists to
 prevent. You already learn who shot you; the killcam only makes it legible.
 
 **Every round ends with its own account.** The results screen lists what happened
-and when — each death with both roles, every star pinned on, every accusation —
-next to the table of who everyone really was.
+and when — each death with both roles, every star pinned on, every accusation,
+and every card that was played — next to the table of who everyone really was.
+Cards and stars are never trimmed out of it however busy the round got: they are
+the payoff for a whole round of not being able to see them.
 
 **The Sheriff may pin on the star** (`B`). It is public and permanent: +45 max
 health and 15% damage resistance, but every Outlaw in town now has a name and a
@@ -440,7 +445,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 81 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 82 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,

@@ -411,9 +411,11 @@ test('a dead spectator who reloads keeps their seat and their row', () => {
     const player = me();
     const token = player.token;
     const role = player.role;
-    const killer = [...room.players.values()].find((p) => p.bot && p.alive && p !== player);
-    room.applyDamage(player, killer, 999, 'revolver', null);
-    assert.equal(player.alive, false);
+    // Straight to dead, without going through applyDamage: whether this
+    // particular death would also end the round depends on the role they were
+    // dealt, and that is not what this test is about.
+    player.alive = false;
+    player.health = 0;
     const before = room.players.size;
 
     // Spectating, and they reload the page.
