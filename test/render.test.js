@@ -28,3 +28,20 @@ test('the dust cloud takes the name with it', () => {
     assert.equal(tagOpacity(d, true), 0, `a dusty player was still named at ${d}m`);
   }
 });
+
+test('every material the map asks for is one the town knows how to draw', async () => {
+  // world.js falls back to plain wood for an unknown tag, silently. Adding a
+  // material in map.js and forgetting to give it a look is therefore invisible
+  // until somebody notices the church is made of planks.
+  const MAP = (await import('../shared/map.js')).default;
+  const { MATS } = await import('../client/js/world.js');
+
+  const used = new Set(MAP.solids.map((b) => b.mat));
+  for (const tag of used) {
+    assert.ok(MATS[tag], `the map is built out of "${tag}" and nothing knows what that looks like`);
+  }
+  // ...and nothing in the palette is dead weight.
+  for (const tag of Object.keys(MATS)) {
+    assert.ok(used.has(tag), `nothing in the town is made of "${tag}"`);
+  }
+});

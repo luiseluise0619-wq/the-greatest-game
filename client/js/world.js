@@ -148,7 +148,6 @@ const MATS = {
   oreCart:    { c: 0x574c42, tex: rough('#574c42', 30, '#332c26') },
   bell:       { c: 0xb8913f, tex: null },
   cactus:     { c: 0x5c7a48, tex: rough('#5c7a48', 60, '#3f5730') },
-  sand:       { c: 0xd6b98a, tex: rough('#d6b98a', 200, '#bd9f70') },
 };
 
 export function buildWorld(scene) {

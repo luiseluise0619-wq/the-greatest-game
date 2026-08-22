@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 92 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 93 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 ```
@@ -447,7 +447,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 92 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 93 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -487,7 +487,10 @@ They are grouped by what they protect:
 - **`test/render.test.js`** — the handful of rendering decisions that are really
   game rules in a costume: how far a name tag is readable from, and that the
   Gambler's dust cloud takes the name with it rather than leaving a legible
-  label floating over a body you cannot see.
+  label floating over a body you cannot see. Plus a check that every material
+  the map is built out of is one the town knows how to draw — the renderer falls
+  back to plain wood for an unknown tag, silently, so a missing look would not
+  show up until somebody noticed the church was made of planks.
 - **`test/settings.test.js`** — everything the settings panel stores comes back
   out of `localStorage`, which anybody can edit by hand, so the part that decides
   what a stored value is *allowed* to be is pure and tested: no value can push a
