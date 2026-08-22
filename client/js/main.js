@@ -716,8 +716,9 @@ class Game {
   playCard(i) {
     const id = this.hud.hand[i];
     if (!id || !this.self.alive) { this.audio.deny(); return; }
+    // No sound yet: the server may refuse this (a Wanted Poster with nobody in
+    // the crosshair), and the flick belongs to the card actually leaving.
     this.send({ t: C.CARD, card: id });
-    this.audio.ability();
   }
 
   tryPickup() {

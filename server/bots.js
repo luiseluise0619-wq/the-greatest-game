@@ -262,13 +262,19 @@ export class BotBrain {
     switch (kind) {
       case 'gunshot': {
         const d = Math.hypot(data.pos.x - me.pos.x, data.pos.z - me.pos.z);
-        if (d < (data.weapon?.noise ?? 45)) {
-          // A shot heard is a lead, not a fact - the position is fuzzed.
+        // A bot holding the Long Glass gets the same deal a player does: the
+        // shot is town-wide, the position is exact, and it comes with a name.
+        const glass = t < (me.glassUntil || 0);
+        if (d < (data.weapon?.noise ?? 45) || glass) {
+          // Otherwise a shot heard is a lead, not a fact - the position is fuzzed.
+          const seen = !!data.shooter && (glass || this.canSee(data.shooter));
           this.noise = {
-            x: data.pos.x + rnd(-4, 4), z: data.pos.z + rnd(-4, 4), t,
-            shooter: data.shooter && this.canSee(data.shooter) ? data.shooter.id : null,
+            x: seen && glass ? data.pos.x : data.pos.x + rnd(-4, 4),
+            z: seen && glass ? data.pos.z : data.pos.z + rnd(-4, 4),
+            t,
+            shooter: seen ? data.shooter.id : null,
           };
-          if (this.noise.shooter) this.suspect(this.noise.shooter, 0.1 * this.paranoia);
+          if (this.noise.shooter) this.suspect(this.noise.shooter, (glass ? 0.16 : 0.1) * this.paranoia);
         }
         break;
       }

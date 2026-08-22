@@ -2,7 +2,9 @@
 // Deliberately sparse in game - health, ammo, cooldown, one objective line.
 // Roles are never on screen unless somebody has died or you asked to see yours.
 
-import { CHARACTERS, CHARACTER_ORDER, ROLES, VOICE_LINES, WEAPONS, PHASE, CARDS } from '../../shared/constants.js';
+import {
+  CHARACTERS, CHARACTER_ORDER, ROLES, VOICE_LINES, WEAPONS, PHASE, CARDS, CARD_ORDER,
+} from '../../shared/constants.js';
 import { useDefs, cardUrl } from './cardart.js';
 
 useDefs(CARDS);
@@ -29,6 +31,7 @@ export class HUD {
     this.chatLines = [];
     this.buildCharacterGrid();
     this.buildVoiceWheel();
+    this.buildDeckStrip();
   }
 
   // ------------------------------------------------------------------ menu
@@ -52,6 +55,37 @@ export class HUD {
       };
       grid.appendChild(el);
     }
+  }
+
+  /**
+   * The whole deck, face up, in the lobby. Printing six faces costs about 180ms
+   * of canvas, so they go in one per idle slice and the menu never stutters.
+   */
+  buildDeckStrip() {
+    const strip = $('deckStrip');
+    if (!strip) return;
+    strip.innerHTML = CARD_ORDER.map((id) => {
+      const c = CARDS[id];
+      return `<figure class="deckCard" data-id="${id}" title="${escapeHtml(c.desc)}">
+        <span class="deckSlot"></span>
+        <figcaption>${escapeHtml(c.name)}</figcaption></figure>`;
+    }).join('');
+    const queue = [...CARD_ORDER];
+    const next = () => {
+      const id = queue.shift();
+      if (!id) return;
+      const slot = strip.querySelector(`.deckCard[data-id="${id}"] .deckSlot`);
+      if (slot) {
+        const img = document.createElement('img');
+        img.src = cardUrl(id);
+        img.alt = CARDS[id].name;
+        slot.replaceWith(img);
+      }
+      if (typeof requestIdleCallback === 'function') requestIdleCallback(next, { timeout: 900 });
+      else setTimeout(next, 40);
+    };
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(next, { timeout: 1500 });
+    else setTimeout(next, 300);
   }
 
   buildVoiceWheel() {
@@ -282,10 +316,15 @@ export class HUD {
     const keys = ['Z', 'X'];
     const one = (id, key, live) => {
       const c = CARDS[id];
+      // How it plays, in one word: arms and waits for a trigger, resolves the
+      // moment you press the key, or runs on a clock.
+      const kind = c.kind === 'armed' ? 'ARMS UNTIL SPENT'
+        : c.kind === 'timed' ? `${c.duration}s` : 'AT ONCE';
       return `<div class="handCard${live ? ' live' : ''}">
         <img src="${cardUrl(id)}" alt="${escapeHtml(c.name)}">
         <div class="handText">
           <h5><span>${escapeHtml(c.name)}</span><em>${live ? 'IN PLAY' : key}</em></h5>
+          <div class="handKind">${kind}</div>
           <p>${escapeHtml(c.desc)}</p>
         </div></div>`;
     };

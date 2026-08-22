@@ -285,40 +285,40 @@ export const GAMBLER_BOONS = [
 // ---------------------------------------------------------------------------
 export const CARDS = {
   barrel: {
-    id: 'barrel', name: 'Rain Barrel', short: 'BARREL', target: 'none', kind: 'armed',
+    id: 'barrel', name: 'Rain Barrel', target: 'none', kind: 'armed',
     rules: 'The next bullet that finds you does nothing — and the shooter is told nothing either.',
     desc: 'Arms until spent. The next bullet that finds you does nothing at all - and the shooter gets no hitmarker, no blood, no confirmation. They will swear to the town that they hit you.',
     flavour: 'Half a barrel of rainwater stops more lead than most men believe.',
     soak: 0.25,        // seconds: soaks the rest of the same burst, not just one pellet
   },
   poster: {
-    id: 'poster', name: 'Wanted Poster', short: 'POSTER', target: 'aim', kind: 'instant',
+    id: 'poster', name: 'Wanted Poster', target: 'aim', kind: 'instant',
     range: 70,
     rules: 'Name whoever is in your sights. The town hears you. You alone hear the answer.',
     desc: 'Nail the name of whoever is in your sights to the church door. The whole town is told that you did it. In return you alone learn whether that person wears the star.',
     flavour: 'Ink is cheap. Being the one holding the hammer is not.',
   },
   tracks: {
-    id: 'tracks', name: 'Cover Your Tracks', short: 'TRACKS', target: 'none', kind: 'timed',
+    id: 'tracks', name: 'Cover Your Tracks', target: 'none', kind: 'timed',
     duration: 75,
     rules: 'Every footprint you have left is swept away, and you leave none for 75 seconds.',
     desc: 'Sweeps away every footprint you have left in this town, and you leave none for 75 seconds. A Tracker who reads the dust after this finds an empty street where you were standing.',
     flavour: 'A dragged blanket and a little patience.',
   },
   witness: {
-    id: 'witness', name: 'Buy a Witness', short: 'WITNESS', target: 'none', kind: 'armed',
+    id: 'witness', name: 'Buy a Witness', target: 'none', kind: 'armed',
     rules: 'Your next kill names nobody. No witness, no feed, no killcam. Not even the body.',
     desc: 'Arms until spent. Your next kill names nobody: no witnesses, no name in anyone\'s feed, no killcam. Not even the body finds out who did it.',
     flavour: 'Everybody in this town has a price. Most of them are cheap.',
   },
   ledger: {
-    id: 'ledger', name: 'Dead Man\'s Ledger', short: 'LEDGER', target: 'none', kind: 'armed',
+    id: 'ledger', name: 'Dead Man\'s Ledger', target: 'none', kind: 'armed',
     rules: "The next man to die in this town writes his killer's name in your book.",
     desc: 'Arms until spent. The next death anywhere in town, you privately learn who pulled the trigger - even from the other end of the street. Beaten by Buy a Witness: an erased kill leaves nothing to read.',
     flavour: 'The undertaker writes everything down. He just does not read it aloud.',
   },
   spyglass: {
-    id: 'spyglass', name: 'Long Glass', short: 'GLASS', target: 'none', kind: 'timed',
+    id: 'spyglass', name: 'Long Glass', target: 'none', kind: 'timed',
     duration: 12, mark: 3.2,
     rules: 'For twelve seconds, every shot fired in this town has a face on it.',
     desc: 'For 12 seconds, anyone who fires a shot anywhere in town is outlined for you for three seconds - through walls, across the whole map. Gunfire stops being a noise and starts being a name.',

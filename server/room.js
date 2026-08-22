@@ -961,7 +961,7 @@ export class Room {
     p.hand.splice(idx, 1);
     p.lastCardAt = t;
     p.cardsPlayed.push(id);
-    telemetry.social(this, 'card');
+    telemetry.card(this, p, id);
 
     switch (id) {
       case 'barrel':
@@ -1119,6 +1119,7 @@ export class Room {
     }
 
     telemetry.matchStart(this);
+    telemetry.cardsDealt(all.length * CARD_DEAL);
     this.pushLobby();          // seeds every client's scoreboard roster
     this.setPhase(PHASE.PREP);
     this.broadcast({

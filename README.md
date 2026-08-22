@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 45 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 46 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 ```
 
@@ -377,12 +377,17 @@ accusations, chat volume, badge reveals and ability use per match, the faction
 win split, average human session length, and which parts of the map people
 actually die in.
 
+Next to it sit the deck numbers — `cardsPerMatch`, `cardPlayRate` (played over
+dealt) and a per-card count. A card nobody ever plays is either too weak or too
+hard to find a moment for, and this is the only way to tell those two apart from
+outside the game.
+
 No chat text is ever written, and player names are omitted unless you set
 `HNH_TELEMETRY_NAMES=1`. Turn the whole thing off with `HNH_TELEMETRY=0`.
 
 ## Tests
 
-`npm test` runs 45 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 46 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -402,6 +407,9 @@ They are grouped by what they protect:
   on the design rule itself: no card description may mention damage or healing,
   and every card in the deck must have a block cut for it in the press (add one
   without art and the suite says so instead of the game shipping a blank face).
+  Bots are held to the same rules: one check confirms a bot holding the Long
+  Glass really does get a name off a shot fired across town, and gets nothing
+  from the same shot once the glass runs out.
 - **`test/security.test.js`** — what a lying client cannot do: teleport, walk
   through a wall, end up inside geometry, be told about players it cannot see, or
   learn the name of a shooter it could not have seen.

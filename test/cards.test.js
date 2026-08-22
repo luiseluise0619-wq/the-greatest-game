@@ -9,6 +9,7 @@ import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
 import { PHASE, TIMING, CARDS, CARD_ORDER, CARD_DEAL, SOCIAL } from '../shared/constants.js';
 
 const { Room } = await import('../server/room.js');
+const { BotBrain } = await import('../server/bots.js');
 
 function makeRoom({ bots = 6, prep = 1, combat = 400 } = {}) {
   TIMING.prep = prep; TIMING.combat = combat; TIMING.endgame = 30; TIMING.results = 5;
@@ -373,6 +374,39 @@ test('the aftermath screen is the first place a silent card is ever named', () =
   } finally { clock.restore(); }
 });
 
+test('a bot holding the Long Glass gets the name too', () => {
+  const { room, clock } = makeRoom({ bots: 8 });
+  try {
+    intoCombat(room, clock);
+    const bots = [...room.players.values()].filter((p) => p.bot && p.alive);
+    const [watcher, shooter] = bots;
+    // intoCombat freezes the bots, so give this one its brain back by hand.
+    watcher.brain = new BotBrain(room, watcher);
+    watcher.pos = { x: 58, y: 0, z: -18 };
+    shooter.pos = { x: -26, y: 0, z: 18 };
+    watcher.hand = ['spyglass'];
+    watcher.lastCardAt = 0;
+    room.onCard(watcher, { card: 'spyglass' });
+    assert.ok(watcher.glassUntil > 0, 'the card did not take');
+
+    const before = watcher.brain.susOf(shooter.id);
+    watcher.brain.onEvent('gunshot', {
+      pos: { x: shooter.pos.x, y: 1.6, z: shooter.pos.z },
+      shooter, weapon: { noise: 45 },
+    });
+    assert.equal(watcher.brain.noise?.shooter, shooter.id, 'the glass named nobody for the bot');
+    assert.ok(watcher.brain.susOf(shooter.id) > before, 'the bot learned nothing from it');
+    // Same shot without the glass, from across town, stays anonymous.
+    watcher.glassUntil = 0;
+    watcher.brain.noise = null;
+    watcher.brain.onEvent('gunshot', {
+      pos: { x: shooter.pos.x, y: 1.6, z: shooter.pos.z },
+      shooter, weapon: { noise: 45 },
+    });
+    assert.equal(watcher.brain.noise, null, 'a shot 90m away should not even be heard');
+  } finally { clock.restore(); }
+});
+
 test('every card in the deck has a face cut for it', async () => {
   // cardart.js only touches the DOM inside its draw functions, so Node can
   // import it and check the press has a block for every card in the deck.
@@ -386,7 +420,8 @@ test('every card in the deck has a face cut for it', async () => {
 test('every card carries the text its face is set from', () => {
   for (const id of CARD_ORDER) {
     const c = CARDS[id];
-    assert.ok(c.name && c.short && c.flavour, `${id} is missing its lettering`);
+    assert.ok(c.name && c.flavour, `${id} is missing its lettering`);
+    assert.ok(['armed', 'instant', 'timed'].includes(c.kind), `${id} has no play kind`);
     assert.ok(c.rules && c.rules.length > 40, `${id} needs a printed rules line`);
     // The rules line is set at 21px across 424px of card; much past this and it
     // runs into the flavour text at the foot.

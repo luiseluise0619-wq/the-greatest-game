@@ -214,7 +214,7 @@ export class GameAudio {
     if (!this.ready || !this.enabled) return;
     const t = this.ctx.currentTime;
     const g = this.ctx.createGain();
-    const bp = this.ctx.createBandpass ? null : this.ctx.createBiquadFilter();
+    const bp = this.ctx.createBiquadFilter();
     bp.type = 'bandpass';
     bp.frequency.setValueAtTime(2600, t);
     bp.frequency.exponentialRampToValueAtTime(5200, t + 0.09);

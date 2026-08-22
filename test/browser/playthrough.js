@@ -67,6 +67,12 @@ try {
   const toLobby = Date.now() - started;
   check(toLobby < 5000, `lobby answers quickly (${toLobby}ms)`);
 
+  // The whole deck is printed face up in the lobby; if cardart.js is broken
+  // this is the first place it shows.
+  const deck = await A.waitForFunction(() => document.querySelectorAll('#deckStrip img').length === 6,
+    null, { timeout: 15000 }).then(() => 6).catch(() => -1);
+  check(deck === 6, `the deck is on show in the lobby (${deck} faces)`);
+
   const code = (await A.textContent('#roomCode')).trim();
   check(/^[A-Z0-9]{4}$/.test(code), `room code issued (${code})`);
   await A.screenshot({ path: `${SHOTS}/01-lobby.png` });

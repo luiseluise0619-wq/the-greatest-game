@@ -36,6 +36,9 @@ class Telemetry {
       chats: 0,
       abilities: 0,
       badgeReveals: 0,
+      cardsDealt: 0,
+      cardsPlayed: 0,
+      byCard: {},
       wins: { law: 0, outlaw: 0, renegade: 0, none: 0 },
       deathsByZone: {},
       deathsByWeapon: {},
@@ -141,6 +144,23 @@ class Telemetry {
     });
   }
 
+  /**
+   * Which cards get played and which rot in hand. If a card is never played it
+   * is either too weak or too hard to find a moment for, and this is the only
+   * way to tell those apart from the outside.
+   */
+  card(room, player, id) {
+    this.agg.cardsPlayed += 1;
+    this.agg.byCard[id] = (this.agg.byCard[id] || 0) + 1;
+    if (room.stats) room.stats.cards = (room.stats.cards || 0) + 1;
+    this.event('card', {
+      room: room.code, card: id, phase: room.phase,
+      bot: !!player.bot, name: this.name(player),
+    });
+  }
+
+  cardsDealt(n) { this.agg.cardsDealt += n; }
+
   social(room, kind) {
     const s = room.stats;
     if (kind === 'accuse') { this.agg.accusations += 1; if (s) s.accusations += 1; }
@@ -176,6 +196,11 @@ class Telemetry {
       chatsPerMatch: per(a.chats, a.matches),
       abilitiesPerMatch: per(a.abilities, a.matches),
       badgeRevealRate: per(a.badgeReveals, a.matches),
+      cardsPerMatch: per(a.cardsPlayed, a.matches),
+      // Below about half and the deck is decoration; at 1.0 nobody is ever
+      // holding anything back, which is its own problem.
+      cardPlayRate: per(a.cardsPlayed, a.cardsDealt),
+      cardsPlayed: top(a.byCard, 6),
       wins: a.wins,
       avgHumanSessionMinutes: per(a.humanSessionSeconds / 60, a.humanSessions),
       humanSessions: a.humanSessions,
