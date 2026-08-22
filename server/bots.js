@@ -6,7 +6,7 @@
 // Everything below is built around a per-bot suspicion table plus a faction goal.
 
 import {
-  PLAYER, WEAPONS, CHARACTERS, CARDS, PHASE, clamp, stepStamina, canSprint,
+  PLAYER, WEAPONS, CHARACTERS, CARDS, PHASE, VISION, clamp, stepStamina, canSprint,
 } from '../shared/constants.js';
 import MAP, { NAV_NODES, zoneAt } from '../shared/map.js';
 import { moveAndCollide, lineOfSight } from '../shared/collision.js';
@@ -424,7 +424,7 @@ export class BotBrain {
     const eye = eyeOf(me);
     const c = chestOf(other);
     const d = Math.hypot(c.x - eye.x, c.z - eye.z);
-    if (d > 72) return false;
+    if (d > VISION.botSight) return false;
     const dir = { x: c.x - eye.x, y: c.y - eye.y, z: c.z - eye.z };
     const len = Math.hypot(dir.x, dir.y, dir.z) || 1;
     dir.x /= len; dir.y /= len; dir.z /= len;

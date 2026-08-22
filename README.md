@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 83 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 85 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 ```
 
@@ -445,13 +445,15 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 83 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 85 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
   no loot is buried in furniture, walls stop movement and doorways do not, the
   nav graph is one connected town with no orphan nodes, weapons are internally
-  consistent, and every role table adds up.
+  consistent, every role table adds up, the sprint budget always recovers, the
+  swap lockout is one rule rather than two, and every place the brief asked the
+  town to have exists, can be stood in and reports its own name.
 - **`test/match.test.js`** — roles are dealt correctly, guns are inert during
   preparation, each faction's win condition fires (including at the bell, for a
   Sheriff who walked out during prep), the dust storm hurts outside the ring and
@@ -552,8 +554,10 @@ Prototype, deliberately scoped to a vertical slice:
   shade its speed inside the clamp, or aim more precisely than a hand can.
   Closing that needs full input-replay reconciliation, which is a rewrite of the
   movement path and worth doing only once the game has proven it deserves it.
-- **Bots do not use rooftops or the water tower** — the nav graph is ground-level
-  only. Deliberate for now, and it makes verticality a human edge.
+- **Bots do not use rooftops or the water tower**, and they only notice anybody
+  inside 72m (`VISION.botSight`) where a player can see across the whole town.
+  Both are deliberate: verticality and the long lines down Main Street are what
+  a human has over them, and a test keeps that gap from closing by accident.
 - **No voice chat.** Text chat and the shout wheel stand in for it — the wheel
   has a range and a voice, but the words are still canned.
 - Match length with bots only runs shorter than the 10–15 minute target because

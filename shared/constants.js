@@ -435,6 +435,11 @@ export const VISION = {
   far: 165,         // beyond this, never sent (longest weapon reaches 140)
   memory: 0.55,     // seconds a player keeps being sent after last being seen,
                     // so peeking round a corner does not strobe them in and out
+  // How far a bot notices anybody at all. Deliberately short of what a human
+  // can see across the flats: a player on a roof at ninety metres has the drop
+  // on a bot, and that is one of the few edges verticality buys you. Raise it
+  // and the town stops having places to shoot from.
+  botSight: 72,
 };
 
 // Death replay. Deliberately narrow: it only ever shows the killer and the

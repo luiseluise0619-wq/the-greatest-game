@@ -1,11 +1,11 @@
 // The map and the maths every other system is built on.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import MAP, { zoneAt, SPAWNS, LOOT_SPAWNS, NAV_NODES } from '../shared/map.js';
+import MAP, { zoneAt, SPAWNS, LOOT_SPAWNS, NAV_NODES, ZONES } from '../shared/map.js';
 import { moveAndCollide, raycastWorld, lineOfSight, isBlocked } from '../shared/collision.js';
 import {
   PLAYER, ROLE_TABLE, MIN_PLAYERS, MAX_PLAYERS, rolesForPlayerCount, WEAPONS,
-  stepStamina, canSprint, swapTime, CHARACTERS,
+  stepStamina, canSprint, swapTime, CHARACTERS, VISION,
 } from '../shared/constants.js';
 
 test('map is well formed', () => {
@@ -78,6 +78,38 @@ test('kill locations always name somewhere a player can go', () => {
     assert.equal(typeof name, 'string');
     assert.ok(name.length > 3, `zone name for ${x},${z} is useless: "${name}"`);
   }
+});
+
+test('every place the town is supposed to have is real and can be stood in', () => {
+  // The brief asked for these by name. A zone the kill feed can name but nobody
+  // can walk to is worse than no zone at all: it sends people looking for a
+  // body in a place that does not exist.
+  const wanted = [
+    'the Saloon', "the Sheriff's Office", 'the General Store', 'the Stable',
+    'the Church', 'the Cemetery', 'the Mine', 'Main Street', 'the back alleys',
+  ];
+  for (const name of wanted) {
+    const zone = ZONES.find((z) => z.name === name);
+    assert.ok(zone, `the town has no ${name}`);
+
+    // Somewhere inside it has to be standable, or it is scenery.
+    let standable = 0;
+    for (let x = zone.x0 + 1; x <= zone.x1 - 1; x += 2) {
+      for (let z = zone.z0 + 1; z <= zone.z1 - 1; z += 2) {
+        if (!isBlocked(x, 0.1, z, PLAYER.radius, PLAYER.height, MAP.solids)) standable++;
+      }
+    }
+    assert.ok(standable > 3, `${name} has almost nowhere to stand (${standable} spots)`);
+    // ...and it must report itself, not a neighbour.
+    const cx = (zone.x0 + zone.x1) / 2, cz = (zone.z0 + zone.z1) / 2;
+    assert.equal(zoneAt(cx, cz, 0), name, `standing in the middle of ${name} reports somewhere else`);
+  }
+
+  // The other two the brief named are not rectangles: one is a height, the
+  // other is everything that is not the town.
+  const roof = zoneAt(0, 20, 9);
+  assert.ok(roof.includes('rooftops'), `up on the church roof reads as "${roof}"`);
+  assert.equal(zoneAt(400, 400, 0), 'the desert outskirts');
 });
 
 test('role tables are balanced and complete', () => {
@@ -172,4 +204,15 @@ test('the swap lockout is one rule, not two', () => {
   assert.equal(swapTime('rifle', 'medic'), WEAPONS.rifle.swapTime);
   // Nonsense in, zero out, rather than NaN into somebody's fire timer.
   assert.equal(swapTime('trebuchet', 'medic'), 0);
+});
+
+test('a bot cannot see as far as a player can shoot', () => {
+  // Bots noticing everything the renderer draws would take the roofs and the
+  // long lines down Main Street away from human players entirely. The gap is
+  // the point, so it should not close by accident.
+  assert.ok(VISION.botSight < VISION.far, 'bots see as far as the game sends');
+  const longest = Math.max(...Object.values(WEAPONS).map((w) => w.falloffEnd));
+  assert.ok(VISION.botSight < longest,
+    `a bot notices you at ${VISION.botSight}m and the longest gun still bites at ${longest}m`);
+  assert.ok(VISION.botSight > 40, 'bots this blind would never find anybody');
 });
