@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>High Noon Hollow — proof sheet</title>
+<!--
+  The press proof. Open /proof/ while the server is running to see every card
+  face at full size; this is how the deck in client/js/cardart.js was tuned, and
+  it is the fastest way to check a change to it. /proof/?c=witness prints one.
+-->
+<style>
+  body { margin: 0; background: #17120e; color: #b8a586; font: 12px "Courier New", monospace; padding: 16px; }
+  h1 { font-size: 13px; letter-spacing: .3em; font-weight: normal; margin: 0 0 14px; }
+  #sheet { display: flex; flex-wrap: wrap; gap: 16px; }
+  canvas { width: 300px; height: 420px; box-shadow: 0 10px 26px rgba(0,0,0,.7); }
+  body.one canvas { width: 600px; height: 840px; }
+</style>
+</head>
+<body>
+<h1>THE DECK — PROOF SHEET</h1>
+<div id="sheet"></div>
+<script type="module">
+  import { CARDS, CARD_ORDER } from '../../shared/constants.js';
+  import { useDefs, cardCanvas } from '../js/cardart.js';
+  useDefs(CARDS);
+  const only = new URLSearchParams(location.search).get('c');
+  if (only) document.body.classList.add('one');
+  const ids = only ? [only] : [...CARD_ORDER, 'back'];
+  for (const id of ids) document.getElementById('sheet').appendChild(cardCanvas(id));
+  window.__ready = true;
+</script>
+</body>
+</html>

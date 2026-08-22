@@ -85,6 +85,10 @@ try {
   check(intel.length > 10, 'the role card carries a lead to pull');
   const dealt = await A.evaluate(() => [...document.querySelectorAll('#roleCards .handCard h5')].length);
   check(dealt === 2, `two cards are dealt and readable on the role card (${dealt})`);
+  // The faces are printed at runtime; if cardart.js throws, these are blank.
+  const faces = await A.evaluate(() => [...document.querySelectorAll('#roleCards .handCard img')]
+    .map((i) => (/^data:image\/(webp|png)/.test(i.src) ? i.src.length : 0)));
+  check(faces.length === 2 && faces.every((n) => n > 20000), `both faces printed (${faces.map((n) => Math.round(n / 1024) + 'k').join(', ')})`);
   await A.screenshot({ path: `${SHOTS}/01b-role-card.png` });
 
   await A.click('#roleCard');
@@ -117,6 +121,12 @@ try {
     `playing a card spends it (${handAfter.hand.length} left, ${handBefore[0]})`);
   const chips = await A.evaluate(() => document.querySelectorAll('#handStrip .cardChip').length);
   check(chips === handAfter.hand.length + handAfter.armed.length, `the hand strip matches the hand (${chips} chips)`);
+  const flourish = await A.evaluate(() => {
+    const el = document.getElementById('cardPlay');
+    return { shown: !el.classList.contains('hidden'), img: !!el.querySelector('img') };
+  });
+  check(!spent || (flourish.shown && flourish.img), 'the played card is held up on screen');
+  await A.screenshot({ path: `${SHOTS}/03-card-played.png` });
   const bFeedAfter = await B.evaluate(() => document.getElementById('feed').textContent.toLowerCase());
   const aName = await A.evaluate(() => document.getElementById('nameInput').value || 'Stranger');
   if (handBefore[0] === 'poster') {

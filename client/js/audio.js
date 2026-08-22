@@ -209,6 +209,30 @@ export class GameAudio {
   deny() { this.blip(150, 0.09, 'square', 0.11, 90); }
   ability() { this.blip(420, 0.22, 'triangle', 0.16, 900); }
 
+  /** Card off a thumb: a short band of filtered noise with a snap on the end. */
+  cardFlick() {
+    if (!this.ready || !this.enabled) return;
+    const t = this.ctx.currentTime;
+    const g = this.ctx.createGain();
+    const bp = this.ctx.createBandpass ? null : this.ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(2600, t);
+    bp.frequency.exponentialRampToValueAtTime(5200, t + 0.09);
+    bp.Q.value = 0.9;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.14, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+    g.connect(bp); bp.connect(this.master);
+    this.noise(0.14, g);
+    this.blip(1500, 0.04, 'square', 0.05, 700);
+  }
+
+  /** A hand being dealt: three flicks, slightly uneven. */
+  cardDeal(n = 2) {
+    if (!this.ready || !this.enabled) return;
+    for (let i = 0; i < n; i++) setTimeout(() => this.cardFlick(), i * 145 + Math.random() * 40);
+  }
+
   bell() {
     if (!this.ready || !this.enabled) return;
     const t = this.ctx.currentTime;

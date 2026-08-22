@@ -3,6 +3,9 @@
 // Roles are never on screen unless somebody has died or you asked to see yours.
 
 import { CHARACTERS, CHARACTER_ORDER, ROLES, VOICE_LINES, WEAPONS, PHASE, CARDS } from '../../shared/constants.js';
+import { useDefs, cardUrl } from './cardart.js';
+
+useDefs(CARDS);
 
 const $ = (id) => document.getElementById(id);
 
@@ -189,25 +192,87 @@ export class HUD {
 
   // ------------------------------------------------------------------ cards
   /**
-   * Your hand, and only ever your hand. The server never tells anybody what
-   * anybody else is holding, so there is nothing here to accidentally render.
+   * Your hand, and only ever your hand. The faces are printed once by cardart.js
+   * and then reused as data URLs, so fanning six of them costs nothing.
    */
   setHand(msg) {
+    const prev = this.hand;
     this.hand = msg.hand || [];
     this.armed = msg.armed || [];
+    // A brand new hand arrives while the role card is still covering the screen,
+    // so it is dealt face down and held until the player takes the reins.
+    const fresh = (!prev || !prev.length) && this.hand.length > 0;
+    if (fresh) this.pendingDeal = true;
+
+    const el = $('handStrip');
     const keys = ['Z', 'X'];
-    const chips = [
-      ...this.hand.map((id, i) => {
-        const c = CARDS[id];
-        return `<div class="cardChip" title="${escapeHtml(c.desc)}"><b>${keys[i] || '·'}</b><span>${c.short}</span></div>`;
-      }),
-      ...this.armed.map((id) => {
-        const c = CARDS[id];
-        return `<div class="cardChip live" title="${escapeHtml(c.desc)}"><b>●</b><span>${c.short}</span></div>`;
-      }),
-    ];
-    $('handStrip').innerHTML = chips.join('');
+    if (fresh) el.classList.remove('dealt');
+    el.innerHTML = '';
+    this.hand.forEach((id, i) => {
+      const c = CARDS[id];
+      const face = cardUrl(id);
+      const d = document.createElement('div');
+      d.className = 'cardChip';
+      d.title = `${c.name} — ${c.desc}`;
+      d.style.setProperty('--i', String(i));
+      d.style.setProperty('--n', String(this.hand.length));
+      d.innerHTML = `<div class="flip"><img src="${this.pendingDeal ? cardUrl('back') : face}"
+        alt="${escapeHtml(this.pendingDeal ? 'face down' : c.name)}"></div><b>${keys[i] || ''}</b>`;
+      d.querySelector('img').dataset.face = face;
+      d.dataset.name = c.name;
+      el.appendChild(d);
+    });
+    for (const id of this.armed) {
+      const c = CARDS[id];
+      const d = document.createElement('div');
+      d.className = 'cardChip live';
+      d.title = `${c.name} — in play. ${c.desc}`;
+      d.innerHTML = `<div class="flip"><img src="${cardUrl(id)}" alt="${escapeHtml(c.name)}"></div>`
+        + `<b>●</b><i>IN PLAY</i>`;
+      el.appendChild(d);
+    }
+
+    // Whatever left the hand since last time is what was just played.
+    if (prev && prev.length > this.hand.length) {
+      const gone = prev.find((id) => !this.hand.includes(id));
+      if (gone) this.flourish(gone);
+    }
     this.renderRoleCards();
+  }
+
+  /** Turn the new hand face up. Called once the role card is out of the way. */
+  playDealAnimation() {
+    if (!this.pendingDeal || !this.hand.length) return;
+    this.pendingDeal = false;
+    const el = $('handStrip');
+    el.classList.remove('dealt');
+    void el.offsetWidth;
+    el.classList.add('dealt');
+    this.game.audio?.cardDeal(this.hand.length);
+    // Turn each card over at the halfway point of its own flip. Swapping the
+    // source beats backface-visibility here: the drop shadow on the image
+    // flattens the 3D context and the back never gets shown.
+    el.querySelectorAll('.cardChip img').forEach((img, i) => {
+      const at = 340 + i * 140 + 275;
+      setTimeout(() => {
+        if (!img.dataset.face) return;
+        img.src = img.dataset.face;
+        img.alt = img.closest('.cardChip')?.dataset.name || '';
+      }, at);
+    });
+  }
+
+  /** The card you just played, held up long enough to be read, then flicked away. */
+  flourish(id) {
+    const box = $('cardPlay');
+    const c = CARDS[id];
+    box.innerHTML = `<img src="${cardUrl(id)}" alt="${escapeHtml(c.name)}">`;
+    box.classList.remove('hidden', 'go');
+    void box.offsetWidth;
+    box.classList.add('go');
+    this.game.audio?.cardFlick();
+    clearTimeout(this._flourish);
+    this._flourish = setTimeout(() => box.classList.add('hidden'), 1750);
   }
 
   renderRoleCards() {
@@ -215,13 +280,17 @@ export class HUD {
     if (!box) return;
     if (!this.hand.length && !this.armed.length) { box.innerHTML = ''; return; }
     const keys = ['Z', 'X'];
-    box.innerHTML = this.hand.map((id, i) => {
+    const one = (id, key, live) => {
       const c = CARDS[id];
-      return `<div class="handCard"><h5>${escapeHtml(c.name)}<em>${keys[i] || ''}</em></h5><p>${escapeHtml(c.desc)}</p><i>${escapeHtml(c.flavour)}</i></div>`;
-    }).join('') + this.armed.map((id) => {
-      const c = CARDS[id];
-      return `<div class="handCard live"><h5>${escapeHtml(c.name)}<em>IN PLAY</em></h5><p>${escapeHtml(c.desc)}</p></div>`;
-    }).join('');
+      return `<div class="handCard${live ? ' live' : ''}">
+        <img src="${cardUrl(id)}" alt="${escapeHtml(c.name)}">
+        <div class="handText">
+          <h5><span>${escapeHtml(c.name)}</span><em>${live ? 'IN PLAY' : key}</em></h5>
+          <p>${escapeHtml(c.desc)}</p>
+        </div></div>`;
+    };
+    box.innerHTML = this.hand.map((id, i) => one(id, keys[i] || '', false)).join('')
+      + this.armed.map((id) => one(id, '', true)).join('');
   }
 
   showKillcam(msg) {
@@ -385,12 +454,15 @@ export class HUD {
         <td class="role" style="color:${r.color}">${r.roleName}</td>
         <td>${r.characterName || ''}</td>
         <td>${r.kills}</td>
-        <td>${(r.cards || []).map((c) => `<span class="crd">${escapeHtml(CARDS[c]?.short || c)}</span>`).join(' ') || '<span class="muted">—</span>'}</td>
+        <td class="cardCol">${(r.cards || []).map((c) => (CARDS[c]
+          ? `<img class="crdMini" src="${cardUrl(c)}" title="${escapeHtml(CARDS[c].name)}" alt="${escapeHtml(CARDS[c].name)}">`
+          : '')).join('') || '<span class="muted">—</span>'}</td>
         <td>${r.damage}</td>
         <td>${r.won ? '<span class="wonTag">WON</span>' : '<span class="lostTag">lost</span>'}</td>`;
       tb.appendChild(tr);
     }
     this.renderTimeline(msg.timeline || []);
+    $('hud').classList.add('resultsUp');
     $('results').classList.remove('hidden');
   }
 
@@ -421,9 +493,10 @@ export class HUD {
         // The payoff for every silent card in the round: the aftermath screen
         // is the first and only place the town finds out what was played.
         const name = escapeHtml(e.cardName || e.card);
+        const face = CARDS[e.card] ? `<img class="crdMini" src="${cardUrl(e.card)}" alt="">` : '';
         body = e.target
-          ? `<b>${escapeHtml(e.who)}</b> played <span class="crd">${name}</span> on <b>${escapeHtml(e.target)}</b>`
-          : `<b>${escapeHtml(e.who)}</b> played <span class="crd">${name}</span>${e.secret ? ' — nobody knew' : ''}`;
+          ? `${face}<b>${escapeHtml(e.who)}</b> played <span class="crd">${name}</span> on <b>${escapeHtml(e.target)}</b>`
+          : `${face}<b>${escapeHtml(e.who)}</b> played <span class="crd">${name}</span>${e.secret ? ' — nobody knew' : ''}`;
         li.className = 'card';
       } else if (e.type === 'badge') {
         body = `<b>${escapeHtml(e.who)}</b> pinned on the star`;
@@ -439,6 +512,7 @@ export class HUD {
 
   hideResults() {
     $('results').classList.add('hidden');
+    $('hud').classList.remove('resultsUp');
   }
 
   /** New hand dealt: forget everything we learned about the last round. */
@@ -446,7 +520,10 @@ export class HUD {
     this.knownRoles.clear();
     this.roster.clear();
     this.hand = []; this.armed = [];
+    this.pendingDeal = false;
     $('handStrip').innerHTML = '';
+    $('handStrip').classList.remove('dealt');
+    $('cardPlay').classList.add('hidden');
     const box = $('roleCards');
     if (box) box.innerHTML = '';
   }

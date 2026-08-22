@@ -179,7 +179,7 @@ td.unknown { color: rgba(232,217,189,.3); font-style: italic; }
 
 /* ------------------------------------------------------------ ROLE CARD */
 #roleCard .card {
-  width: 470px; padding: 30px 34px 24px;
+  width: 470px; max-height: 96vh; overflow-y: auto; padding: 22px 32px 18px;
   background: linear-gradient(165deg, #ede0c4, #cdb997);
   color: #241a12; border: 1px solid #7c6444;
   box-shadow: 0 40px 90px rgba(0,0,0,.75);
@@ -189,15 +189,15 @@ td.unknown { color: rgba(232,217,189,.3); font-style: italic; }
   content: ''; position: absolute; inset: 6px; border: 1px solid rgba(60,42,26,.28); pointer-events: none;
 }
 .cardLabel { font-size: 9.5px; letter-spacing: .36em; color: #6d5637; }
-#roleCard h1 { margin: 4px 0 0; font-size: 40px; letter-spacing: .1em; line-height: 1; }
+#roleCard h1 { margin: 3px 0 0; font-size: 34px; letter-spacing: .1em; line-height: 1; }
 #roleFaction { font-size: 11px; letter-spacing: .24em; color: #7a5f3c; margin-top: 4px; }
-#roleBlurb { font-size: 13px; line-height: 1.6; font-style: italic; color: #4a382a; margin: 16px 0; }
-.objBox, .intelBox, .charBox { margin-top: 12px; border-top: 1px solid rgba(60,42,26,.25); padding-top: 9px; }
+#roleBlurb { font-size: 12.5px; line-height: 1.55; font-style: italic; color: #4a382a; margin: 11px 0; }
+.objBox, .intelBox, .charBox { margin-top: 9px; border-top: 1px solid rgba(60,42,26,.25); padding-top: 7px; }
 .objBox span, .intelBox span, .charBox span { font-size: 9px; letter-spacing: .28em; color: #7a5f3c; }
-.objBox p, .intelBox p, .charBox p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.5; }
+.objBox p, .intelBox p, .charBox p { margin: 3px 0 0; font-size: 13px; line-height: 1.45; }
 .intelBox p { color: #6b2f22; font-weight: bold; }
 .charBox em { display: block; font-size: 11.5px; color: #5a4633; margin-top: 3px; }
-.cardHint { margin-top: 18px; font-size: 10px; letter-spacing: .1em; color: #7a5f3c; text-align: center; }
+.cardHint { margin-top: 12px; font-size: 10px; letter-spacing: .1em; color: #7a5f3c; text-align: center; }
 .cardHint b { background: #4a382a; color: #ede0c4; padding: 1px 5px; }
 
 /* --------------------------------------------------------------- RESULT */
@@ -308,31 +308,110 @@ button.big { width: 100%; padding: 14px; font-size: 15px; letter-spacing: .22em;
 #hud.replay #bottomRight,
 #hud.replay #crosshair,
 #hud.replay #statusStrip { opacity: 0; }
-/* ---- The Deck: your hand, bottom centre, deliberately small ------------- */
-#handStrip { position: absolute; left: 50%; bottom: 62px; transform: translateX(-50%); display: flex; gap: 7px; }
-.cardChip { display: flex; align-items: center; gap: 7px; padding: 4px 10px 4px 5px;
-  background: rgba(18,14,11,.62); border: 1px solid rgba(184,165,134,.34);
-  font-size: 10px; letter-spacing: .13em; color: #cbbfa6; }
-.cardChip b { display: inline-flex; align-items: center; justify-content: center;
-  width: 15px; height: 15px; background: rgba(184,165,134,.16); border: 1px solid rgba(184,165,134,.42);
-  font-size: 9px; color: #e8dcc0; }
-.cardChip.live { border-color: rgba(232,193,90,.6); color: var(--gold); }
-.cardChip.live b { color: var(--gold); border-color: rgba(232,193,90,.6); background: rgba(232,193,90,.16); }
-#hud.replay #handStrip { opacity: 0; transition: opacity .25s; }
+/* ---- The Deck ----------------------------------------------------------
+   The hand is real cards, fanned, tucked into the bottom edge of the screen -
+   near enough to read at a glance, far enough not to sit on the crosshair. */
+#handStrip {
+  position: absolute; left: 50%; bottom: -34px; transform: translateX(-50%);
+  display: flex; align-items: flex-end; height: 150px; pointer-events: none;
+  perspective: 900px;
+}
+.cardChip {
+  position: relative; width: 100px; margin: 0 -7px;
+  transform-origin: 50% 130%;
+  transform: rotate(calc((var(--i, 0) - (var(--n, 2) - 1) / 2) * 7deg)) translateY(6px);
+  transition: transform .18s ease;
+  perspective: 800px;
+}
+.cardChip .flip { position: relative; }
+.cardChip img {
+  display: block; width: 100%; border-radius: 5px;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, .65));
+}
+.cardChip b {
+  position: absolute; left: 50%; top: -9px; transform: translateX(-50%);
+  min-width: 19px; padding: 1px 5px; font-size: 10px; text-align: center;
+  background: rgba(12, 9, 6, .88); border: 1px solid rgba(184, 165, 134, .55);
+  color: var(--sand); letter-spacing: .06em;
+}
+.cardChip i {
+  position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%) rotate(-4deg);
+  font-style: normal; font-size: 8px; letter-spacing: .18em; white-space: nowrap;
+  background: rgba(140, 40, 30, .92); color: #f2e2c4; padding: 2px 6px;
+}
+.cardChip.live img { filter: drop-shadow(0 0 10px rgba(232, 193, 90, .5)) saturate(.7) brightness(.86); }
+.cardChip.live b { color: var(--gold); border-color: rgba(232, 193, 90, .7); }
+/* A fresh hand is dealt face down off the bottom of the screen and then turned
+   over, one card at a time - the only place the card back is ever seen. */
+#handStrip.dealt .cardChip { animation: dealIn .5s cubic-bezier(.2, .9, .25, 1) backwards; }
+#handStrip.dealt .cardChip:nth-child(2) { animation-delay: .14s; }
+#handStrip.dealt .cardChip:nth-child(3) { animation-delay: .28s; }
+#handStrip.dealt .cardChip .flip { animation: turnOver .55s ease-in-out .34s backwards; }
+#handStrip.dealt .cardChip:nth-child(2) .flip { animation-delay: .48s; }
+#handStrip.dealt .cardChip:nth-child(3) .flip { animation-delay: .62s; }
+@keyframes dealIn {
+  from { transform: translateY(150px) rotate(-24deg) scale(.86); opacity: 0; }
+}
+@keyframes turnOver {
+  from { transform: rotateY(180deg); }
+  to   { transform: rotateY(0deg); }
+}
+#hud.replay #handStrip,
+#hud.resultsUp #handStrip { opacity: 0; transition: opacity .25s; }
 
-.deckBox { margin-top: 12px; border-top: 1px solid rgba(60,42,26,.25); padding-top: 9px; }
+/* The card you just played, held up where you cannot miss it, then flicked. */
+#cardPlay {
+  position: fixed; left: 50%; top: 40%; z-index: 30;
+  width: 300px; margin-left: -150px; pointer-events: none;
+}
+/* A pool of shade behind it, so a pale card reads against a bright street. */
+#cardPlay::before {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 760px; height: 760px;
+  margin: -380px 0 0 -380px;
+  background: radial-gradient(closest-side, rgba(10, 7, 4, .62), rgba(10, 7, 4, 0) 72%);
+}
+#cardPlay img {
+  position: relative; display: block; width: 100%; border-radius: 10px;
+  filter: drop-shadow(0 24px 44px rgba(0, 0, 0, .85)) sepia(.12) saturate(1.05);
+}
+#cardPlay.go { animation: cardPlayed 1.7s cubic-bezier(.16, .8, .3, 1) forwards; }
+@keyframes cardPlayed {
+  0%   { transform: translateY(200px) rotate(16deg) scale(.7); opacity: 0; filter: drop-shadow(0 20px 40px rgba(0,0,0,.8)); }
+  16%  { transform: translateY(-8px) rotate(-2.5deg) scale(1.04); opacity: 1; }
+  26%  { transform: translateY(0) rotate(-2deg) scale(1); opacity: 1; }
+  62%  { transform: translateY(0) rotate(-2deg) scale(1); opacity: 1; }
+  100% { transform: translateY(-150px) rotate(-26deg) scale(.5); opacity: 0; }
+}
+
+/* The two cards printed on the role card, with their rules set beside them. */
+.deckBox { margin-top: 9px; border-top: 1px solid rgba(60,42,26,.25); padding-top: 7px; }
 .deckBox > span { font-size: 9px; letter-spacing: .28em; color: #7a5f3c; }
 .deckBox > span b { color: #6b2f22; }
-#roleCards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 7px; }
-.handCard { border: 1px solid rgba(60,42,26,.3); background: rgba(60,42,26,.06); padding: 7px 9px; }
-.handCard.live { border-color: rgba(150,100,30,.55); background: rgba(180,130,40,.1); }
-.handCard h5 { margin: 0 0 4px; font-size: 11.5px; letter-spacing: .08em; color: #3c2a1a;
-  display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
-.handCard h5 em { font-style: normal; font-size: 9px; letter-spacing: .18em; color: #8a6a44; }
+#roleCards { display: flex; flex-direction: column; gap: 9px; margin-top: 8px; }
+.handCard { display: flex; gap: 11px; align-items: flex-start; text-align: left; }
+.handText { flex: 1 1 auto; min-width: 0; }
+.handCard img {
+  flex: 0 0 auto; display: block; width: 84px; border-radius: 5px;
+  box-shadow: 0 4px 12px rgba(50, 32, 14, .38);
+}
+.handCard.live img { filter: saturate(.6) brightness(.92); box-shadow: 0 0 0 2px rgba(150,100,30,.55); }
+.handCard h5 {
+  margin: 1px 0 4px; font-size: 12px; letter-spacing: .06em; color: #3c2a1a;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 6px;
+}
+.handCard h5 em {
+  font-style: normal; font-size: 9px; letter-spacing: .16em; color: #7a5f3c;
+  border: 1px solid rgba(60,42,26,.4); padding: 0 4px;
+}
 .handCard p { margin: 0; font-size: 11px; line-height: 1.45; color: #4a3a2a; }
-.handCard i { display: block; margin-top: 4px; font-size: 10px; color: #8a7358; }
-@media (max-width: 620px) { #roleCards { grid-template-columns: 1fr; } }
 
+/* Mini faces in the aftermath table and the round's timeline. */
+.crdMini {
+  display: inline-block; vertical-align: middle; width: 27px; border-radius: 2px;
+  margin-right: 3px; box-shadow: 0 1px 3px rgba(0,0,0,.5);
+}
+#timeline .crdMini { width: 32px; margin-right: 7px; }
+td.cardCol { white-space: nowrap; }
 .crd { font-size: 9.5px; letter-spacing: .12em; padding: 1px 5px; border: 1px solid rgba(184,165,134,.4);
   color: #c9bb9d; white-space: nowrap; }
 #timeline li.card { border-left-color: rgba(184,165,134,.55); }

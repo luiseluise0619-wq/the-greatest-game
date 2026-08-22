@@ -21,7 +21,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 43 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 45 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 ```
 
@@ -129,7 +129,10 @@ Tracker's footprints — which are deliberately colourless, so you can see that
 ## The Deck
 
 Two cards are dealt to you at the start of every round, face down, and nobody is
-ever told what anybody else is holding. Press `Z` or `X` to play one.
+ever told what anybody else is holding. They turn over once the role card is out
+of the way, and sit fanned into the bottom edge of the screen. Press `Z` or `X`
+to play one — it comes up into the middle of the screen, big enough to read,
+before it is flicked away.
 
 **None of them shoot.** That is the whole design rule: shooting, healing and
 blowing a hole in a wall are FPS verbs and they stay on the mouse. A card that
@@ -168,6 +171,28 @@ Implementation notes worth knowing:
 These six cards, their names and their effects are original to this project.
 Hidden-role structure is a mechanic; a card set is expression, so this expression
 is ours.
+
+### The cards are printed, not drawn
+
+There are no image files here either. `client/js/cardart.js` is a small printing
+press: it lays down rag paper (pulp blotches, fibres, foxing, a glass ring,
+handled edges), engraves a wood cut for each card in the hatching vocabulary an
+1880s job printer had, sets the type, and then presses the whole ink layer onto
+the paper. Three details do most of the work:
+
+- the ink is drawn on **its own layer**, eroded with a thousand tiny holes, and
+  then composited with `multiply` — so the paper grain shows *through* the ink
+  rather than sitting on top of it,
+- a faint **mis-registered red plate** sits under the black one, the way a
+  two-colour press drifts,
+- every card is **seeded from its own id**, so a given card is always the same
+  physical object and never shimmers between redraws.
+
+Each face is about 30ms of canvas work and is printed once, in idle time while
+you are still in the lobby, then kept as a WebP data URL (~120KB, against 1.4MB
+for the same face as a PNG). Open **`/proof/`** while the server is running to
+see the whole sheet at full size — that page is how the deck was tuned, and
+`/proof/?c=witness` prints a single card.
 
 ---
 
@@ -321,6 +346,7 @@ client/     js/main.js    networking, local movement, input, render loop
             js/effects.js tracers, impacts, dynamite, footprints, pickups
             js/audio.js   every sound synthesised in WebAudio, no files
             js/hud.js     HUD, feed, role card, your hand, scoreboard, results
+            js/cardart.js the printing press: every card face drawn onto a canvas
 ```
 
 **Authority split.** Movement is simulated on the client and speed-clamped by the
@@ -356,7 +382,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 43 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 45 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -373,7 +399,9 @@ They are grouped by what they protect:
   killcam, a ledger that stays armed because there was nothing to read, a Wanted
   Poster whose answer never leaves the player who nailed it up, and a Long Glass
   mark that punches through the visibility cull and then fades. Plus a guard rail
-  on the design rule itself: no card description may mention damage or healing.
+  on the design rule itself: no card description may mention damage or healing,
+  and every card in the deck must have a block cut for it in the press (add one
+  without art and the suite says so instead of the game shipping a blank face).
 - **`test/security.test.js`** — what a lying client cannot do: teleport, walk
   through a wall, end up inside geometry, be told about players it cannot see, or
   learn the name of a shooter it could not have seen.

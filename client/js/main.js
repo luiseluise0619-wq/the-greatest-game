@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import MAP from '../../shared/map.js';
 import { moveAndCollide } from '../../shared/collision.js';
 import {
-  PLAYER, WEAPONS, PHASE, VOICE_LINES, ENDGAME, REPLAY, clamp,
+  PLAYER, WEAPONS, PHASE, VOICE_LINES, ENDGAME, REPLAY, CARD_ORDER, clamp,
 } from '../../shared/constants.js';
 import { C, S } from '../../shared/protocol.js';
 import { buildWorld, animateWorld } from './world.js';
@@ -18,6 +18,7 @@ import { ViewModel } from './viewmodel.js';
 import { GameAudio } from './audio.js';
 import { HUD } from './hud.js';
 import { initCharacterModels } from './charmodels.js';
+import { cardUrl } from './cardart.js';
 
 const $ = (id) => document.getElementById(id);
 const INTERP_DELAY = 0.1;
@@ -144,6 +145,28 @@ class Game {
     const build = () => this.ensureWorld();
     if (typeof requestIdleCallback === 'function') requestIdleCallback(build, { timeout: 2500 });
     else setTimeout(build, 400);
+    this.warmDeck();
+  }
+
+  /**
+   * Print the whole deck while the player is still reading the lobby. Each face
+   * is about 30ms of canvas work; doing them one per idle slice means the round
+   * never stops to print one - not when a hand is dealt, and not when six of
+   * them turn up at once on the results screen.
+   */
+  warmDeck() {
+    if (this.deckWarming) return;
+    this.deckWarming = true;
+    const queue = [...CARD_ORDER, 'back'];
+    const next = () => {
+      const id = queue.shift();
+      if (!id) return;
+      try { cardUrl(id); } catch { /* a blank face is not worth a broken lobby */ }
+      if (typeof requestIdleCallback === 'function') requestIdleCallback(next, { timeout: 1200 });
+      else setTimeout(next, 60);
+    };
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(next, { timeout: 3000 });
+    else setTimeout(next, 900);
   }
 
   // ----------------------------------------------------------------- menu
@@ -572,6 +595,7 @@ class Game {
     if (this.peeking || card.classList.contains('hidden')) return false;
     card.classList.add('hidden');
     if (this.inGame) this.requestLock();
+    this.hud.playDealAnimation();
     return true;
   }
 

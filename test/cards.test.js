@@ -373,6 +373,29 @@ test('the aftermath screen is the first place a silent card is ever named', () =
   } finally { clock.restore(); }
 });
 
+test('every card in the deck has a face cut for it', async () => {
+  // cardart.js only touches the DOM inside its draw functions, so Node can
+  // import it and check the press has a block for every card in the deck.
+  const { PRINTABLE } = await import('../client/js/cardart.js');
+  for (const id of CARD_ORDER) {
+    assert.ok(PRINTABLE.includes(id), `${id} would print a blank face`);
+  }
+  assert.equal(PRINTABLE.length, CARD_ORDER.length, 'the press has a block nothing uses');
+});
+
+test('every card carries the text its face is set from', () => {
+  for (const id of CARD_ORDER) {
+    const c = CARDS[id];
+    assert.ok(c.name && c.short && c.flavour, `${id} is missing its lettering`);
+    assert.ok(c.rules && c.rules.length > 40, `${id} needs a printed rules line`);
+    // The rules line is set at 21px across 424px of card; much past this and it
+    // runs into the flavour text at the foot.
+    assert.ok(c.rules.length <= 96, `${id}'s rules line will not fit on the card`);
+    assert.ok(c.flavour.length <= 90, `${id}'s flavour line will not fit on the card`);
+    assert.ok(['none', 'aim'].includes(c.target), `${id} has an unknown targeting mode`);
+  }
+});
+
 test('the deck is our own: no card deals damage or heals', () => {
   // A guard rail for the design rule, not for the code: if somebody ever adds a
   // card that shoots, this fails and they have to argue with it.
