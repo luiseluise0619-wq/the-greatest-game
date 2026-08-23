@@ -39,6 +39,23 @@ export class HUD {
   }
 
   // ------------------------------------------------------------------ menu
+  /** This string, in the player's language. Shorthand - it is used everywhere. */
+  t(key, english, params) { return this.game.tr(key, english, params); }
+
+  /**
+   * The language changed. Everything the HTML owns is repainted by the game's
+   * own walker; this is the rest - the widgets whose words came out of
+   * constants.js and were built by hand.
+   */
+  relabel() {
+    this.buildCharacterGrid();
+    this.buildVoiceWheel();
+    this.buildDeckStrip();
+    if (this.phase) this.setPhase({ phase: this.phase, alive: this.standing, total: this.standingTotal });
+    if (this.hand.length || this.armed.length) this.setHand({ hand: this.hand, armed: this.armed });
+    if (this.selfRole) this.setRole(this.selfRole);
+  }
+
   buildCharacterGrid() {
     const grid = $('charGrid');
     grid.innerHTML = '';
@@ -49,10 +66,10 @@ export class HUD {
       el.dataset.id = id;
       el.innerHTML = `
         <div class="swatch" style="background:linear-gradient(90deg,${c.coat},${c.accent})"></div>
-        <h4>${c.role.toUpperCase()}</h4>
-        <div class="who">${c.name}</div>
-        <div class="ab">${c.ability}</div>
-        <p>${c.desc}</p>`;
+        <h4>${escapeHtml(this.t(`char.${id}.role`, c.role).toUpperCase())}</h4>
+        <div class="who">${escapeHtml(c.name)}</div>
+        <div class="ab">${escapeHtml(this.t(`char.${id}.ability`, c.ability))}</div>
+        <p>${escapeHtml(this.t(`char.${id}.desc`, c.desc))}</p>`;
       el.onclick = () => {
         this.game.character = id;
         for (const n of grid.children) n.classList.toggle('sel', n.dataset.id === id);
@@ -70,9 +87,10 @@ export class HUD {
     if (!strip) return;
     strip.innerHTML = CARD_ORDER.map((id) => {
       const c = CARDS[id];
-      return `<figure class="deckCard" data-id="${id}" title="${escapeHtml(c.desc)}">
+      return `<figure class="deckCard" data-id="${id}" title="${escapeHtml(this.t(`card.${id}.desc`, c.desc))}">
         <span class="deckSlot"></span>
-        <figcaption>${escapeHtml(c.name)}</figcaption></figure>`;
+        <figcaption>${escapeHtml(this.t(`card.${id}.name`, c.name))}
+          <em>${escapeHtml(this.t(`card.${id}.rules`, c.rules))}</em></figcaption></figure>`;
     }).join('');
     const queue = [...CARD_ORDER];
     const next = () => {
@@ -103,7 +121,7 @@ export class HUD {
       // the top and bottom of the ring are the ones that collide.
       el.style.left = `${350 + Math.cos(a) * 250}px`;
       el.style.top = `${215 + Math.sin(a) * 175}px`;
-      el.innerHTML = `<b>${i + 1}</b>${line.text}`;
+      el.innerHTML = `<b>${i + 1}</b>${escapeHtml(this.t(`voice.${line.id}`, line.text))}`;
       inner.appendChild(el);
     });
   }
@@ -127,7 +145,8 @@ export class HUD {
     $('botCount').textContent = msg.botTarget;
     const humans = msg.players.filter((p) => !p.bot).length;
     const bots = Math.max(0, msg.botTarget - humans);
-    $('botBreak').textContent = `${humans} human · ${bots} bot${bots === 1 ? '' : 's'}`;
+    $('botBreak').textContent = this.t('ui.humanBots',
+      `${humans} human · ${bots} bot${bots === 1 ? '' : 's'}`, { h: humans, b: bots });
 
     // A public town deals itself in once a second person turns up. Count it
     // down locally rather than making the server push a packet a second.
@@ -138,12 +157,14 @@ export class HUD {
   tickAutoStart() {
     const btn = $('startBtn');
     if (!this.autoStartAt) {
-      btn.textContent = 'DEAL THE ROLES';
+      btn.textContent = this.t('ui.deal', 'DEAL THE ROLES');
       btn.classList.remove('counting');
       return;
     }
     const left = Math.max(0, Math.ceil(this.autoStartAt - performance.now() / 1000));
-    btn.textContent = left > 0 ? `DEAL THE ROLES — ${left}s` : 'DEALING…';
+    btn.textContent = left > 0
+      ? this.t('ui.dealIn', `DEAL THE ROLES — ${left}s`, { n: left })
+      : this.t('ui.dealing', 'DEALING…');
     btn.classList.add('counting');
   }
 
@@ -153,7 +174,11 @@ export class HUD {
   setReconnecting(on, attempt = 0) {
     const el = $('netBanner');
     el.classList.toggle('hidden', !on);
-    if (on) el.textContent = `RECONNECTING${attempt > 1 ? ` (${attempt})` : ''}…`;
+    if (on) {
+      el.textContent = attempt > 1
+        ? this.t('hud.reconnectingN', `RECONNECTING (${attempt})…`, { n: attempt })
+        : this.t('hud.reconnecting', 'RECONNECTING…');
+    }
     // Every one of these buttons is a message to a server that is not there.
     // The status line says why; a button that still looks pressable does not.
     // Nothing else in the client sets `disabled` on any of them, so this can
@@ -166,9 +191,9 @@ export class HUD {
 
   setRoom(msg) {
     $('roomCode').textContent = msg.code || '····';
-    const kind = !msg.code ? 'finding a town…'
-      : msg.isPublic ? 'public · strangers can drop in'
-      : 'private · code only';
+    const kind = !msg.code ? this.t('ui.findingTown', 'finding a town…')
+      : msg.isPublic ? this.t('ui.publicTown', 'public · strangers can drop in')
+        : this.t('ui.privateTown', 'private · code only');
     $('roomKind').textContent = kind;
     $('copyLink').disabled = !msg.code;
   }
@@ -189,15 +214,22 @@ export class HUD {
     }
     this.selfRole = msg;
     const c = CHARACTERS[msg.character];
-    $('roleName').textContent = msg.roleName.toUpperCase();
+    // The server sends the English. The role's own id is the key to the rest.
+    const role = msg.role;
+    const objective = this.t(`role.${role}.objective`, msg.objective);
+    $('roleName').textContent = this.t(`role.${role}.name`, msg.roleName).toUpperCase();
     $('roleName').style.color = msg.color;
-    $('roleFaction').textContent = msg.faction === 'law' ? 'THE LAW' : msg.faction === 'outlaw' ? 'THE GANG' : 'NOBODY BUT YOU';
-    $('roleBlurb').textContent = msg.blurb;
-    $('roleObjective').textContent = msg.objective;
-    $('roleIntel').textContent = msg.intel || 'Nothing. You are working blind.';
-    $('roleCharacter').textContent = `${c.role} — ${c.name}`;
-    $('roleAbility').textContent = `${c.ability}: ${c.desc}`;
-    this.setObjective(msg.objective);
+    $('roleFaction').textContent = msg.faction === 'law'
+      ? this.t('faction.law', 'THE LAW')
+      : msg.faction === 'outlaw' ? this.t('faction.outlaw', 'THE GANG')
+        : this.t('faction.renegade', 'NOBODY BUT YOU');
+    $('roleBlurb').textContent = this.t(`role.${role}.blurb`, msg.blurb);
+    $('roleObjective').textContent = objective;
+    $('roleIntel').textContent = msg.intel || this.t('role.blind', 'Nothing. You are working blind.');
+    $('roleCharacter').textContent = `${this.t(`char.${msg.character}.role`, c.role)} — ${c.name}`;
+    $('roleAbility').textContent = `${this.t(`char.${msg.character}.ability`, c.ability)}: `
+      + this.t(`char.${msg.character}.desc`, c.desc);
+    this.setObjective(objective);
   }
 
   showRoleCard(msg) {
@@ -214,12 +246,15 @@ export class HUD {
 
   // ------------------------------------------------------------- hud state
   setPhase(msg) {
-    $('phaseLabel').textContent = PHASE_LABEL[msg.phase] || msg.phase.toUpperCase();
+    this.phase = msg.phase;
+    $('phaseLabel').textContent = this.t(`phase.${msg.phase}`,
+      PHASE_LABEL[msg.phase] || msg.phase.toUpperCase());
     this.setStanding(msg.alive, msg.total);
     if (msg.phase === PHASE.PREP) {
-      this.setObjective('Guns are holstered. Find weapons, find people, decide who you like.');
+      this.setObjective(this.t('phase.prepObjective',
+        'Guns are holstered. Find weapons, find people, decide who you like.'));
     } else if (this.selfRole) {
-      this.setObjective(this.selfRole.objective);
+      this.setObjective(this.t(`role.${this.selfRole.role}.objective`, this.selfRole.objective));
     }
   }
 
@@ -233,7 +268,10 @@ export class HUD {
       el.classList.add('dropped');
     }
     this.standing = n;
-    el.innerHTML = `<b>${n}</b> STILL STANDING${Number.isFinite(total) && total > n ? ` <span class="muted">of ${total}</span>` : ''}`;
+    this.standingTotal = total;
+    el.innerHTML = this.t('hud.standing', `<b>${n}</b> STILL STANDING`, { n })
+      + (Number.isFinite(total) && total > n
+        ? ` <span class="muted">${this.t('hud.ofTotal', `of ${total}`, { n: total })}</span>` : '');
   }
 
   setTimer(seconds) {
@@ -267,7 +305,7 @@ export class HUD {
     $('reserve').textContent = `/ ${s.reserve}`;
     $('ammo').classList.toggle('empty', s.mag === 0);
     $('dynCount').classList.toggle('hidden', s.dyn <= 0);
-    $('dynCount').innerHTML = `DYNAMITE x${s.dyn} <em>G</em>`;
+    $('dynCount').innerHTML = `${escapeHtml(this.t('hud.dynamite', `DYNAMITE x${s.dyn}`, { n: s.dyn }))} <em>G</em>`;
 
     const c = CHARACTERS[this.game.character];
     const cdPct = s.cd > 0 ? 1 - s.cd / (s.cdMax || 1) : 1;
@@ -394,14 +432,15 @@ export class HUD {
       const c = CARDS[id];
       // How it plays, in one word: arms and waits for a trigger, resolves the
       // moment you press the key, or runs on a clock.
-      const kind = c.kind === 'armed' ? 'ARMS UNTIL SPENT'
-        : c.kind === 'timed' ? `${c.duration}s` : 'AT ONCE';
+      const kind = c.kind === 'armed' ? this.t('card.kind.armed', 'ARMS UNTIL SPENT')
+        : c.kind === 'timed' ? `${c.duration}s` : this.t('card.kind.instant', 'AT ONCE');
+      const name = this.t(`card.${id}.name`, c.name);
       return `<div class="handCard${live ? ' live' : ''}">
-        <img src="${cardUrl(id)}" alt="${escapeHtml(c.name)}">
+        <img src="${cardUrl(id)}" alt="${escapeHtml(name)}">
         <div class="handText">
-          <h5><span>${escapeHtml(c.name)}</span><em>${live ? 'IN PLAY' : key}</em></h5>
-          <div class="handKind">${kind}</div>
-          <p>${escapeHtml(c.desc)}</p>
+          <h5><span>${escapeHtml(name)}</span><em>${live ? this.t('card.inPlay', 'IN PLAY') : key}</em></h5>
+          <div class="handKind">${escapeHtml(kind)}</div>
+          <p>${escapeHtml(this.t(`card.${id}.desc`, c.desc))}</p>
         </div></div>`;
     };
     box.innerHTML = this.hand.map((id, i) => one(id, keys[i] || '', false)).join('')
@@ -466,7 +505,7 @@ export class HUD {
     const el = $('interactPrompt');
     if (!item) { el.classList.add('hidden'); return; }
     el.classList.remove('hidden');
-    el.querySelector('span').textContent = LOOT_LABEL[item.type] || item.type;
+    el.querySelector('span').textContent = this.t(`loot.${item.type}`, LOOT_LABEL[item.type] || item.type);
   }
 
   // ------------------------------------------------------------------ feed
@@ -548,11 +587,12 @@ export class HUD {
       const tr = document.createElement('tr');
       tr.className = (p.alive ? '' : 'dead ') + (isSelf ? 'you' : '');
       tr.innerHTML = `
-        <td>${escapeHtml(p.name || '?')}${isSelf ? ' <span class="muted">(you)</span>' : ''}</td>
-        <td>${p.alive ? 'standing' : 'dead'}</td>
+        <td>${escapeHtml(p.name || '?')}${isSelf ? ` <span class="muted">${this.t('sb.you', '(you)')}</span>` : ''}</td>
+        <td>${p.alive ? this.t('sb.standing', 'standing') : this.t('sb.deadStatus', 'dead')}</td>
         ${role
-          ? `<td class="role" style="color:${role.color}">${role.name}${isSelf ? ' (yours)' : ''}</td>`
-          : '<td class="unknown">unknown</td>'}
+          ? `<td class="role" style="color:${role.color}">${escapeHtml(this.t(`role.${known}.name`, role.name))}`
+            + `${isSelf ? ` ${this.t('sb.yours', '(yours)')}` : ''}</td>`
+          : `<td class="unknown">${this.t('sb.unknown', 'unknown')}</td>`}
         <td>${p.alive ? '—' : ''}</td>`;
       tb.appendChild(tr);
     }
@@ -560,7 +600,7 @@ export class HUD {
 
   // --------------------------------------------------------------- results
   showResults(msg) {
-    $('resultTitle').textContent = msg.title;
+    $('resultTitle').textContent = this.t(`res.title.${msg.winner}`, msg.title);
     $('resultTitle').className = msg.winner;
     $('resultBlurb').textContent = msg.blurb;
     const tb = $('resultTable').querySelector('tbody');
@@ -569,15 +609,16 @@ export class HUD {
       const tr = document.createElement('tr');
       tr.className = (r.alive ? '' : 'dead ') + (r.id === this.game.selfId ? 'you' : '');
       tr.innerHTML = `
-        <td>${escapeHtml(r.name)}${r.bot ? ' <span class="muted">bot</span>' : ''}</td>
-        <td class="role" style="color:${r.color}">${r.roleName}</td>
-        <td>${r.characterName || ''}</td>
+        <td>${escapeHtml(r.name)}${r.bot ? ` <span class="muted">${this.t('sb.bot', 'bot')}</span>` : ''}</td>
+        <td class="role" style="color:${r.color}">${escapeHtml(this.t(`role.${r.role}.name`, r.roleName))}</td>
+        <td>${escapeHtml(this.t(`char.${r.character}.role`, r.characterName || ''))}</td>
         <td>${r.kills}</td>
         <td class="cardCol">${(r.cards || []).map((c) => (CARDS[c]
-          ? `<img class="crdMini" src="${cardUrl(c)}" title="${escapeHtml(CARDS[c].name)}" alt="${escapeHtml(CARDS[c].name)}">`
+          ? `<img class="crdMini" src="${cardUrl(c)}" title="${escapeHtml(this.t(`card.${c}.name`, CARDS[c].name))}" alt="${escapeHtml(this.t(`card.${c}.name`, CARDS[c].name))}">`
           : '')).join('') || '<span class="muted">—</span>'}</td>
         <td>${r.damage}</td>
-        <td>${r.won ? '<span class="wonTag">WON</span>' : '<span class="lostTag">lost</span>'}</td>`;
+        <td>${r.won ? `<span class="wonTag">${this.t('res.won', 'WON')}</span>`
+          : `<span class="lostTag">${this.t('res.lost', 'lost')}</span>`}</td>`;
       tb.appendChild(tr);
     }
     this.renderTimeline(msg.timeline || []);
@@ -651,19 +692,21 @@ export class HUD {
   setResultCountdown(s) {
     // What actually happens when this runs out is the lobby, not a new round -
     // a new round needs everybody to say they want one.
-    $('resultCountdown').textContent = s > 0 ? `back to the lobby in ${s}s` : '';
+    $('resultCountdown').textContent = s > 0
+      ? this.t('res.backToLobby', `back to the lobby in ${s}s`, { n: s }) : '';
   }
 
   /** How many of the living have asked to go again. */
   setReady(msg) {
     const btn = $('playAgain');
     if (!msg || msg.of <= 1) return;
-    btn.textContent = `RIDE AGAIN — ${msg.ready}/${msg.of}`;
+    btn.textContent = this.t('res.rideAgainN', `RIDE AGAIN — ${msg.ready}/${msg.of}`,
+      { ready: msg.ready, of: msg.of });
   }
 
   /** Called when the results screen opens, before anybody has said anything. */
   resetReady() {
-    $('playAgain').textContent = 'RIDE AGAIN';
+    $('playAgain').textContent = this.t('res.rideAgain', 'RIDE AGAIN');
     $('playAgain').disabled = false;
   }
 
@@ -672,7 +715,8 @@ export class HUD {
   chatInput(show, dead = false) {
     $('chatInputWrap').classList.toggle('hidden', !show);
     // Being dead is not a broadcast licence - say so before they type.
-    $('chatInputWrap').firstElementChild.textContent = dead ? 'SAY (ONLY THE DEAD HEAR YOU)' : 'SAY';
+    $('chatInputWrap').firstElementChild.textContent = dead
+      ? this.t('hud.sayDead', 'SAY (ONLY THE DEAD HEAR YOU)') : this.t('hud.say', 'SAY');
     if (show) { $('chatInput').value = ''; $('chatInput').focus(); }
     else $('chatInput').blur();
   }

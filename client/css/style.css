@@ -625,3 +625,75 @@ td.cardCol { white-space: nowrap; }
   .dmgArrow { display: none; }
   .cardChip { transition: none; }
 }
+
+
+/* --------------------------------------------------- HANGUL
+   English small-caps labels in this game are tracked wide - that is what makes
+   "NAME ON THE HEADSTONE" read as a label rather than as a sentence. Korean is
+   already spaced by its own syllable blocks, so the same tracking makes it read
+   as b r o k e n. Every rule that sets letter-spacing gets it taken back off
+   when the page is in Korean. The one exception is the game's own title, which
+   is not translated and stays a logo. */
+html[lang="ko"] #phaseLabel,
+html[lang="ko"] #timer,
+html[lang="ko"] #standing,
+html[lang="ko"] #objective,
+html[lang="ko"] #weaponName,
+html[lang="ko"] #dynCount,
+html[lang="ko"] #abilityName,
+html[lang="ko"] #interactPrompt,
+html[lang="ko"] .statusChip,
+html[lang="ko"] .panel h2,
+html[lang="ko"] th,
+html[lang="ko"] .wonTag,
+html[lang="ko"] .lostTag,
+html[lang="ko"] #netBanner,
+html[lang="ko"] #fpsMeter,
+html[lang="ko"] .cardLabel,
+html[lang="ko"] #roleCard h1,
+html[lang="ko"] #roleFaction,
+html[lang="ko"] .objBox span,
+html[lang="ko"] .intelBox span,
+html[lang="ko"] .charBox span,
+html[lang="ko"] .cardHint,
+html[lang="ko"] #results h1,
+html[lang="ko"] .tag,
+html[lang="ko"] .fieldLabel,
+html[lang="ko"] .roomId b,
+html[lang="ko"] .roomId span,
+html[lang="ko"] button.ghost,
+html[lang="ko"] .roomJoin input,
+html[lang="ko"] .roomJoin button,
+html[lang="ko"] button,
+html[lang="ko"] button.big,
+html[lang="ko"] .charCard h4,
+html[lang="ko"] .charCard .ab,
+html[lang="ko"] .rules h3,
+html[lang="ko"] .deckCard figcaption,
+html[lang="ko"] .voiceOpt b,
+html[lang="ko"] #chatInputWrap span,
+html[lang="ko"] .cardChip b,
+html[lang="ko"] .cardChip i,
+html[lang="ko"] .deckBox > span,
+html[lang="ko"] .handCard h5,
+html[lang="ko"] .handCard h5 em,
+html[lang="ko"] .handKind,
+html[lang="ko"] .crd,
+html[lang="ko"] .kcTop b,
+html[lang="ko"] .kcTop span,
+html[lang="ko"] .kcName,
+html[lang="ko"] .kcSkip,
+html[lang="ko"] .timelineWrap h3,
+html[lang="ko"] #deadBanner b,
+html[lang="ko"] #deadBanner span,
+html[lang="ko"] #loading,
+html[lang="ko"] #loading.failed,
+html[lang="ko"] #loading.failed b {
+  letter-spacing: .02em;
+}
+/* And a Korean face to fall back to, from what the machine already has -
+   nothing here is downloaded. */
+html[lang="ko"] {
+  --font: "Courier New", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans CJK KR",
+    "Noto Sans KR", "DejaVu Sans Mono", monospace;
+}

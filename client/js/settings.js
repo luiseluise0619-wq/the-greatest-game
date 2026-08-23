@@ -6,7 +6,18 @@
 // window or a browser with site data blocked throws on access rather than
 // returning null, and a settings panel is not worth breaking the game over.
 
+import { LANGS, pickLang } from '../../shared/i18n.js';
+
 const KEY = 'hnh.settings.v1';
+
+/** What the browser says it would rather read. Guarded: not every host has one. */
+function browserLanguages() {
+  try {
+    const n = globalThis.navigator;
+    if (!n) return [];
+    return n.languages && n.languages.length ? [...n.languages] : [n.language];
+  } catch { return []; }
+}
 
 export const LIMITS = {
   sensitivity: { min: 0.0005, max: 0.0075, step: 0.0001 },
@@ -15,6 +26,9 @@ export const LIMITS = {
 };
 
 export const DEFAULTS = {
+  // Not a preference so much as a first guess: whatever the browser asked for,
+  // changeable in the panel like everything else here.
+  lang: pickLang(browserLanguages()),
   sensitivity: 0.0022,
   invertY: false,
   adsScale: 0.55,      // how much slower the mouse gets down the sights
@@ -47,6 +61,7 @@ export function sanitise(raw) {
   if (Number.isFinite(raw.fov)) s.fov = Math.round(clamp(raw.fov, LIMITS.fov.min, LIMITS.fov.max));
   if (Number.isFinite(raw.volume)) s.volume = clamp(raw.volume, 0, 1);
   if (Number.isFinite(raw.adsScale)) s.adsScale = clamp(raw.adsScale, 0.2, 1);
+  s.lang = LANGS.includes(raw.lang) ? raw.lang : DEFAULTS.lang;
   s.invertY = !!raw.invertY;
   s.muted = !!raw.muted;
   s.showFps = !!raw.showFps;

@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 132 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 139 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 ```
@@ -477,7 +477,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 132 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 139 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -562,6 +562,14 @@ They are grouped by what they protect:
 - **`test/ratelimit.test.js`** — the socket token bucket: a burst gets through,
   a flood does not, an idle socket cannot save up more than one burst, and a
   stream at exactly the limit is never refused.
+- **`test/i18n.test.js`** — the Korean overlay. There is only ever one English
+  copy of any string — the one in the HTML, in `constants.js`, or in the
+  sentence the server built — and Korean is keyed to it, so two English copies
+  cannot drift apart. What can happen instead is a key the page asks for that
+  nobody translated, or a translation for a key that no longer exists, and both
+  of those fail here. Plus: an untranslated key falls through to the English it
+  was handed rather than to a hole, a Korean browser gets Korean without being
+  asked, and no Korean entry is secretly still in English.
 - **`test/fuzz.test.js`** — every shape of message a socket can send that a real
   client never would: numbers where objects go, `NaN` and `Infinity` where
   coordinates go, five-thousand-character strings, `__proto__` as a card name.

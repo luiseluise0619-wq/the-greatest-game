@@ -55,7 +55,7 @@
   <div id="bottomRight">
     <div id="abilityWrap" title="Q">
       <svg id="cdRing" viewBox="0 0 48 48"><circle class="bg" cx="24" cy="24" r="20"/><circle class="fg" cx="24" cy="24" r="20"/></svg>
-      <div id="abilityName">ABILITY</div>
+      <div id="abilityName" data-i18n="hud.ability">ABILITY</div>
       <div id="abilityKey">Q</div>
     </div>
     <div id="ammoWrap">
@@ -65,7 +65,7 @@
     </div>
   </div>
 
-  <div id="interactPrompt" class="hidden"><b>E</b> <span>pick up</span></div>
+  <div id="interactPrompt" class="hidden"><b>E</b> <span data-i18n="hud.pickup">pick up</span></div>
   <div id="statusStrip"></div>
   <div id="handStrip"></div>
   <div id="reloadBar" class="hidden"><i></i></div>
@@ -75,32 +75,32 @@
 <div id="roleCard" class="overlay hidden">
   <div class="card">
     <div class="cardTop">
-      <div class="cardLabel">YOUR HAND — TELL NO ONE</div>
+      <div class="cardLabel" data-i18n="role.yourHand">YOUR HAND — TELL NO ONE</div>
       <h1 id="roleName">OUTLAW</h1>
       <div id="roleFaction">Outlaws</div>
     </div>
     <p id="roleBlurb"></p>
-    <div class="objBox"><span>OBJECTIVE</span><p id="roleObjective"></p></div>
-    <div class="intelBox"><span>WHAT YOU KNOW</span><p id="roleIntel"></p></div>
+    <div class="objBox"><span data-i18n="role.objective">OBJECTIVE</span><p id="roleObjective"></p></div>
+    <div class="intelBox"><span data-i18n="role.whatYouKnow">WHAT YOU KNOW</span><p id="roleIntel"></p></div>
     <div class="charBox">
-      <span>YOU ARE PLAYING</span>
+      <span data-i18n="role.youArePlaying">YOU ARE PLAYING</span>
       <p id="roleCharacter"></p>
       <em id="roleAbility"></em>
     </div>
     <div class="deckBox">
-      <span>DEALT TO YOU — <b>Z</b> and <b>X</b> to play</span>
+      <span data-i18n-html="role.dealtToYou">DEALT TO YOU — <b>Z</b> and <b>X</b> to play</span>
       <div id="roleCards"></div>
     </div>
-    <div class="cardHint">Hold <b>H</b> in game to look at this again · click or press <b>Space</b> to take the reins</div>
+    <div class="cardHint" data-i18n-html="role.hint">Hold <b>H</b> in game to look at this again · click or press <b>Space</b> to take the reins</div>
   </div>
 </div>
 
 <!-- ===================== SCOREBOARD ===================== -->
 <div id="scoreboard" class="overlay hidden">
   <div class="panel">
-    <h2>PERDITION FLATS</h2>
-    <div class="sbNote">Roles are only revealed when somebody dies. Everything else is your problem.</div>
-    <table id="sbTable"><thead><tr><th>Gunhand</th><th>Status</th><th>Known role</th><th>Kills</th></tr></thead><tbody></tbody></table>
+    <h2 data-i18n="sb.town">PERDITION FLATS</h2>
+    <div class="sbNote" data-i18n="sb.note">Roles are only revealed when somebody dies. Everything else is your problem.</div>
+    <table id="sbTable"><thead><tr><th data-i18n="sb.gunhand">Gunhand</th><th data-i18n="sb.status">Status</th><th data-i18n="sb.knownRole">Known role</th><th data-i18n="sb.kills">Kills</th></tr></thead><tbody></tbody></table>
   </div>
 </div>
 
@@ -113,14 +113,14 @@
     <h1 id="resultTitle">THE LAW HOLDS</h1>
     <p id="resultBlurb"></p>
     <div class="resultCols">
-      <table id="resultTable"><thead><tr><th>Gunhand</th><th>Role</th><th>Character</th><th>Kills</th><th>Cards</th><th>Damage</th><th></th></tr></thead><tbody></tbody></table>
+      <table id="resultTable"><thead><tr><th data-i18n="sb.gunhand">Gunhand</th><th data-i18n="res.role">Role</th><th data-i18n="res.character">Character</th><th data-i18n="sb.kills">Kills</th><th data-i18n="res.cards">Cards</th><th data-i18n="res.damage">Damage</th><th></th></tr></thead><tbody></tbody></table>
       <div class="timelineWrap">
-        <h3>HOW IT WENT</h3>
+        <h3 data-i18n="res.howItWent">HOW IT WENT</h3>
         <ol id="timeline"></ol>
       </div>
     </div>
     <div class="row">
-      <button id="playAgain" class="primary">RIDE AGAIN</button>
+      <button id="playAgain" class="primary" data-i18n="res.rideAgain">RIDE AGAIN</button>
       <span id="resultCountdown" class="muted"></span>
     </div>
   </div>
@@ -131,68 +131,68 @@
   <div class="menuInner">
     <header>
       <h1>HIGH&nbsp;NOON<br/><em>HOLLOW</em></h1>
-      <p class="tag">Eight strangers. One hidden star. Nobody rides out clean.</p>
+      <p class="tag" data-i18n="ui.tagline">Eight strangers. One hidden star. Nobody rides out clean.</p>
     </header>
 
     <div class="menuGrid">
       <section class="mCol">
-        <label class="fieldLabel">NAME ON THE HEADSTONE</label>
-        <input id="nameInput" maxlength="16" placeholder="Stranger" />
+        <label class="fieldLabel" data-i18n="ui.nameLabel">NAME ON THE HEADSTONE</label>
+        <input id="nameInput" maxlength="16" placeholder="Stranger" data-i18n-ph="ui.namePlaceholder" />
 
-        <label class="fieldLabel">THIS TOWN</label>
+        <label class="fieldLabel" data-i18n="ui.thisTown">THIS TOWN</label>
         <div class="roomBox">
           <div class="roomId"><b id="roomCode">····</b><span id="roomKind">finding a town…</span></div>
-          <button id="copyLink" class="ghost">COPY INVITE LINK</button>
+          <button id="copyLink" class="ghost" data-i18n="ui.copyLink">COPY INVITE LINK</button>
         </div>
         <div class="roomJoin">
-          <input id="joinCode" maxlength="4" placeholder="CODE" autocomplete="off" spellcheck="false" />
-          <button id="joinBtn">JOIN</button>
-          <button id="newRoom" title="Open a private town only your code can reach">NEW</button>
+          <input id="joinCode" maxlength="4" placeholder="CODE" data-i18n-ph="ui.codePlaceholder" autocomplete="off" spellcheck="false" />
+          <button id="joinBtn" data-i18n="ui.join">JOIN</button>
+          <button id="newRoom" title="Open a private town only your code can reach" data-i18n="ui.newRoom" data-i18n-title="ui.newRoomTitle">NEW</button>
         </div>
 
-        <label class="fieldLabel">TABLE SIZE</label>
+        <label class="fieldLabel" data-i18n="ui.tableSize">TABLE SIZE</label>
         <div class="botRow">
           <button id="botMinus">−</button>
-          <div><b id="botCount">6</b> <span>gunhands</span><em id="botBreak"></em></div>
+          <div><b id="botCount">6</b> <span data-i18n="ui.gunhands">gunhands</span><em id="botBreak"></em></div>
           <button id="botPlus">+</button>
         </div>
 
-        <label class="fieldLabel">IN THE LOBBY</label>
+        <label class="fieldLabel" data-i18n="ui.inTheLobby">IN THE LOBBY</label>
         <ul id="lobbyList"></ul>
 
-        <button id="startBtn" class="primary big">DEAL THE ROLES</button>
-        <div id="menuStatus" class="muted">connecting…</div>
-        <button id="openSettings" class="ghost wide">SETTINGS</button>
+        <button id="startBtn" class="primary big" data-i18n="ui.deal">DEAL THE ROLES</button>
+        <div id="menuStatus" class="muted" data-i18n="ui.connecting">connecting…</div>
+        <button id="openSettings" class="ghost wide" data-i18n="ui.settings">SETTINGS</button>
       </section>
 
       <section class="mCol wide">
-        <label class="fieldLabel">PICK YOUR GUNHAND</label>
+        <label class="fieldLabel" data-i18n="ui.pickGunhand">PICK YOUR GUNHAND</label>
         <div id="charGrid"></div>
 
         <div class="rules">
-          <h3>HOW A ROUND GOES</h3>
+          <h3 data-i18n="ui.howItGoes">HOW A ROUND GOES</h3>
           <ul>
-            <li><b>Roles are secret.</b> Sheriff, Deputies, Outlaws, one Renegade. Nobody is told who anybody is.</li>
-            <li><b>You get one thread to pull.</b> A Deputy learns two names, one of which is the Sheriff. An Outlaw recognises a single accomplice.</li>
-            <li><b>Kills only name the killer if somebody watched it happen.</b> Everything else is a rumour and a location.</li>
-            <li><b>The dead reveal their role.</b> Every body is evidence — for whoever is still standing.</li>
-            <li><b>The Sheriff may pin on the star</b> for real armour and a permanent target. Or stay a stranger.</li>
+            <li data-i18n-html="rules.secret"><b>Roles are secret.</b> Sheriff, Deputies, Outlaws, one Renegade. Nobody is told who anybody is.</li>
+            <li data-i18n-html="rules.thread"><b>You get one thread to pull.</b> A Deputy learns two names, one of which is the Sheriff. An Outlaw recognises a single accomplice.</li>
+            <li data-i18n-html="rules.kills"><b>Kills only name the killer if somebody watched it happen.</b> Everything else is a rumour and a location.</li>
+            <li data-i18n-html="rules.dead"><b>The dead reveal their role.</b> Every body is evidence — for whoever is still standing.</li>
+            <li data-i18n-html="rules.star"><b>The Sheriff may pin on the star</b> for real armour and a permanent target. Or stay a stranger.</li>
           </ul>
-          <h3>THE DECK</h3>
-          <p class="deckLead">Two of these six are dealt to you every round, and nobody is ever told
+          <h3 data-i18n="ui.theDeck">THE DECK</h3>
+          <p class="deckLead" data-i18n-html="ui.deckLead">Two of these six are dealt to you every round, and nobody is ever told
           what anybody else is holding. None of them shoot — they edit what the town is allowed to
           know. Play one with <b>Z</b> or <b>X</b>.</p>
           <div id="deckStrip"></div>
 
-          <h3>CONTROLS</h3>
+          <h3 data-i18n="ui.controls">CONTROLS</h3>
           <div class="keys">
-            <span><b>WASD</b> move</span><span><b>Shift</b> sprint</span><span><b>Ctrl</b> crouch</span>
-            <span><b>Space</b> jump</span><span><b>LMB</b> fire</span><span><b>RMB</b> aim (rifle)</span>
-            <span><b>R</b> reload</span><span><b>1 2 3</b> guns</span><span><b>G</b> dynamite</span>
-            <span><b>E</b> pick up</span><span><b>Q</b> ability</span><span><b>F</b> call out</span>
-            <span><b>V</b> shout</span><span><b>T</b> chat</span><span><b>Tab</b> table</span>
-            <span><b>H</b> your hand</span><span><b>B</b> pin the star</span><span><b>Z X</b> play a card</span>
-            <span><b>Esc</b> settings</span>
+            <span data-i18n-html="key.move"><b>WASD</b> move</span><span data-i18n-html="key.sprint"><b>Shift</b> sprint</span><span data-i18n-html="key.crouch"><b>Ctrl</b> crouch</span>
+            <span data-i18n-html="key.jump"><b>Space</b> jump</span><span data-i18n-html="key.fire"><b>LMB</b> fire</span><span data-i18n-html="key.aim"><b>RMB</b> aim (rifle)</span>
+            <span data-i18n-html="key.reload"><b>R</b> reload</span><span data-i18n-html="key.guns"><b>1 2 3</b> guns</span><span data-i18n-html="key.dynamite"><b>G</b> dynamite</span>
+            <span data-i18n-html="key.pickup"><b>E</b> pick up</span><span data-i18n-html="key.ability"><b>Q</b> ability</span><span data-i18n-html="key.callout"><b>F</b> call out</span>
+            <span data-i18n-html="key.shout"><b>V</b> shout</span><span data-i18n-html="key.chat"><b>T</b> chat</span><span data-i18n-html="key.table"><b>Tab</b> table</span>
+            <span data-i18n-html="key.hand"><b>H</b> your hand</span><span data-i18n-html="key.star"><b>B</b> pin the star</span><span data-i18n-html="key.card"><b>Z X</b> play a card</span>
+            <span data-i18n-html="key.settings"><b>Esc</b> settings</span>
           </div>
         </div>
       </section>
@@ -200,61 +200,68 @@
   </div>
 </div>
 
-<div id="chatInputWrap" class="hidden"><span>SAY</span><input id="chatInput" maxlength="140" /></div>
+<div id="chatInputWrap" class="hidden"><span data-i18n="hud.say">SAY</span><input id="chatInput" maxlength="140" /></div>
 <div id="killcam" class="hidden">
-  <div class="kcTop"><b>KILLCAM</b><span id="kcWhere"></span></div>
-  <div class="kcName">killed by <em id="kcKiller"></em></div>
+  <div class="kcTop"><b data-i18n="hud.killcam">KILLCAM</b><span id="kcWhere"></span></div>
+  <div class="kcName"><span data-i18n="hud.killedBy">killed by</span> <em id="kcKiller"></em></div>
   <div class="kcBar"><i id="kcFill"></i></div>
-  <div class="kcSkip">any key to skip</div>
+  <div class="kcSkip" data-i18n="hud.skip">any key to skip</div>
 </div>
 
 <!-- ===================== SETTINGS ===================== -->
 <div id="settings" class="overlay hidden">
   <div class="panel">
-    <h2>SETTINGS</h2>
-    <p class="muted small">Kept in this browser only. Nothing here is sent anywhere.</p>
+    <h2 data-i18n="set.title">SETTINGS</h2>
+    <p class="muted small" data-i18n="set.note">Kept in this browser only. Nothing here is sent anywhere.</p>
 
     <label class="setRow">
-      <span>Mouse sensitivity</span>
+      <span data-i18n="set.language">Language</span>
+      <select id="setLang">
+        <option value="en">English</option>
+        <option value="ko">한국어</option>
+      </select>
+    </label>
+    <label class="setRow">
+      <span data-i18n="set.sens">Mouse sensitivity</span>
       <input id="setSens" type="range" />
       <b id="setSensVal">0.0022</b>
     </label>
     <label class="setRow check">
       <input id="setInvert" type="checkbox" />
-      <span>Invert vertical look</span>
+      <span data-i18n="set.invert">Invert vertical look</span>
     </label>
     <label class="setRow">
-      <span>Field of view</span>
+      <span data-i18n="set.fov">Field of view</span>
       <input id="setFov" type="range" />
       <b id="setFovVal">76</b>
     </label>
     <label class="setRow">
-      <span>Volume</span>
+      <span data-i18n="set.volume">Volume</span>
       <input id="setVol" type="range" />
       <b id="setVolVal">55%</b>
     </label>
     <label class="setRow check">
       <input id="setMute" type="checkbox" />
-      <span>Mute everything</span>
+      <span data-i18n="set.mute">Mute everything</span>
     </label>
     <label class="setRow check">
       <input id="setFps" type="checkbox" />
-      <span>Show frame rate</span>
+      <span data-i18n="set.fps">Show frame rate</span>
     </label>
 
     <div class="setButtons">
-      <button id="setClose" class="primary">BACK TO THE GAME</button>
-      <button id="setReset" class="ghost">RESET TO DEFAULTS</button>
+      <button id="setClose" class="primary" data-i18n="set.backToGame">BACK TO THE GAME</button>
+      <button id="setReset" class="ghost" data-i18n="set.reset">RESET TO DEFAULTS</button>
     </div>
-    <div class="cardHint dark">Press <b>Esc</b> at any time to open or close this</div>
+    <div class="cardHint dark" data-i18n-html="set.escHint">Press <b>Esc</b> at any time to open or close this</div>
   </div>
 </div>
 
-<div id="netBanner" class="hidden">RECONNECTING…</div>
+<div id="netBanner" class="hidden" data-i18n="hud.reconnecting">RECONNECTING…</div>
 <div id="fpsMeter" class="hidden">0</div>
 <div id="cardPlay" class="hidden"></div>
-<div id="deadBanner" class="hidden"><b>YOU ARE DEAD</b><span>Spectating. The round is still going.</span></div>
-<div id="loading">saddling up…</div>
+<div id="deadBanner" class="hidden"><b data-i18n="hud.dead">YOU ARE DEAD</b><span data-i18n="hud.spectating">Spectating. The round is still going.</span></div>
+<div id="loading" data-i18n="hud.loading">saddling up…</div>
 
 <script type="module" src="/client/js/main.js"></script>
 </body>

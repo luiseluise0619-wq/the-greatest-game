@@ -15,7 +15,7 @@ import {
 import { C, S } from '../../shared/protocol.js';
 
 // Said often enough to be worth saying the same way every time.
-const DEAD_LINE = 'You are dead. Watch, and listen.';
+const DEAD_LINE = ['deny.dead', 'You are dead. Watch, and listen.'];
 import { buildWorld, animateWorld } from './world.js';
 import { PlayerView } from './players.js';
 import { Effects } from './effects.js';
@@ -25,6 +25,7 @@ import { HUD } from './hud.js';
 import { initCharacterModels } from './charmodels.js';
 import { cardUrl } from './cardart.js';
 import { Settings, LIMITS, motionScale } from './settings.js';
+import { t, pickLang } from '../../shared/i18n.js';
 
 const $ = (id) => document.getElementById(id);
 const INTERP_DELAY = 0.1;
@@ -207,7 +208,7 @@ class Game {
     $('newRoom').onclick = () => this.switchRoom({ create: true });
     $('joinBtn').onclick = () => {
       const code = $('joinCode').value.trim().toUpperCase();
-      if (code.length !== 4) { this.hud.setStatus('a town code is four characters'); return; }
+      if (code.length !== 4) { this.hud.setStatus(this.tr('ui.codeIsFour', 'a town code is four characters')); return; }
       $('joinCode').value = '';
       this.switchRoom({ room: code });
     };
@@ -274,6 +275,9 @@ class Game {
     check($('setMute'), 'muted');
     check($('setFps'), 'showFps');
 
+    $('setLang').value = v.lang;
+    $('setLang').onchange = () => this.settings.set('lang', $('setLang').value);
+
     $('setClose').onclick = () => this.showSettings(false);
     $('setReset').onclick = () => { this.settings.reset(); this.syncSettingsPanel(); };
     $('openSettings').onclick = () => this.showSettings(true);
@@ -291,6 +295,39 @@ class Game {
     $('setInvert').checked = v.invertY;
     $('setMute').checked = v.muted;
     $('setFps').checked = v.showFps;
+    $('setLang').value = v.lang;
+  }
+
+  /** This string, in the language the player asked for. */
+  tr(key, english = '', params = null) {
+    return t(this.settings?.get('lang') || 'en', key, english, params);
+  }
+
+  /**
+   * Repaint every word on the page.
+   *
+   * The English is not in a table anywhere - it is the content the element was
+   * written with - so it is captured on the first pass and kept, and switching
+   * back to English is putting it back rather than looking it up.
+   */
+  applyLanguage() {
+    const lang = this.settings?.get('lang') || 'en';
+    document.documentElement.lang = lang;
+    const paint = (attr, read, write) => {
+      for (const el of document.querySelectorAll(`[${attr}]`)) {
+        // Kept on the node rather than in its dataset: "data-i18n" is not a
+        // valid name for a data attribute of its own.
+        const kept = el.hnhEnglish || (el.hnhEnglish = {});
+        if (kept[attr] === undefined) kept[attr] = read(el);
+        write(el, t(lang, el.getAttribute(attr), kept[attr]));
+      }
+    };
+    paint('data-i18n', (el) => el.textContent, (el, v) => { el.textContent = v; });
+    paint('data-i18n-html', (el) => el.innerHTML, (el, v) => { el.innerHTML = v; });
+    paint('data-i18n-ph', (el) => el.placeholder, (el, v) => { el.placeholder = v; });
+    paint('data-i18n-title', (el) => el.title, (el, v) => { el.title = v; });
+    // The parts the HTML does not own.
+    this.hud?.relabel();
   }
 
   applySettings(v) {
@@ -301,12 +338,17 @@ class Game {
     }
     if (this.audio) this.audio.setVolume(v.muted ? 0 : v.volume);
     $('fpsMeter').classList.toggle('hidden', !v.showFps);
+    if (v.lang !== this.shownLang) { this.shownLang = v.lang; this.applyLanguage(); }
   }
 
   showSettings(show) {
     this.settingsOpen = show;
     // The button offered to take you back to a game you may not be in yet.
-    if (show) $('setClose').textContent = this.inGame ? 'BACK TO THE GAME' : 'BACK TO THE LOBBY';
+    if (show) {
+      $('setClose').textContent = this.inGame
+        ? this.tr('set.backToGame', 'BACK TO THE GAME')
+        : this.tr('set.backToLobby', 'BACK TO THE LOBBY');
+    }
     $('settings').classList.toggle('hidden', !show);
     if (show) document.exitPointerLock?.();
     else if (this.inGame) this.requestLock();
@@ -318,7 +360,7 @@ class Game {
     const btn = $('copyLink');
     try {
       await navigator.clipboard.writeText(link);
-      btn.textContent = 'LINK COPIED';
+      btn.textContent = this.tr('ui.copied', 'LINK COPIED');
     } catch {
       // Clipboard is blocked on insecure origins; show the link so it can be
       // selected by hand rather than failing silently.
@@ -338,7 +380,7 @@ class Game {
     this.ws = new WebSocket(`${proto}://${location.host}`);
     this.ws.onopen = () => {
       this.retries = 0;
-      this.hud.setStatus('connected — pick a gunhand and deal the roles');
+      this.hud.setStatus(this.tr('ui.connected', 'connected — pick a gunhand and deal the roles'));
       this.hud.setReconnecting(false);
       this.warmWorld();
       this.send({
@@ -375,11 +417,11 @@ class Game {
     const wait = waits[Math.min(this.retries - 1, waits.length - 1)];
     if (this.retries > waits.length) {
       this.hud.setReconnecting(false);
-      this.hud.setStatus('connection lost — refresh to ride again');
+      this.hud.setStatus(this.tr('ui.lostForGood', 'connection lost — refresh to ride again'));
       return;
     }
     this.hud.setReconnecting(true, this.retries);
-    this.hud.setStatus(`connection lost — reconnecting (${this.retries})…`);
+    this.hud.setStatus(this.tr('ui.lost', `connection lost — reconnecting (${this.retries})…`, { n: this.retries }));
     clearTimeout(this._reconnect);
     this._reconnect = setTimeout(() => this.connect(), wait * 1000);
   }
@@ -393,7 +435,7 @@ class Game {
    * so switching means reconnecting - which also gives us a clean slate.
    */
   switchRoom(intent) {
-    if (this.inGame) { this.hud.setStatus('finish this round before changing towns'); return; }
+    if (this.inGame) { this.hud.setStatus(this.tr('ui.finishFirst', 'finish this round before changing towns')); return; }
     this.joinIntent = intent;
     // A new town means a new body; the old token belongs to the room we left.
     try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* nothing to do */ }
@@ -401,7 +443,7 @@ class Game {
     this.selfId = null;
     this.switching = true;
     if (this.ws) { try { this.ws.close(); } catch { /* already gone */ } }
-    this.hud.setStatus('riding over…');
+    this.hud.setStatus(this.tr('ui.ridingOver', 'riding over…'));
     setTimeout(() => { this.switching = false; this.connect(); }, 120);
   }
 
@@ -892,7 +934,8 @@ class Game {
 
   swapTo(slot) {
     if (!this.self.guns.includes(slot)) {
-      this.deny(`No ${WEAPONS[slot]?.name || 'gun'} on your hip.`);
+      const name = WEAPONS[slot]?.name || 'gun';
+      this.deny(['deny.noGun', `No ${name} on your hip.`], { name });
       return;
     }
     if (this.self.weapon === slot) return;
@@ -906,12 +949,12 @@ class Game {
   /** Play a card out of the hand. The server owns every rule; this just names one. */
   playCard(i) {
     const id = this.hud.hand[i];
-    if (!this.self.alive) { this.deny('Dead men play no cards.'); return; }
-    if (!id) { this.deny('Nothing left in that hand.'); return; }
+    if (!this.self.alive) { this.deny(['deny.deadNoCards', 'Dead men play no cards.']); return; }
+    if (!id) { this.deny(['deny.emptyHand', 'Nothing left in that hand.']); return; }
     // Two cards in the same breath is a rule, not a dropped keypress.
     const now = performance.now() / 1000;
     if (now - (this.lastCardAt || 0) < SOCIAL.cardCooldown) {
-      this.deny('One card at a time.');
+      this.deny(['deny.oneCard', 'One card at a time.']);
       return;
     }
     this.lastCardAt = now;
@@ -924,7 +967,7 @@ class Game {
   tryPickup() {
     const near = this.effects.nearestLoot(this.camera.position, 2.6);
     if (near) this.send({ t: C.PICKUP, id: near.id });
-    else this.deny('Nothing within reach.');
+    else this.deny(['deny.nothingNear', 'Nothing within reach.']);
   }
 
   /**
@@ -940,7 +983,9 @@ class Game {
    * none of it goes on the wire, and none of it says anything about anybody
    * else that this player did not already know.
    */
-  deny(reason) {
+  deny(spec, params = null) {
+    // A refusal arrives as [key, English] so it can be said in either language.
+    const reason = Array.isArray(spec) ? this.tr(spec[0], spec[1], params) : spec;
     // Leaning on a key should not fill the feed with the same sentence, or the
     // ear with the same beep - the second identical refusal in a second and a
     // half is not news.
@@ -956,8 +1001,10 @@ class Game {
   tryAbility() {
     if (!this.self.alive) { this.deny(DEAD_LINE); return; }
     if (this.self.cd > 0) {
-      const name = CHARACTERS[this.character]?.ability || 'That';
-      this.deny(`${name} is not ready - ${Math.ceil(this.self.cd)}s.`);
+      const c = CHARACTERS[this.character];
+      const name = this.tr(`char.${this.character}.ability`, c?.ability || 'That');
+      const n = Math.ceil(this.self.cd);
+      this.deny(['deny.notReady', `${name} is not ready - ${n}s.`], { name, n });
       return;
     }
     this.send({ t: C.ABILITY });
@@ -965,7 +1012,7 @@ class Game {
 
   tryThrow() {
     if (!this.self.alive) { this.deny(DEAD_LINE); return; }
-    if (this.self.dyn <= 0) { this.deny('No dynamite on you.'); return; }
+    if (this.self.dyn <= 0) { this.deny(['deny.noDynamite', 'No dynamite on you.']); return; }
     this.send({ t: C.THROW, dir: this.aimDir() });
     this.viewmodel.throwAnim();
   }
@@ -973,8 +1020,8 @@ class Game {
   tryBadge() {
     // canBadge rather than a role check: the server decides who may pin it on,
     // and the client should not be the second place that rule is written down.
-    if (this.self.badge) { this.deny('You are already wearing it.'); return; }
-    if (!this.selfRole?.canBadge) { this.deny('The star is not yours to pin on.'); return; }
+    if (this.self.badge) { this.deny(['deny.alreadyStar', 'You are already wearing it.']); return; }
+    if (!this.selfRole?.canBadge) { this.deny(['deny.notYourStar', 'The star is not yours to pin on.']); return; }
     this.send({ t: C.BADGE });
   }
 
@@ -982,9 +1029,13 @@ class Game {
     const now = performance.now() / 1000;
     if (!this.self.alive) { this.deny(DEAD_LINE); return; }
     const left = SOCIAL.accuseCooldown - (now - (this.lastAccuseAt || 0));
-    if (left > 0) { this.deny(`Let that one settle first - ${Math.ceil(left)}s.`); return; }
+    if (left > 0) {
+      const n = Math.ceil(left);
+      this.deny(['deny.accuseSoon', `Let that one settle first - ${n}s.`], { n });
+      return;
+    }
     const target = this.playerInCrosshair(60);
-    if (!target) { this.deny('Nobody in your sights to call out.'); return; }
+    if (!target) { this.deny(['deny.noTarget', 'Nobody in your sights to call out.']); return; }
     this.lastAccuseAt = now;
     this.send({ t: C.ACCUSE, target: target.id });
   }
@@ -1038,7 +1089,7 @@ class Game {
       // is a rule, and rules get said out loud.
       const me = this.self;
       if (me.alive && me.sprint && me.moving && me.mag > 0 && me.reloading <= 0) {
-        this.deny('Not at a dead run. Slow up to shoot.');
+        this.deny(['deny.running', 'Not at a dead run. Slow up to shoot.']);
         return;
       }
       // An empty gun reloads itself. This runs every frame while the trigger
@@ -1308,15 +1359,21 @@ function bootFailed(err) {
     const c = document.createElement('canvas');
     can3d = !!(c.getContext('webgl2') || c.getContext('webgl'));
   } catch { can3d = false; }
+  // Read straight from the browser rather than from the settings store: this
+  // runs because something already threw, and the store may be one of the
+  // things that did not survive.
+  let lang = 'en';
+  try { lang = pickLang(navigator.languages || [navigator.language]); } catch { /* English then */ }
   const why = can3d
-    ? 'The town would not build.'
-    : 'This browser cannot draw 3D graphics (WebGL).';
+    ? t(lang, 'boot.broke', 'The town would not build.')
+    : t(lang, 'boot.noWebgl', 'This browser cannot draw 3D graphics (WebGL).');
   const fix = can3d
-    ? 'Reloading is worth one try.'
-    : 'Turn on hardware acceleration in your browser\'s settings, or open the'
-      + ' game in a recent Chrome, Firefox, Edge or Safari.';
+    ? t(lang, 'boot.brokeFix', 'Reloading is worth one try.')
+    : t(lang, 'boot.noWebglFix', 'Turn on hardware acceleration in your browser\'s settings, or open the'
+      + ' game in a recent Chrome, Firefox, Edge or Safari.');
   el.className = 'failed';
-  el.innerHTML = `<div><b>NO GAME TONIGHT</b><p>${why}</p><p>${fix}</p>`
+  document.documentElement.lang = lang;
+  el.innerHTML = `<div><b>${t(lang, 'boot.title', 'NO GAME TONIGHT')}</b><p>${why}</p><p>${fix}</p>`
     + `<code>${String(err && err.message ? err.message : err).slice(0, 200)
       .replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</code></div>`;
 }
