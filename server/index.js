@@ -37,6 +37,10 @@ const ALLOW = ['client', 'shared', 'vendor'];
 
 function resolveRequest(urlPath) {
   if (urlPath === '/' || urlPath === '') return path.join(ROOT, 'client', 'index.html');
+  // A directory is served by its index.html, the way every static server does.
+  // Without this the proof sheet the README hands people - /proof/ - is a read
+  // of a directory, which fails with EISDIR and comes back looking like a 404.
+  if (urlPath.endsWith('/')) urlPath += 'index.html';
   // three.js is served straight out of node_modules so there is no build step.
   if (urlPath === '/vendor/three.module.js') {
     return path.join(ROOT, 'node_modules', 'three', 'build', 'three.module.js');
@@ -93,7 +97,16 @@ const server = http.createServer((req, res) => {
 
   const file = resolveRequest(urlPath);
   if (!file) { res.writeHead(404); res.end('not found'); return; }
+  serve(file, res, true);
+});
+
+function serve(file, res, retryAsDirectory = false) {
   fs.readFile(file, (err, data) => {
+    // A bare directory name with no trailing slash: same answer, one hop later.
+    if (err && err.code === 'EISDIR' && retryAsDirectory) {
+      serve(path.join(file, 'index.html'), res);
+      return;
+    }
     if (err) { res.writeHead(404); res.end('not found'); return; }
     res.writeHead(200, {
       'Content-Type': MIME[path.extname(file)] || 'application/octet-stream',
@@ -101,7 +114,7 @@ const server = http.createServer((req, res) => {
     });
     res.end(data);
   });
-});
+}
 
 // Nothing this protocol sends is large: chat is capped at 140 characters and
 // the biggest message is a movement packet. 8KB is generous and stops a socket

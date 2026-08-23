@@ -105,6 +105,24 @@ test('an unknown path is a plain 404, not a stack trace', async () => {
   assert.ok(!/Error|at Object|node:internal/.test(body));
 });
 
+test('the proof sheet is where the README says it is', async () => {
+  // The README hands people /proof/ and /proof/?c=witness. A directory read is
+  // an EISDIR, which came back looking exactly like a 404 - so the one page
+  // that shows what the printing press produces was unreachable by its own
+  // documented address.
+  for (const path of ['/proof/', '/proof', '/proof/index.html', '/proof/?c=witness']) {
+    const res = await fetch(BASE + path);
+    assert.equal(res.status, 200, `${path} does not answer`);
+    const html = await res.text();
+    assert.match(html, /PROOF SHEET/, `${path} answered with something else`);
+  }
+});
+
+test('a directory with no index in it is still a 404', async () => {
+  const res = await fetch(`${BASE}/js/`);
+  assert.equal(res.status, 404);
+});
+
 test('/healthz answers with the readout the deploy notes promise', async () => {
   // DEPLOY.md prints this object verbatim and the container healthcheck polls
   // it, so the shape is part of the contract rather than a debugging aid.
