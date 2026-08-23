@@ -243,7 +243,10 @@ button.wide { width: 100%; margin-top: 12px; }
   background: rgba(200,180,140,.1); border: 1px solid rgba(200,180,140,.4); cursor: pointer;
 }
 .setRow input[type="checkbox"]:checked { background: var(--gold); border-color: var(--gold); }
-.setButtons { display: flex; gap: 10px; margin-top: 20px; }
+/* Both buttons on one line each: one of them wrapping made it a head taller
+   than the other, which reads as a mistake rather than as emphasis. */
+.setButtons { display: flex; gap: 10px; margin-top: 20px; align-items: stretch; }
+.setButtons button { white-space: nowrap; }
 .cardHint.dark { color: rgba(232,217,189,.4); margin-top: 14px; }
 .cardHint.dark b { background: rgba(200,180,140,.18); color: var(--sand); }
 
@@ -587,6 +590,12 @@ td.cardCol { white-space: nowrap; }
   background: #0b0906; font-size: 13px; letter-spacing: .3em; color: rgba(232,217,189,.5);
 }
 #loading.done { opacity: 0; pointer-events: none; transition: opacity .5s; }
+/* The town could not be built. Better than a loading screen that never ends. */
+#loading.failed { letter-spacing: normal; text-align: center; padding: 24px; }
+#loading.failed div { max-width: min(520px, 90vw); }
+#loading.failed b { display: block; font-size: 15px; letter-spacing: .3em; color: var(--blood); margin-bottom: 14px; }
+#loading.failed p { margin: 0 0 10px; font-size: 13px; line-height: 1.6; color: rgba(232,217,189,.8); }
+#loading.failed code { display: block; margin-top: 16px; font-size: 11px; color: rgba(232,217,189,.4); word-break: break-word; }
 
 /* ------------------------------------------------- REDUCED MOTION
    Somebody who has told their machine that moving pictures make them ill has

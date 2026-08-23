@@ -598,6 +598,33 @@ try {
       `the button says who is waiting ("${afterReady.label}")`);
   }
 
+  // Last, in its own browser: a machine that cannot draw the town has to be
+  // told so. The socket connects in milliseconds and the renderer is what
+  // fails, so the failure used to be a loading screen that never went away and
+  // a reason in a console nobody opens.
+  const blindArgs = ['--no-sandbox', '--disable-gpu', '--disable-software-rasterizer',
+    '--disable-webgl', '--disable-webgl2'];
+  const blind = await chromium.launch(
+    launch.executablePath ? { args: blindArgs, executablePath: launch.executablePath } : { args: blindArgs },
+  );
+  try {
+    const page = await blind.newPage({ viewport: { width: 900, height: 600 } });
+    const boom = [];
+    page.on('pageerror', (e) => boom.push(String(e).slice(0, 90)));
+    await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'domcontentloaded' });
+    const said = await page.waitForFunction(
+      () => document.getElementById('loading')?.classList.contains('failed'),
+      null, { timeout: 20000 },
+    ).then(() => true).catch(() => false);
+    const told = await page.evaluate(() => document.getElementById('loading')?.textContent || '');
+    check(said && /WebGL/i.test(told),
+      `a browser that cannot draw the town is told why (${told.slice(0, 44).trim() || 'nothing at all'})`);
+    // And it fails once. The socket used to open before the renderer, so a
+    // half-built game carried on receiving a round it could not draw.
+    check(boom.length === 0, `and it fails once, not forever (${boom.join(' | ') || 'quiet'})`);
+    await page.close();
+  } finally { await blind.close(); }
+
   check(serverErrors.length === 0, `server stayed quiet${serverErrors.length ? `: ${serverErrors[0]}` : ''}`);
   check(problems.length === 0 || problems.every((p) => !p.includes('console') && !p.includes(':')), 'no page errors');
 } finally {

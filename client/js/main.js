@@ -73,11 +73,17 @@ class Game {
     this.hud = new HUD(this);
     this.audio = new GameAudio();
     this.initMenu();
-    this.connect();          // socket first: the lobby should answer immediately
-    this.initThree();        // then the expensive part
+    // Graphics before the socket. The socket used to go first, on the grounds
+    // that the lobby should answer immediately - but it is a renderer and a
+    // camera, not the town, and building those takes a couple of milliseconds.
+    // Going first meant that on a machine with no WebGL the socket was already
+    // open and delivering a round to a Game whose constructor had thrown
+    // halfway through, which turned one honest failure into a stream of them.
+    this.initThree();
     this.initInput();
     this.initSettingsPanel();
     this.applySettings(this.settings.values);
+    this.connect();
 
     this.modelsReady = false;
     modelsLoading.then(() => { this.modelsReady = true; });
@@ -299,6 +305,8 @@ class Game {
 
   showSettings(show) {
     this.settingsOpen = show;
+    // The button offered to take you back to a game you may not be in yet.
+    if (show) $('setClose').textContent = this.inGame ? 'BACK TO THE GAME' : 'BACK TO THE LOBBY';
     $('settings').classList.toggle('hidden', !show);
     if (show) document.exitPointerLock?.();
     else if (this.inGame) this.requestLock();
@@ -1276,7 +1284,39 @@ function escapeHtml(s) {
 // it. Resolves right away when client/models/characters.json names nothing.
 const modelsLoading = initCharacterModels();
 
-const game = new Game();
-game.start();
+// If the town cannot be built there is no game, and the one thing that must not
+// happen is the loading screen sitting there saying "saddling up" forever while
+// the reason is in a console the player will never open. The overwhelmingly
+// likely cause is no WebGL - an old machine, a locked-down browser, hardware
+// acceleration switched off - so say that, and say what to do about it.
+let game;
+try {
+  game = new Game();
+  game.start();
+} catch (err) {
+  console.error('[boot]', err);
+  bootFailed(err);
+}
 window.game = game;
 window.PV = PlayerView;   // handy for inspecting characters from the console
+
+function bootFailed(err) {
+  const el = document.getElementById('loading');
+  if (!el) return;
+  let can3d = false;
+  try {
+    const c = document.createElement('canvas');
+    can3d = !!(c.getContext('webgl2') || c.getContext('webgl'));
+  } catch { can3d = false; }
+  const why = can3d
+    ? 'The town would not build.'
+    : 'This browser cannot draw 3D graphics (WebGL).';
+  const fix = can3d
+    ? 'Reloading is worth one try.'
+    : 'Turn on hardware acceleration in your browser\'s settings, or open the'
+      + ' game in a recent Chrome, Firefox, Edge or Safari.';
+  el.className = 'failed';
+  el.innerHTML = `<div><b>NO GAME TONIGHT</b><p>${why}</p><p>${fix}</p>`
+    + `<code>${String(err && err.message ? err.message : err).slice(0, 200)
+      .replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</code></div>`;
+}
