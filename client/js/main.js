@@ -1186,8 +1186,10 @@ class Game {
       if (this.settings.get('showFps')) this.tickFps(t);
 
       this.renderer.render(this.scene, this.camera);
-      // No first-person gun during a killcam - you are watching, not holding one.
-      if (!this.replay) {
+      // No first-person gun during a killcam, and none once you are dead: in
+      // both cases you are watching the town rather than standing in it.
+      const holding = !this.replay && !(this.inGame && this.self && this.self.alive === false);
+      if (holding) {
         this.renderer.autoClear = false;
         this.renderer.clearDepth();
         this.renderer.render(this.vmScene, this.vmCamera);

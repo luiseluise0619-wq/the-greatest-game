@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 131 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 132 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 ```
@@ -471,7 +471,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 131 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 132 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -479,7 +479,10 @@ They are grouped by what they protect:
   nav graph is one connected town with no orphan nodes, weapons are internally
   consistent, every role table adds up, the sprint budget always recovers, the
   swap lockout is one rule rather than two, every place the brief asked the town
-  to have exists, can be stood in and reports its own name, and nothing in
+  to have exists, can be stood in and reports its own name in a sentence that
+  reads (you are *in* the Saloon, *on* Main Street and *at* the water tower, and
+  the feed used to announce that somebody had died *in just outside* the
+  Church), and nothing in
   `shared/` reaches for Node — the browser imports those four files directly, so
   one `process.env` in there breaks the whole game rather than one test.
 - **`test/match.test.js`** — roles are dealt correctly, guns are inert during
@@ -516,7 +519,10 @@ They are grouped by what they protect:
   label floating over a body you cannot see. Plus a check that every material
   the map is built out of is one the town knows how to draw — the renderer falls
   back to plain wood for an unknown tag, silently, so a missing look would not
-  show up until somebody noticed the church was made of planks.
+  show up until somebody noticed the church was made of planks. Plus a check
+  that nothing the HUD writes over the world - the phase, the head count, the
+  killcam's caption - is left as pale letters on a pale wall with neither a
+  shadow under it nor something opaque behind it.
 - **`test/rooms.test.js`** — how a socket finds a town, which is the first
   thing that happens to every player who ever arrives: codes that can be read
   aloud without being misheard and never collide, quick play filling the busiest

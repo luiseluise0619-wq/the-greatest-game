@@ -232,3 +232,40 @@ test('nothing in shared/ reaches for Node', async () => {
     }
   }
 });
+
+test('everywhere in town reads as a place a sentence can end with', async () => {
+  // The feed writes "died <place>", and zoneAt has five shapes, three of which
+  // already begin with a word of their own. Gluing "in " onto the front of all
+  // of them announced that somebody had died IN JUST OUTSIDE the Church.
+  const { zoneAt, placePhrase, ZONES, bounds } = await import('../shared/map.js')
+    .then((m) => ({ ...m, bounds: m.default.bounds }));
+
+  const STARTS = ['in ', 'on ', 'at ', 'just outside '];
+  const seen = new Set();
+  for (let x = bounds.min; x <= bounds.max; x += 3) {
+    for (let z = bounds.min; z <= bounds.max; z += 3) {
+      for (const y of [0, 6]) {
+        const place = zoneAt(x, z, y);
+        const phrase = placePhrase(place);
+        seen.add(phrase.replace(/the \w+ between .* and/, 'the X between Y and'));
+        assert.ok(STARTS.some((s) => phrase.startsWith(s)),
+          `"died ${phrase}" at ${x},${z} starts with nothing`);
+        // Two prepositions in a row is the bug this exists for.
+        assert.ok(!/^(in|on|at) (in|on|at|just) /.test(phrase),
+          `"died ${phrase}" says it twice`);
+        assert.ok(phrase.endsWith(place), `the phrase lost the place: "${phrase}" / "${place}"`);
+      }
+    }
+  }
+  assert.ok(seen.size >= 5, `only ${seen.size} kinds of place turned up: ${[...seen]}`);
+
+  // And the two zones that do not take "in" keep the word they were given.
+  assert.equal(placePhrase('Main Street'), 'on Main Street');
+  assert.equal(placePhrase('the water tower'), 'at the water tower');
+  for (const z of ZONES) {
+    assert.ok(placePhrase(z.name).endsWith(z.name), `${z.name} lost its own name`);
+  }
+  // Nothing at all is still nothing, not "in undefined".
+  assert.equal(placePhrase(undefined), '');
+  assert.equal(placePhrase(''), '');
+});

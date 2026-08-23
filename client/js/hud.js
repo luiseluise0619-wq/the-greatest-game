@@ -6,6 +6,7 @@ import {
   CHARACTERS, CHARACTER_ORDER, ROLES, VOICE_LINES, WEAPONS, PHASE, CARDS, CARD_ORDER,
 } from '../../shared/constants.js';
 import { useDefs, cardUrl } from './cardart.js';
+import { placePhrase } from '../../shared/map.js';
 
 useDefs(CARDS);
 
@@ -419,8 +420,10 @@ export class HUD {
   setDead(dead) {
     $('deadBanner').classList.toggle('hidden', !dead);
     $('crosshair').classList.toggle('hide', dead);
-    // A hand you cannot play should not look playable.
+    // A hand you cannot play should not look playable, and neither should an
+    // ammunition count for a gun you are no longer holding.
     $('handStrip').classList.toggle('spent', dead);
+    $('hud').classList.toggle('dead', dead);
   }
 
   setCrosshairSpread(px) {
@@ -482,8 +485,8 @@ export class HUD {
     let line;
     if (msg.youDied) {
       line = msg.killerName
-        ? `<b>${escapeHtml(msg.killerName)}</b> put you down in ${msg.place}.`
-        : `You died in ${msg.place}.`;
+        ? `<b>${escapeHtml(msg.killerName)}</b> put you down ${placePhrase(msg.place)}.`
+        : `You died ${placePhrase(msg.place)}.`;
     } else if (msg.youKilled) {
       line = `You killed <b>${escapeHtml(msg.victimName)}</b> — they were the ${roleTag}.`;
     } else if (msg.witnessed && msg.killerName) {
@@ -493,7 +496,7 @@ export class HUD {
     } else if (msg.cause === 'left') {
       line = `<b>${escapeHtml(msg.victimName)}</b> rode out of town — the ${roleTag}.`;
     } else {
-      line = `A shot in ${msg.place}. <b>${escapeHtml(msg.victimName)}</b> is dead — the ${roleTag}. Nobody saw who.`;
+      line = `A shot ${placePhrase(msg.place)}. <b>${escapeHtml(msg.victimName)}</b> is dead — the ${roleTag}. Nobody saw who.`;
     }
     this.addFeed(line, 'kill');
     const p = this.roster.get(msg.victim);
@@ -595,8 +598,8 @@ export class HUD {
         else if (e.cause === 'left') body = `${who} rode out`;
         else if (e.killer) {
           const kr = ROLES[e.killerRole];
-          body = `<b>${escapeHtml(e.killer)}</b> <span class="rle" style="color:${kr?.color}">${kr?.name || ''}</span> killed ${who} in ${e.place}`;
-        } else body = `${who} died in ${e.place}`;
+          body = `<b>${escapeHtml(e.killer)}</b> <span class="rle" style="color:${kr?.color}">${kr?.name || ''}</span> killed ${who} ${placePhrase(e.place)}`;
+        } else body = `${who} died ${placePhrase(e.place)}`;
         li.className = 'death';
       } else if (e.type === 'card') {
         // The payoff for every silent card in the round: the aftermath screen

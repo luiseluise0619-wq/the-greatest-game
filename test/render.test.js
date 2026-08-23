@@ -64,18 +64,22 @@ test('nothing the HUD writes over the world is left to fend for itself', async (
       rules.set(key, (rules.get(key) || '') + body);
     }
   }
-  const declaredFor = (id) => [...rules.entries()]
-    .filter(([sel]) => sel.split(/\s+/).some((part) => part === id || part.startsWith(`${id}:`)))
+  const declaredFor = (want) => [...rules.entries()]
+    .filter(([sel]) => sel === want
+      || sel.split(/\s+/).some((part) => part === want || part.startsWith(`${want}:`)))
     .map(([, body]) => body).join('');
 
   const overTheWorld = [
     '#phaseLabel', '#timer', '#standing', '#objective',
     '#weaponName', '#ammo', '#dynCount', '#healthNum',
+    // The killcam plays over the street too, and its own caption - who killed
+    // you and where - was the palest thing on the screen.
+    '.kcTop b', '.kcTop span', '.kcName', '.kcSkip',
   ];
-  for (const id of overTheWorld) {
-    const decl = declaredFor(id);
-    assert.ok(decl, `${id} is in the HUD and the stylesheet has never heard of it`);
+  for (const sel of overTheWorld) {
+    const decl = declaredFor(sel);
+    assert.ok(decl, `${sel} is in the HUD and the stylesheet has never heard of it`);
     assert.ok(/text-shadow|background/.test(decl),
-      `${id} is written straight onto the world with nothing to lift it off`);
+      `${sel} is written straight onto the world with nothing to lift it off`);
   }
 });

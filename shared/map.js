@@ -462,6 +462,11 @@ for (const [rx, rz, rw, rh, rd] of [
 
 // ---------------------------------------------------------------------------
 // ZONES - kill-feed location hints ("...someone died near the stable").
+//
+// `prep` is the word that goes in front of the name in a sentence, because the
+// feed says "died <somewhere>" and English does not use one preposition for
+// every place: you are IN the Saloon, ON Main Street and AT the water tower.
+// Defaults to "in", which is right for most of this town.
 // ---------------------------------------------------------------------------
 export const ZONES = [
   { name: 'the Saloon', x0: -33, z0: -27, x1: -11, z1: -7 },
@@ -471,9 +476,9 @@ export const ZONES = [
   { name: 'the Stable', x0: -41, z0: 7, x1: -21, z1: 23 },
   { name: 'the Church', x0: -9, z0: 10, x1: 9, z1: 30 },
   { name: 'the Cemetery', x0: 13, z0: 9, x1: 37, z1: 27 },
-  { name: 'Main Street', x0: -42, z0: -7, x1: 33, z1: 7 },
+  { name: 'Main Street', prep: 'on', x0: -42, z0: -7, x1: 33, z1: 7 },
   { name: 'the back alleys', x0: -36, z0: -35, x1: 30, z1: -25 },
-  { name: 'the water tower', x0: -53, z0: -6, x1: -40, z1: 4 },
+  { name: 'the water tower', prep: 'at', x0: -53, z0: -6, x1: -40, z1: 4 },
 ];
 
 export function zoneAt(x, z, y = 0) {
@@ -492,6 +497,26 @@ export function zoneAt(x, z, y = 0) {
   if (nearest && nearestD < 16) return `just outside ${nearest.name}`;
   if (nearest && nearestD < 34) return `the ground between ${nearest.name} and the flats`;
   return 'the desert outskirts';
+}
+
+/**
+ * A place, as it reads after a verb: "died <this>", "a shot <this>".
+ *
+ * zoneAt returns the place itself, because that is what goes on the wire and
+ * into the playtest log, and "just outside the Church" is a place rather than a
+ * phrase. But four things in the HUD write it into a sentence, and three of the
+ * five shapes zoneAt can produce already begin with their own preposition -
+ * which is how the feed came to announce that somebody had died IN JUST OUTSIDE
+ * the Church.
+ */
+export function placePhrase(place) {
+  const p = String(place || '');
+  if (!p) return '';
+  if (p.startsWith('just outside ')) return p;                    // already a phrase
+  if (p.startsWith('the rooftops above ')) return `on ${p}`;
+  if (p.startsWith('the ground between ')) return `on ${p}`;
+  const zone = ZONES.find((z) => z.name === p);
+  return `${zone?.prep || 'in'} ${p}`;
 }
 
 // ---------------------------------------------------------------------------
