@@ -234,6 +234,38 @@ try {
     .filter((i) => i.dataset.face && i.src !== i.dataset.face).length);
   check(faceUpStill === 0, 'the hand is still face up with the deal animation off');
 
+  // And nothing in the HUD may be written straight onto the world with nothing
+  // to lift it off it. Half of this town is sunlit adobe: pale letters on a
+  // pale wall are not letters. Either a shadow under it or something opaque
+  // behind it - this is the general form of a bug the topbar, the killcam
+  // caption and the ability dial's key each had separately.
+  const bare = await A.evaluate(() => {
+    const alpha = (c) => {
+      const m = /rgba?\(([^)]+)\)/.exec(c);
+      if (!m) return 0;
+      const parts = m[1].split(',').map(Number);
+      return parts.length > 3 ? parts[3] : 1;
+    };
+    const backed = (el) => {
+      for (let n = el; n && n.id !== 'hud'; n = n.parentElement) {
+        if (alpha(getComputedStyle(n).backgroundColor) >= 0.5) return true;
+      }
+      return false;
+    };
+    const out = [];
+    for (const el of document.querySelectorAll('#hud *')) {
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') continue;
+      // Only elements with words of their own; a wrapper inherits nothing.
+      if (![...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) continue;
+      if (cs.textShadow !== 'none' || backed(el)) continue;
+      out.push(`${el.tagName}${el.id ? `#${el.id}` : ''}`);
+    }
+    return out;
+  });
+  check(bare.length === 0,
+    `every word the HUD puts over the town is readable on a bright wall${bare.length ? `: ${bare.join(', ')}` : ''}`);
+
   // Nothing in the HUD may run off the edge of the window. The hand is the one
   // deliberate exception - the cards are tucked into the bottom edge like cards
   // held in a hand - and it says so in the stylesheet.

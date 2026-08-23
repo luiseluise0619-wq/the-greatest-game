@@ -81,6 +81,7 @@ html, body {
    timer, the ammo count, the feed - already carry a shadow; these are the ones
    that were left to take their chances against a bright wall. */
 #phaseLabel, #standing, #objective, #weaponName, #dynCount,
+#abilityName, #abilityKey,
 .kcTop b, .kcTop span, .kcSkip {
   text-shadow: 0 1px 3px rgba(0, 0, 0, .9), 0 0 9px rgba(0, 0, 0, .55);
 }
@@ -153,7 +154,7 @@ html, body {
 #abilityWrap.ready #cdRing .fg { stroke: var(--gold); }
 #abilityWrap.active #cdRing .bg { fill: rgba(232,193,90,.25); }
 #abilityName { position: absolute; left: 0; right: 0; top: 20px; font-size: 8.5px; letter-spacing: .08em; line-height: 1.15; color: rgba(232,217,189,.85); }
-#abilityKey { position: absolute; left: 0; right: 0; bottom: -16px; font-size: 10px; color: rgba(232,217,189,.45); }
+#abilityKey { position: absolute; left: 0; right: 0; bottom: -16px; font-size: 10px; color: rgba(232,217,189,.6); }
 
 #interactPrompt {
   position: absolute; left: 50%; top: 56%; transform: translateX(-50%);
