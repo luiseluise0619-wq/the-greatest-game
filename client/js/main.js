@@ -103,11 +103,14 @@ class Game {
     this.vmScene = new THREE.Scene();
     this.vmCamera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.01, 12);
     this.vmScene.add(this.vmCamera);
-    this.vmScene.add(new THREE.AmbientLight(0xffe8cc, 2.0));
-    const vmKey = new THREE.DirectionalLight(0xfff0d8, 2.6);
+    // Lit to roughly the same budget as the street outside. It used to carry
+    // five and a half units of light between three lamps, which pushed blued
+    // steel and walnut past white and handed the player a gun made of chalk.
+    this.vmScene.add(new THREE.AmbientLight(0xffe8cc, 0.5));
+    const vmKey = new THREE.DirectionalLight(0xfff0d8, 1.7);
     vmKey.position.set(1.4, 1.8, 1.2);       // lights the side the player sees
     this.vmScene.add(vmKey);
-    const vmFill = new THREE.DirectionalLight(0xbcd2ee, 0.9);
+    const vmFill = new THREE.DirectionalLight(0xbcd2ee, 0.45);
     vmFill.position.set(-1.2, 0.6, -0.8);
     this.vmScene.add(vmFill);
     this.viewmodel = new ViewModel(this.vmCamera);

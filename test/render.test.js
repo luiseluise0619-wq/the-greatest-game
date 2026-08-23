@@ -45,3 +45,37 @@ test('every material the map asks for is one the town knows how to draw', async 
     assert.ok(used.has(tag), `nothing in the town is made of "${tag}"`);
   }
 });
+
+test('nothing the HUD writes over the world is left to fend for itself', async () => {
+  // Every one of these sits on top of the game, and half this town is sunlit
+  // adobe. A pale letter on a pale wall is unreadable, so each needs either a
+  // shadow under it or something opaque behind it. This is a real thing that
+  // happened: the phase, the head count, the objective line and the weapon
+  // name were the four that had neither.
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../client/css/style.css', import.meta.url), 'utf8');
+
+  // Selector -> the declarations of every rule that names it, joined.
+  const rules = new Map();
+  for (const [, sel, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    for (const one of sel.split(',')) {
+      const key = one.trim();
+      if (!key) continue;
+      rules.set(key, (rules.get(key) || '') + body);
+    }
+  }
+  const declaredFor = (id) => [...rules.entries()]
+    .filter(([sel]) => sel.split(/\s+/).some((part) => part === id || part.startsWith(`${id}:`)))
+    .map(([, body]) => body).join('');
+
+  const overTheWorld = [
+    '#phaseLabel', '#timer', '#standing', '#objective',
+    '#weaponName', '#ammo', '#dynCount', '#healthNum',
+  ];
+  for (const id of overTheWorld) {
+    const decl = declaredFor(id);
+    assert.ok(decl, `${id} is in the HUD and the stylesheet has never heard of it`);
+    assert.ok(/text-shadow|background/.test(decl),
+      `${id} is written straight onto the world with nothing to lift it off`);
+  }
+});

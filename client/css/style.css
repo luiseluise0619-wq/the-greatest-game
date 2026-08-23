@@ -76,19 +76,26 @@ html, body {
 @keyframes fadeArrow { to { opacity: 0; } }
 
 #topbar { position: absolute; top: 14px; left: 0; right: 0; text-align: center; }
-#phaseLabel { font-size: 11px; letter-spacing: .34em; color: rgba(232,217,189,.62); }
+/* Every one of these sits on top of whatever the player happens to be looking
+   at, and half of this town is sunlit adobe. Their louder neighbours - the
+   timer, the ammo count, the feed - already carry a shadow; these are the ones
+   that were left to take their chances against a bright wall. */
+#phaseLabel, #standing, #objective, #weaponName, #dynCount {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .9), 0 0 9px rgba(0, 0, 0, .55);
+}
+#phaseLabel { font-size: 11px; letter-spacing: .34em; color: rgba(232,217,189,.72); }
 #timer { font-size: 26px; letter-spacing: .06em; text-shadow: 0 2px 6px rgba(0,0,0,.8); margin-top: 2px; }
 /* How many are left is the single number a hidden-role game turns on, and it
    was being sent every tick and shown nowhere. */
-#standing { font-size: 10.5px; letter-spacing: .22em; color: rgba(232,217,189,.5); margin-top: 1px; }
+#standing { font-size: 10.5px; letter-spacing: .22em; color: rgba(232,217,189,.66); margin-top: 1px; }
 #standing b { font-weight: normal; color: var(--sand); }
 #standing.dropped { animation: standingDrop 1.4s ease-out; }
 @keyframes standingDrop {
   0% { color: var(--rust); transform: scale(1.16); }
-  100% { color: rgba(232,217,189,.5); transform: scale(1); }
+  100% { color: rgba(232,217,189,.66); transform: scale(1); }
 }
 #timer.urgent { color: #e08b6a; }
-#objective { font-size: 11.5px; letter-spacing: .1em; color: rgba(232,217,189,.5); margin-top: 3px; }
+#objective { font-size: 11.5px; letter-spacing: .1em; color: rgba(232,217,189,.68); margin-top: 3px; }
 
 #feed { position: absolute; top: 14px; right: 18px; width: 340px; text-align: right; }
 .feedLine {
@@ -131,7 +138,7 @@ html, body {
 
 #bottomRight { position: absolute; right: 22px; bottom: 20px; display: flex; align-items: flex-end; gap: 20px; }
 #ammoWrap { text-align: right; }
-#weaponName { font-size: 11px; letter-spacing: .26em; color: rgba(232,217,189,.6); }
+#weaponName { font-size: 11px; letter-spacing: .26em; color: rgba(232,217,189,.72); }
 #ammo { font-size: 30px; line-height: 1.1; text-shadow: 0 2px 6px rgba(0,0,0,.9); }
 #ammo span { font-size: 15px; color: rgba(232,217,189,.55); margin-left: 4px; }
 #ammo.empty b { color: var(--rust); }
