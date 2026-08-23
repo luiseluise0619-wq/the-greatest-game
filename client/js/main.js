@@ -8,10 +8,14 @@ import * as THREE from 'three';
 import MAP from '../../shared/map.js';
 import { moveAndCollide } from '../../shared/collision.js';
 import {
-  PLAYER, WEAPONS, BUFF_VALUES, PHASE, VOICE_LINES, ENDGAME, REPLAY, CARD_ORDER, INPUT_RATE, SOCIAL,
+  PLAYER, WEAPONS, CHARACTERS, BUFF_VALUES, PHASE, VOICE_LINES, ENDGAME, REPLAY, CARD_ORDER,
+  INPUT_RATE, SOCIAL,
   clamp, stepStamina, canSprint, swapTime,
 } from '../../shared/constants.js';
 import { C, S } from '../../shared/protocol.js';
+
+// Said often enough to be worth saying the same way every time.
+const DEAD_LINE = 'You are dead. Watch, and listen.';
 import { buildWorld, animateWorld } from './world.js';
 import { PlayerView } from './players.js';
 import { Effects } from './effects.js';
@@ -879,7 +883,10 @@ class Game {
   }
 
   swapTo(slot) {
-    if (!this.self.guns.includes(slot)) { this.audio.deny(); return; }
+    if (!this.self.guns.includes(slot)) {
+      this.deny(`No ${WEAPONS[slot]?.name || 'gun'} on your hip.`);
+      return;
+    }
     if (this.self.weapon === slot) return;
     // Start the lockout here rather than waiting for the server to say so.
     // Without it the first clicks after a swap fired locally - flash, bang, a
@@ -891,10 +898,14 @@ class Game {
   /** Play a card out of the hand. The server owns every rule; this just names one. */
   playCard(i) {
     const id = this.hud.hand[i];
-    if (!id || !this.self.alive) { this.audio.deny(); return; }
+    if (!this.self.alive) { this.deny('Dead men play no cards.'); return; }
+    if (!id) { this.deny('Nothing left in that hand.'); return; }
     // Two cards in the same breath is a rule, not a dropped keypress.
     const now = performance.now() / 1000;
-    if (now - (this.lastCardAt || 0) < SOCIAL.cardCooldown) { this.audio.deny(); return; }
+    if (now - (this.lastCardAt || 0) < SOCIAL.cardCooldown) {
+      this.deny('One card at a time.');
+      return;
+    }
     this.lastCardAt = now;
     // No sound for the play itself yet: the server may refuse it (a Wanted
     // Poster with nobody in the crosshair), and the flick belongs to the card
@@ -905,20 +916,48 @@ class Game {
   tryPickup() {
     const near = this.effects.nearestLoot(this.camera.position, 2.6);
     if (near) this.send({ t: C.PICKUP, id: near.id });
-    else this.audio.deny();
+    else this.deny('Nothing within reach.');
   }
 
   /**
    * The cooldown ring is on screen, but a key that does nothing and makes no
    * sound reads as a dropped input rather than a rule.
    */
+  /**
+   * A refusal the player can act on. The sound says no; the line says why.
+   *
+   * A beep on its own reads as a dropped keypress. Every one of these is a rule
+   * the player has not learned yet, and the whole game is about working things
+   * out, so it may as well start with its own controls. Local to this client -
+   * none of it goes on the wire, and none of it says anything about anybody
+   * else that this player did not already know.
+   */
+  deny(reason) {
+    // Leaning on a key should not fill the feed with the same sentence, or the
+    // ear with the same beep - the second identical refusal in a second and a
+    // half is not news.
+    const t = performance.now() / 1000;
+    if (reason && this.lastDenyText === reason && t - (this.lastDenyAt || 0) < 1.6) return;
+    this.audio.deny();
+    if (!reason) return;
+    this.lastDenyText = reason;
+    this.lastDenyAt = t;
+    this.hud.addFeed(reason, 'bad');
+  }
+
   tryAbility() {
-    if (!this.self.alive || this.self.cd > 0) { this.audio.deny(); return; }
+    if (!this.self.alive) { this.deny(DEAD_LINE); return; }
+    if (this.self.cd > 0) {
+      const name = CHARACTERS[this.character]?.ability || 'That';
+      this.deny(`${name} is not ready - ${Math.ceil(this.self.cd)}s.`);
+      return;
+    }
     this.send({ t: C.ABILITY });
   }
 
   tryThrow() {
-    if (this.self.dyn <= 0) { this.audio.deny(); return; }
+    if (!this.self.alive) { this.deny(DEAD_LINE); return; }
+    if (this.self.dyn <= 0) { this.deny('No dynamite on you.'); return; }
     this.send({ t: C.THROW, dir: this.aimDir() });
     this.viewmodel.throwAnim();
   }
@@ -926,17 +965,18 @@ class Game {
   tryBadge() {
     // canBadge rather than a role check: the server decides who may pin it on,
     // and the client should not be the second place that rule is written down.
-    if (!this.selfRole?.canBadge || this.self.badge) { this.audio.deny(); return; }
+    if (this.self.badge) { this.deny('You are already wearing it.'); return; }
+    if (!this.selfRole?.canBadge) { this.deny('The star is not yours to pin on.'); return; }
     this.send({ t: C.BADGE });
   }
 
   tryAccuse() {
     const now = performance.now() / 1000;
+    if (!this.self.alive) { this.deny(DEAD_LINE); return; }
+    const left = SOCIAL.accuseCooldown - (now - (this.lastAccuseAt || 0));
+    if (left > 0) { this.deny(`Let that one settle first - ${Math.ceil(left)}s.`); return; }
     const target = this.playerInCrosshair(60);
-    if (!target || !this.self.alive || now - (this.lastAccuseAt || 0) < SOCIAL.accuseCooldown) {
-      this.audio.deny();
-      return;
-    }
+    if (!target) { this.deny('Nobody in your sights to call out.'); return; }
     this.lastAccuseAt = now;
     this.send({ t: C.ACCUSE, target: target.id });
   }
@@ -984,6 +1024,15 @@ class Game {
   tryFire() {
     const now = performance.now() / 1000;
     if (!this.canFireLocally()) {
+      // Of the four things that stop a trigger, three announce themselves: an
+      // empty magazine reloads, a reload has its own bar, and the gap between
+      // shots is the gun's own rhythm. Not being able to shoot while running
+      // is a rule, and rules get said out loud.
+      const me = this.self;
+      if (me.alive && me.sprint && me.moving && me.mag > 0 && me.reloading <= 0) {
+        this.deny('Not at a dead run. Slow up to shoot.');
+        return;
+      }
       // An empty gun reloads itself. This runs every frame while the trigger
       // is held, and the server needs a round trip to answer, so ask once and
       // then wait for it rather than shouting sixty times a second.

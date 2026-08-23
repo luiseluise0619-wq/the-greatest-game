@@ -159,10 +159,13 @@ try {
   });
   check(churn && churn.grew === 0, `loot churn allocates nothing (${churn ? `+${churn.grew} geometries` : 'no loot'})`);
 
-  // Every key that can do nothing has to say so. A silent no-op reads as a
-  // dropped input rather than a rule the player has not learned yet.
+  // Every key that can do nothing has to say so, and say why. A silent no-op
+  // reads as a dropped input rather than a rule the player has not learned
+  // yet - and a beep on its own says no without saying which rule.
   const denials = await A.evaluate(async () => {
     const g = window.game;
+    const feed = () => [...document.querySelectorAll('#feed .feedLine')].map((e) => e.textContent);
+    const feedBefore = feed().length;
     let denied = 0;
     const realDeny = g.audio.deny.bind(g.audio);
     g.audio.deny = () => { denied += 1; realDeny(); };
@@ -187,10 +190,13 @@ try {
     g.send = realSend;
     g.self.cd = 0;
     g.lastCardAt = 0;
-    return { denied, abilityQuiet, throwQuiet, cardQuiet };
+    const said = feed().slice(feedBefore);
+    return { denied, abilityQuiet, throwQuiet, cardQuiet, said };
   });
   check(denials.abilityQuiet && denials.throwQuiet && denials.cardQuiet && denials.denied === 3,
     `keys that cannot fire say so instead of nothing (${denials.denied}/3 refused out loud)`);
+  check(denials.said.length === 3 && denials.said.every((line) => line.trim().length > 8),
+    `and each of them says which rule (${denials.said.map((l) => `"${l}"`).join(' ') || 'nothing'})`);
 
   // A browser that has been told to reduce motion is telling us something
   // about the person in front of it. The gun still fires; the view just stops

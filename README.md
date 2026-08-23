@@ -382,6 +382,12 @@ agendas:
 
 ## Settings
 
+Every key that can do nothing says why. Pressing `Q` on cooldown, `G` with no
+dynamite, `2` with no coach gun on your hip, `B` when the star is not yours, or
+the trigger at a dead run all put one line in the feed naming the rule, rather
+than a beep that reads as a dropped keypress. None of it goes on the wire and
+none of it says anything about anybody else.
+
 `Esc` (or **SETTINGS** in the lobby) opens mouse sensitivity, invert-Y, field of
 view, volume, mute and a frame-rate readout. It is kept in `localStorage` and
 nothing goes on the wire — the server has no opinion about anybody's
