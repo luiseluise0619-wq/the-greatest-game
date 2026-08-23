@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { WEAPONS } from '../../shared/constants.js';
+import { motionScale } from './settings.js';
 
 const STEEL = 0x7d7266;
 const DARKSTEEL = 0x534b42;
@@ -165,15 +166,18 @@ export class ViewModel {
   update(dt, opts) {
     const { moving = false, sprinting = false, grounded = true, ads = false, speed = 0 } = opts;
 
-    // Bob
+    // Bob. Damped right down for anybody whose browser says moving pictures
+    // are a problem - the gun still reacts, it just stops walking about.
+    const m = motionScale(0.2);
     this.bob += dt * (sprinting ? 13 : 8.5) * (moving && grounded ? 1 : 0);
-    const bobAmt = moving && grounded ? (sprinting ? 0.022 : 0.012) : 0;
+    const bobAmt = (moving && grounded ? (sprinting ? 0.022 : 0.012) : 0) * m;
     const bx = Math.cos(this.bob) * bobAmt;
     const by = Math.abs(Math.sin(this.bob)) * bobAmt * 0.8;
 
     // Sway lag
     this.swayTarget.multiplyScalar(1 - Math.min(1, dt * 6));
     this.sway.lerp(this.swayTarget, Math.min(1, dt * 12));
+    if (m < 1) this.sway.multiplyScalar(m);
 
     // ADS blend (rifle only)
     const wantAds = ads && WEAPONS[this.current]?.ads ? 1 : 0;

@@ -26,6 +26,17 @@ export const DEFAULTS = {
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
+// The one preference here that is not ours to store, because the browser
+// already knows it. Somebody who has told their machine that moving pictures
+// make them ill has said it once and should not have to say it again in a
+// settings panel. Read live rather than cached: the answer can change while
+// the page is open, and a round runs for eleven minutes.
+const REDUCE = typeof matchMedia === 'function'
+  ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+export function reduceMotion() { return !!REDUCE?.matches; }
+/** How much of a decorative movement to keep. */
+export function motionScale(floor = 0.25) { return reduceMotion() ? floor : 1; }
+
 /** Coerce anything that came out of storage into a settings object we trust. */
 export function sanitise(raw) {
   const s = { ...DEFAULTS };

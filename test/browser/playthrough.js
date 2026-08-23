@@ -192,6 +192,48 @@ try {
   check(denials.abilityQuiet && denials.throwQuiet && denials.cardQuiet && denials.denied === 3,
     `keys that cannot fire say so instead of nothing (${denials.denied}/3 refused out loud)`);
 
+  // A browser that has been told to reduce motion is telling us something
+  // about the person in front of it. The gun still fires; the view just stops
+  // being thrown around to celebrate it.
+  const kickOf = async () => A.evaluate(() => {
+    const g = window.game;
+    g.self.guns = ['revolver'];
+    g.self.weapon = 'revolver';
+    g.self.mag = 6;
+    g.self.nextFireAt = 0;
+    g.self.swapUntil = 0;
+    g.self.buffs = [];
+    g.recoilKick = 0;
+    g.wantFire = true;
+    g.tryFire();
+    g.wantFire = false;
+    return g.recoilKick;
+  });
+  const kickNormal = await kickOf();
+  await A.emulateMedia({ reducedMotion: 'reduce' });
+  const kickReduced = await kickOf();
+  const quiet = await A.evaluate(() => {
+    const probe = document.createElement('div');
+    probe.className = 'dmgArrow';
+    document.getElementById('damageDirs').appendChild(probe);
+    const arrow = getComputedStyle(probe).display;
+    probe.remove();
+    const strip = document.getElementById('handStrip');
+    strip.classList.add('dealt');
+    const chip = strip.querySelector('.cardChip');
+    const anim = chip ? getComputedStyle(chip).animationName : 'none';
+    strip.classList.remove('dealt');
+    return { arrow, anim };
+  });
+  await A.emulateMedia({ reducedMotion: null });
+  check(kickNormal > 0 && kickReduced > 0 && kickReduced < kickNormal * 0.5,
+    `reducing motion quiets the recoil without removing it (${kickNormal.toFixed(4)} -> ${kickReduced.toFixed(4)})`);
+  check(quiet.arrow === 'none' && quiet.anim === 'none',
+    `and stops the decoration moving (arrow ${quiet.arrow}, deal ${quiet.anim})`);
+  const faceUpStill = await A.evaluate(() => [...document.querySelectorAll('#handStrip .cardChip img')]
+    .filter((i) => i.dataset.face && i.src !== i.dataset.face).length);
+  check(faceUpStill === 0, 'the hand is still face up with the deal animation off');
+
   // Nothing in the HUD may run off the edge of the window. The hand is the one
   // deliberate exception - the cards are tucked into the bottom edge like cards
   // held in a hand - and it says so in the stylesheet.

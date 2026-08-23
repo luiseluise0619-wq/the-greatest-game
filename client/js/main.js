@@ -20,7 +20,7 @@ import { GameAudio } from './audio.js';
 import { HUD } from './hud.js';
 import { initCharacterModels } from './charmodels.js';
 import { cardUrl } from './cardart.js';
-import { Settings, LIMITS } from './settings.js';
+import { Settings, LIMITS, motionScale } from './settings.js';
 
 const $ = (id) => document.getElementById(id);
 const INTERP_DELAY = 0.1;
@@ -1011,7 +1011,10 @@ class Game {
     this.viewmodel.kick(s.weapon);
     this.worldFlash.intensity = 7;
     this.audio.gunshot(s.weapon, this.self.pos);
-    this.recoilKick = (this.recoilKick || 0) + w.recoil * 0.0032;
+    // The camera itself does not bob in this game; the only thing that moves
+    // the view without the player asking is the kick, so that is what gets
+    // damped when the browser says to reduce motion.
+    this.recoilKick = (this.recoilKick || 0) + w.recoil * 0.0032 * motionScale(0.25);
     this.hud.setSelf({ ...this.lastSelfMsg, stam: s.stamina, mag: s.mag, reserve: s.reserve, hp: s.hp, maxHp: s.maxHp, weapon: s.weapon, guns: s.guns, dyn: s.dyn, cd: s.cd, cdMax: s.cdMax, active: s.active, armour: s.armour || 0, reloading: 0, badge: s.badge, buffs: s.buffs });
   }
 

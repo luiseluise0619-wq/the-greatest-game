@@ -583,3 +583,32 @@ td.cardCol { white-space: nowrap; }
   background: #0b0906; font-size: 13px; letter-spacing: .3em; color: rgba(232,217,189,.5);
 }
 #loading.done { opacity: 0; pointer-events: none; transition: opacity .5s; }
+
+/* ------------------------------------------------- REDUCED MOTION
+   Somebody who has told their machine that moving pictures make them ill has
+   said it once, and should not have to say it again in a settings panel. The
+   gun stops bobbing and the view stops kicking in JS; here, everything that
+   moves for effect rather than to say something stops moving.
+
+   Deliberately not switched off: the fade that hides the hand for the
+   aftermath, and the loading screen's own fade. Both of those END somewhere,
+   and something has to get there. Every animation below is decoration whose
+   finished state is where the element already was - the card flip is driven by
+   a timer swapping the image, not by the animation, so the hand still turns
+   face up with all of this off. */
+@media (prefers-reduced-motion: reduce) {
+  #hitmarker.show,
+  #standing.dropped,
+  .feedLine,
+  #netBanner,
+  button.counting,
+  #handStrip.dealt .cardChip,
+  #handStrip.dealt .cardChip .flip,
+  #cardPlay.go {
+    animation: none !important;
+  }
+  /* The damage arrows exist only to fade; without the animation they would
+     never leave the screen, so they simply do not arrive. */
+  .dmgArrow { display: none; }
+  .cardChip { transition: none; }
+}

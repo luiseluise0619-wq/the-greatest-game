@@ -388,6 +388,14 @@ nothing goes on the wire — the server has no opinion about anybody's
 sensitivity. Every read and write is guarded, so a private window or a browser
 with site data blocked falls back to the defaults instead of failing to start.
 
+One preference is not in that panel, because the browser already knows it. If
+the machine is set to **reduce motion**, the gun stops bobbing, the view stops
+kicking when you fire, and everything that animates for effect rather than to
+say something stops animating. Somebody who has told their operating system
+that moving pictures make them ill has said it once already. The field of view
+slider is the other half of that: it goes down to 65 for anybody who finds a
+wide one uncomfortable.
+
 ---
 
 ## Controls
