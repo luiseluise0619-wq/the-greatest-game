@@ -390,12 +390,23 @@ button.big { width: 100%; padding: 14px; font-size: 15px; letter-spacing: .22em;
 
 /* ------------------------------------------------------------ VOICE/CHAT */
 #voiceWheel { pointer-events: none; }
-#voiceInner { position: relative; width: 420px; height: 420px; }
+/* An ellipse, not a circle, and every tile centred on its own box rather than
+   on a guess at how tall it is. Eight tiles 168px wide will not fit around a
+   circle small enough to read comfortably: the ones at the top and bottom sat
+   on their neighbours, and a line that wrapped to three was covered by the tile
+   drawn after it. Nobody can pick a line they cannot read. */
+#voiceInner { position: relative; width: 700px; height: 430px; }
 .voiceOpt {
-  position: absolute; width: 160px; margin: -18px 0 0 -80px; text-align: center;
-  font-size: 11.5px; padding: 6px 8px; background: rgba(20,15,11,.9);
+  position: absolute; width: 168px; transform: translate(-50%, -50%);
+  text-align: center;
+  font-size: 11.5px; padding: 6px 8px; background: rgba(20,15,11,.92);
   border: 1px solid rgba(200,180,140,.3); line-height: 1.35;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
 }
+/* The wheel is the widest thing this HUD ever puts on screen; shrink it whole
+   rather than let it run off the sides of a small window. */
+@media (max-width: 740px) { #voiceInner { transform: scale(.82); } }
+@media (max-width: 620px) { #voiceInner { transform: scale(.66); } }
 .voiceOpt b { display: block; color: var(--gold); font-size: 10px; letter-spacing: .16em; }
 
 #chatInputWrap {

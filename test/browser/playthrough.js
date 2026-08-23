@@ -192,6 +192,37 @@ try {
   check(denials.abilityQuiet && denials.throwQuiet && denials.cardQuiet && denials.denied === 3,
     `keys that cannot fire say so instead of nothing (${denials.denied}/3 refused out loud)`);
 
+  // The shout wheel is eight tiles of prose laid out around a ring, and the
+  // only way to say any of it is to read one and press its number. Tiles that
+  // sit on each other, or run off the side of the window, are tiles nobody can
+  // pick - so this measures them rather than trusting the arithmetic.
+  await A.keyboard.down('KeyV');
+  await A.waitForTimeout(350);
+  const wheel = await A.evaluate(() => {
+    const open = !document.getElementById('voiceWheel').classList.contains('hidden');
+    const tiles = [...document.querySelectorAll('.voiceOpt')].map((e) => {
+      const r = e.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height, text: e.textContent.trim() };
+    });
+    let overlaps = 0;
+    for (let i = 0; i < tiles.length; i++) {
+      for (let j = i + 1; j < tiles.length; j++) {
+        const a = tiles[i], b = tiles[j];
+        if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) overlaps++;
+      }
+    }
+    const off = tiles.filter((t) => t.x < 0 || t.y < 0
+      || t.x + t.w > innerWidth || t.y + t.h > innerHeight).length;
+    return { open, count: tiles.length, overlaps, off };
+  });
+  await A.keyboard.up('KeyV');
+  check(wheel.open && wheel.count === 8, `the shout wheel opens with every line on it (${wheel.count})`);
+  check(wheel.overlaps === 0, `no shout sits on top of another (${wheel.overlaps} overlapping)`);
+  check(wheel.off === 0, `every shout is on the screen to be read (${wheel.off} off it)`);
+  const wheelShut = await A.evaluate(
+    () => document.getElementById('voiceWheel').classList.contains('hidden'));
+  check(wheelShut, 'letting go of the key puts the wheel away');
+
   // Swapping a weapon has to lock the trigger on the client too, or the first
   // clicks after a swap flash and bang and the server drops every one of them.
   const swap = await A.evaluate(async () => {

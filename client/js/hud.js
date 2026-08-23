@@ -98,8 +98,10 @@ export class HUD {
       const a = (i / VOICE_LINES.length) * Math.PI * 2 - Math.PI / 2;
       const el = document.createElement('div');
       el.className = 'voiceOpt';
-      el.style.left = `${210 + Math.cos(a) * 150}px`;
-      el.style.top = `${210 + Math.sin(a) * 150}px`;
+      // Wider than it is tall: the tiles are wide and the ones that end up at
+      // the top and bottom of the ring are the ones that collide.
+      el.style.left = `${350 + Math.cos(a) * 250}px`;
+      el.style.top = `${215 + Math.sin(a) * 175}px`;
       el.innerHTML = `<b>${i + 1}</b>${line.text}`;
       inner.appendChild(el);
     });
