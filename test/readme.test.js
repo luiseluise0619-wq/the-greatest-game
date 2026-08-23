@@ -57,11 +57,35 @@ test('every card and character the game has is written up', () => {
   }
 });
 
-test('the test count in the README is not a fossil', async () => {
-  // Two places quote it, and they have to agree with each other at minimum.
+test('the test count in the README is the number of tests there are', async () => {
+  // Two places quote it. They have to agree with each other, and with the
+  // suite - a count that only agrees with itself is how it became a fossil the
+  // first time.
   const counts = [...README.matchAll(/(\d+) checks|runs (\d+) checks/g)]
     .map((m) => Number(m[1] || m[2]));
   assert.ok(counts.length >= 2, 'the README stopped saying how many checks there are');
   assert.equal(new Set(counts).size, 1,
     `the README quotes different test counts in different places: ${counts.join(' and ')}`);
+
+  const { readdir } = await import('node:fs/promises');
+  const dir = new URL('./', import.meta.url);
+  const files = (await readdir(dir)).filter((f) => f.endsWith('.test.js'));
+  let real = 0;
+  for (const f of files) {
+    const src = await readFile(new URL(f, dir), 'utf8');
+    real += (src.match(/^test\(/gm) || []).length;
+  }
+  assert.equal(counts[0], real,
+    `the README says ${counts[0]} checks and there are ${real} across ${files.length} files`);
+});
+
+test('every test file is written up in the README', () => {
+  // The list of what each file protects is the map people read before they go
+  // looking. A file nobody mentions is a file nobody knows to look in.
+  return import('node:fs/promises').then(async ({ readdir }) => {
+    const dir = new URL('./', import.meta.url);
+    for (const f of (await readdir(dir)).filter((x) => x.endsWith('.test.js'))) {
+      assert.ok(README.includes(`test/${f}`), `the README never mentions test/${f}`);
+    }
+  });
 });

@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 113 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 131 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 ```
@@ -463,7 +463,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 113 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 131 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -542,6 +542,23 @@ They are grouped by what they protect:
 - **`test/ratelimit.test.js`** — the socket token bucket: a burst gets through,
   a flood does not, an idle socket cannot save up more than one burst, and a
   stream at exactly the limit is never refused.
+- **`test/fuzz.test.js`** — every shape of message a socket can send that a real
+  client never would: numbers where objects go, `NaN` and `Infinity` where
+  coordinates go, five-thousand-character strings, `__proto__` as a card name.
+  None of it may throw — the process would survive, but a message that throws
+  halfway through a kill leaves the round in a state nobody designed — and none
+  of it may leave a player somewhere that is not a place or holding something
+  that is not a card. The room then runs another twenty seconds to prove it. A
+  socket that never joined can do nothing at all, and one that joins twenty
+  times collects one body.
+- **`test/http.test.js`** — the front door, and the only test that asks the real
+  server for anything. There is no build step, so a module served with the wrong
+  content type is a black screen rather than a warning; and the handler that
+  serves `client/index.html` is the one that must refuse `server/room.js`, which
+  sits on the same disk and holds every answer the game is about. That refusal,
+  six ways of climbing out of the served directories, the proof sheet answering
+  at the address this file gives for it, and the two readouts DEPLOY.md tells
+  people to curl.
 
 Both suites run in CI on every push (`.github/workflows/test.yml`) across Node
 18, 20 and 22, with the browser check on its own runner and the screenshots kept

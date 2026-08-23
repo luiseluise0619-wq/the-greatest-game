@@ -71,7 +71,10 @@ export class RoomManager {
   resolve(msg) {
     if (msg.room) {
       const room = this.get(msg.room);
-      if (!room) return { error: `No town goes by "${String(msg.room).toUpperCase()}". Check the code.` };
+      // Clipped: a code is four letters, and a socket that asks for a five
+      // thousand character one should not get five thousand characters back.
+      const asked = String(msg.room).toUpperCase().trim().slice(0, CODE_LEN + 4);
+      if (!room) return { error: `No town goes by "${asked}". Check the code.` };
       if (!this.hasSpace(room)) return { error: 'That town is full - 8 guns is the limit.' };
       return { room };
     }
