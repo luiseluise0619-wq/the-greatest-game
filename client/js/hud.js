@@ -154,6 +154,14 @@ export class HUD {
     const el = $('netBanner');
     el.classList.toggle('hidden', !on);
     if (on) el.textContent = `RECONNECTING${attempt > 1 ? ` (${attempt})` : ''}…`;
+    // Every one of these buttons is a message to a server that is not there.
+    // The status line says why; a button that still looks pressable does not.
+    // Nothing else in the client sets `disabled` on any of them, so this can
+    // own the flag outright.
+    for (const id of ['startBtn', 'joinBtn', 'newRoom', 'botPlus', 'botMinus']) {
+      const btn = document.getElementById(id);
+      if (btn) btn.disabled = on;
+    }
   }
 
   setRoom(msg) {

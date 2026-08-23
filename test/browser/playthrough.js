@@ -508,6 +508,10 @@ try {
     null, { timeout: 10000 },
   ).then(() => true).catch(() => false);
   check(bannerSeen, 'a dropped socket says so on screen');
+  // Every button in the lobby is a message to a server that is not there.
+  const shut = await A.evaluate(() => ['startBtn', 'joinBtn', 'newRoom', 'botPlus', 'botMinus']
+    .filter((id) => !document.getElementById(id).disabled));
+  check(shut.length === 0, `nothing that talks to the server looks pressable${shut.length ? `: ${shut.join(', ')}` : ''}`);
   // Wait for the seat to actually come back, not just for the socket to open:
   // the client still has to re-announce itself with its token and be handed
   // the same body, and on a loaded machine that round trip is not instant.
@@ -522,6 +526,8 @@ try {
     banner: !document.getElementById('netBanner').classList.contains('hidden'),
     cardUp: !document.getElementById('roleCard').classList.contains('hidden'),
     inGame: window.game.inGame,
+    stuck: ['startBtn', 'joinBtn', 'newRoom', 'botPlus', 'botMinus']
+      .filter((id) => document.getElementById(id).disabled),
   }));
   check(netBack && netAfter.inGame && netAfter.id === netBefore.id && netAfter.role === netBefore.role,
     `a dropped socket reconnects into the same seat (${netAfter.role})`);
@@ -532,6 +538,8 @@ try {
     `reconnecting keeps what the player had worked out (${netBefore.known} -> ${netAfter.known})`);
   check(!netAfter.cardUp, 'reconnecting does not shove the role card back on screen');
   check(!netAfter.banner, 'the reconnecting banner goes away again');
+  check(netAfter.stuck.length === 0,
+    `and the buttons come back with it${netAfter.stuck.length ? `: ${netAfter.stuck.join(', ')} still dead` : ''}`);
 
 
   // Ride the round out: the aftermath screen is where every silent card is
