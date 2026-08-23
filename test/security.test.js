@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
-import { TIMING, PLAYER, VISION, SOCIAL, VOICE_LINES } from '../shared/constants.js';
+import { TIMING, PLAYER, VISION, SOCIAL, VOICE_LINES, MODES } from '../shared/constants.js';
 import MAP from '../shared/map.js';
 import { isBlocked } from '../shared/collision.js';
 
@@ -12,7 +12,7 @@ const { Room } = await import('../server/room.js');
 function liveRoom({ bots = 6 } = {}) {
   TIMING.prep = 1; TIMING.combat = 600; TIMING.endgame = 30; TIMING.results = 5;
   const clock = fakeClock();
-  const room = new Room({ code: 'SEC', isPublic: false });
+  const room = new Room({ code: 'SEC', isPublic: false, mode: MODES.FREE });
   room.botFillTarget = bots;
   room.resetClock();
   const stub = stubClient();

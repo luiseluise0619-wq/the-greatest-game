@@ -413,6 +413,40 @@ export const TIMING = {
   lobbyCountdown: 12,
 };
 
+// ---------------------------------------------------------------------------
+// The turn mode.
+//
+// The original this is modelled on is a card game played round a table: you
+// take your turn, everybody watches, and the only reason you can shoot anybody
+// is that it is your go. Translating that to a first-person game means
+// rationing the trigger rather than the movement - so a round alternates
+// between everybody moving at once and nobody moving at all.
+//
+//   배치 / reposition - everyone walks, nobody can fire. This is where you
+//                       choose the spot you will be standing in when your turn
+//                       comes, and it is the whole strategic decision: the
+//                       middle of Main Street can shoot everybody and be shot
+//                       by everybody; behind a water trough is safe and useless.
+//   차례 / turns      - nobody walks. Each player in order gets a few seconds
+//                       in which their gun, and only their gun, is live.
+//
+// Health is counted in hits rather than in points, because one shot has to be
+// worth a quarter of a life for the standoff to mean anything.
+// ---------------------------------------------------------------------------
+export const DUEL = {
+  reposition: 15,          // seconds the whole town moves at once
+  turn: 6,                 // seconds each player's trigger is live
+  health: 4,               // hits, not hit points
+  sheriffHealth: 5,        // the star is worth one more, and a public target
+  draw: 2,                 // cards at the start of your turn
+  // A hit is a hit. Where you put it decides whether it lands, not what it is
+  // worth - which is the rule the card game runs on.
+  damagePerHit: 1,
+};
+
+export const MODES = { FREE: 'free', DUEL: 'duel' };
+export const DEFAULT_MODE = MODES.DUEL;
+
 export const ENDGAME = {
   startRadius: 62,
   endRadius: 14,

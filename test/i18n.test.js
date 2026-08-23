@@ -28,7 +28,7 @@ function htmlKeys() {
 // call shapes instead was how this test came to report a dozen keys as unused
 // while the game was quite happily using all of them.
 const NAMESPACES = ['ui', 'rules', 'key', 'set', 'hud', 'phase', 'role', 'faction',
-  'char', 'card', 'sb', 'res', 'deny', 'boot', 'voice', 'loot'];
+  'char', 'card', 'sb', 'res', 'deny', 'boot', 'voice', 'loot', 'turn'];
 const KEYISH = new RegExp(`^(?:${NAMESPACES.join('|')})\\.[\\w.]+$`);
 
 /** Every key the client asks for in code, literal or built from an id. */

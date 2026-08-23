@@ -244,6 +244,60 @@ export class HUD {
 
   setObjective(text) { $('objective').textContent = text; }
 
+  // -------------------------------------------------------------- the turn
+  /**
+   * Whose go it is. A card game round a table says this by whose hands are
+   * moving; here everybody is moving at once, so it has to be said out loud.
+   */
+  setTurn(msg) {
+    this.turn = msg && msg.kind ? msg : null;
+    const bar = $('turnBar');
+    if (!this.turn) {
+      bar.classList.add('hidden');
+      $('hud').classList.remove('rooted');
+      return;
+    }
+    const mine = this.turn.holder === this.game.selfId;
+    const walk = this.turn.kind === 'reposition';
+    bar.classList.remove('hidden');
+    bar.classList.toggle('mine', mine && !walk);
+    bar.classList.toggle('walk', walk);
+    $('hud').classList.toggle('rooted', !walk);
+
+    $('turnWhat').textContent = walk
+      ? this.t('turn.walk', 'FIND YOUR MARK')
+      : mine ? this.t('turn.yours', 'YOUR GO')
+        : this.t('turn.theirs', `${this.nameOf(this.turn.holder)} HAS THE FLOOR`,
+          { name: this.nameOf(this.turn.holder) });
+    $('turnClock').textContent = walk
+      ? this.t('turn.walkHint', 'nobody can shoot · everybody can walk')
+      : this.t('turn.rootedHint', 'nobody can walk');
+
+    const ol = $('turnOrder');
+    ol.innerHTML = '';
+    for (const id of this.turn.order || []) {
+      const li = document.createElement('li');
+      li.textContent = this.nameOf(id);
+      li.className = (id === this.turn.holder ? 'now ' : '')
+        + (id === this.game.selfId ? 'self' : '');
+      ol.appendChild(li);
+    }
+    this.tickTurnClock();
+  }
+
+  /** The seconds left, ticked locally so the server sends one packet, not thirty. */
+  tickTurnClock() {
+    if (!this.turn) return;
+    const left = Math.max(0, (this.game.turnDeadline || 0) - performance.now() / 1000);
+    const el = $('turnClock');
+    const label = this.turn.kind === 'reposition'
+      ? this.t('turn.walkHint', 'nobody can shoot · everybody can walk')
+      : this.t('turn.rootedHint', 'nobody can walk');
+    el.textContent = `${label} · ${left.toFixed(1)}s`;
+  }
+
+  nameOf(id) { return this.roster.get(id)?.name || '?'; }
+
   // ------------------------------------------------------------- hud state
   setPhase(msg) {
     this.phase = msg.phase;

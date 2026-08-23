@@ -8,7 +8,7 @@
 import {
   PLAYER, WEAPONS, DYNAMITE, WEAPON_ORDER, ROLES, PHASE, TIMING, ENDGAME,
   SOCIAL, HITBOX, CHARACTERS, GAMBLER_BOONS, LOOT_RESPAWN, VOICE_LINES, VISION, REPLAY,
-  CARDS, CARD_ORDER, CARD_DEAL,
+  CARDS, CARD_ORDER, CARD_DEAL, DUEL, MODES, DEFAULT_MODE,
   MIN_PLAYERS, MAX_PLAYERS, rolesForPlayerCount, clamp, stepStamina, swapTime,
 } from '../shared/constants.js';
 import MAP, { zoneAt, SPAWNS, LOOT_SPAWNS } from '../shared/map.js';
@@ -62,6 +62,11 @@ export class Room {
     this.lobbyStartAt = 0;      // public rooms deal themselves in - see stepLobby
     this.lastTime = now();
     this.botFillTarget = 6;
+    // How this town plays. See DUEL in shared/constants.js.
+    this.mode = opts.mode === MODES.FREE ? MODES.FREE : DEFAULT_MODE;
+    this.turnOrder = [];
+    this.turnPtr = -1;
+    this.turn = null;
     this.resetLoot();
   }
 
@@ -393,6 +398,11 @@ export class Room {
     p.sprint = !!msg.sprint;
     p.moving = !!msg.moving;
 
+    // At your marks. Where you stand was decided during the walk; a client that
+    // keeps sending positions through a turn is simply not listened to. Heads
+    // still turn - being able to look is what makes standing still bearable.
+    if (this.rooted) { p.moving = false; p.sprint = false; return; }
+
     if (!msg.pos || !Number.isFinite(msg.pos.x) || !Number.isFinite(msg.pos.y) || !Number.isFinite(msg.pos.z)) return;
 
     const want = {
@@ -480,6 +490,9 @@ export class Room {
   canFire(p) {
     const t = now();
     if (!p.alive) return false;
+    // The whole point of the mode: one gun is live at a time, and the town can
+    // see whose. During a walk nobody's is.
+    if (this.duel && this.turnHolder !== p.id) return false;
     if (t < p.swapUntil || t < p.nextFireAt) return false;
     if (p.reloading) return false;
     const g = p.guns[p.slot];
@@ -585,6 +598,9 @@ export class Room {
 
   applyDamage(victim, attacker, amount, cause, point, part = 'body') {
     if (!victim.alive) return;
+    // Where you put the shot decides whether it lands, not what it is worth.
+    // The storm is the one thing that still works in points.
+    if (this.duel && cause !== 'storm') amount = DUEL.damagePerHit;
     if (this.phase === PHASE.PREP) return;                       // guns are noise only in prep
     if (this.phase !== PHASE.COMBAT && this.phase !== PHASE.ENDGAME) return;
 
@@ -1242,7 +1258,12 @@ export class Room {
       p.role = roles[i];
       p.faction = ROLES[p.role].faction;
       p.alive = true;
-      p.maxHealth = PLAYER.maxHealth + (ROLES[p.role].bonusHealth || 0);
+      if (this.duel) {
+        // Hits, not hit points. One shot is a quarter of a life.
+        p.maxHealth = p.role === 'sheriff' ? DUEL.sheriffHealth : DUEL.health;
+      } else {
+        p.maxHealth = PLAYER.maxHealth + (ROLES[p.role].bonusHealth || 0);
+      }
       p.health = p.maxHealth;
       p.armour = 0;
       p.badge = false;
@@ -1287,6 +1308,12 @@ export class Room {
       this.sendRole(p);
       this.pushCards(p);
     }
+
+    // The order the town takes its turns in, fixed for the round and shown to
+    // everybody. Shuffled rather than seating order, because there are no seats.
+    this.turnOrder = this.duel ? shuffle(all.map((p) => p.id)) : [];
+    this.turnPtr = -1;
+    this.turn = null;
 
     telemetry.matchStart(this);
     telemetry.cardsDealt(all.length * CARD_DEAL);
@@ -1371,6 +1398,12 @@ export class Room {
       alive: [...this.players.values()].filter((p) => p.alive).length,
       total: this.players.size,
     });
+    if (phase === PHASE.COMBAT && this.duel) {
+      // Straight into a walk: nobody has chosen where to stand yet.
+      this.turnPtr = -1;
+      this.setTurn({ kind: 'reposition', holder: null, endsAt: now() + DUEL.reposition });
+    }
+    if (phase !== PHASE.COMBAT && phase !== PHASE.ENDGAME) this.turn = null;
     if (phase === PHASE.COMBAT) {
       this.broadcast({ t: S.FEED, text: 'The bell rings. Nothing is holstered now.', tone: 'system' });
       this.broadcast({ t: S.SOUND, sound: 'bell' });
@@ -1460,6 +1493,7 @@ export class Room {
       this.stepDynamite(t, dt);
       this.stepLoot(t);
       if (this.phase === PHASE.ENDGAME) this.stepRing(t, dt);
+      if (this.phase !== PHASE.PREP) this.stepTurns(t);
       if (t >= this.phaseEndsAt) this.advancePhase();
     } else if (this.phase === PHASE.RESULTS) {
       if (t >= this.phaseEndsAt) this.toLobby();
@@ -1492,6 +1526,77 @@ export class Room {
       this.lobbyStartAt = 0;
       this.beginMatch();
     }
+  }
+
+  /** Shorthand, because it is asked on nearly every path through this file. */
+  get duel() { return this.mode === MODES.DUEL; }
+
+  /** True while nobody is allowed to walk: the town is standing at its marks. */
+  get rooted() { return this.duel && this.turn?.kind === 'turn'; }
+
+  /** Whose gun is live right now, if anybody's. */
+  get turnHolder() { return this.turn?.kind === 'turn' ? this.turn.holder : null; }
+
+  setTurn(turn) {
+    this.turn = turn;
+    this.pushTurn();
+  }
+
+  pushTurn() {
+    if (!this.duel) return;
+    this.broadcast({
+      t: S.TURN,
+      kind: this.turn ? this.turn.kind : null,
+      holder: this.turn ? this.turn.holder : null,
+      // Seconds remaining rather than a moment in time: the browser's clock and
+      // this one are not the same clock, and the difference is a countdown that
+      // starts wrong. The client ticks it down itself from here.
+      left: this.turn ? r2(Math.max(0, this.turn.endsAt - now())) : 0,
+      // The whole running order, so every screen can show the same table.
+      order: this.turnOrder.filter((id) => this.players.get(id)?.alive),
+    });
+  }
+
+  /**
+   * The clock that runs the round: a walk for everybody, then one short go
+   * each, then a walk again. Called every step while a duel round is live.
+   */
+  stepTurns(t) {
+    if (!this.duel || !this.turn) return;
+    if (t < this.turn.endsAt) return;
+    this.advanceTurn(t);
+  }
+
+  advanceTurn(t) {
+    // Walk the order looking for the next living player. Running off the end is
+    // the end of the round of turns, and everybody gets up and moves again.
+    for (let guard = this.turnOrder.length + 1; guard > 0; guard -= 1) {
+      this.turnPtr += 1;
+      if (this.turnPtr >= this.turnOrder.length) {
+        this.turnPtr = -1;
+        this.setTurn({ kind: 'reposition', holder: null, endsAt: t + DUEL.reposition });
+        this.broadcast({ t: S.SOUND, sound: 'bell' });
+        return;
+      }
+      const p = this.players.get(this.turnOrder[this.turnPtr]);
+      if (p && p.alive) {
+        this.setTurn({ kind: 'turn', holder: p.id, endsAt: t + DUEL.turn });
+        this.onTurnStart(p);
+        return;
+      }
+    }
+    this.turnPtr = -1;
+    this.setTurn({ kind: 'reposition', holder: null, endsAt: t + DUEL.reposition });
+  }
+
+  /** Your go. Everything you are given for it arrives here. */
+  onTurnStart(p) {
+    // Standing still is not resting, but it is not running either.
+    p.stamina = PLAYER.staminaMax;
+    p.sprint = false;
+    p.moving = false;
+    p.vel = { x: 0, y: 0, z: 0 };
+    this.pushSelf(p);
   }
 
   advancePhase() {

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
 import {
   PHASE, TIMING, CARDS, CARD_ORDER, CARD_DEAL, SOCIAL, CHARACTERS, WEAPONS,
-  BUFF_VALUES, GAMBLER_BOONS, PLAYER,
+  BUFF_VALUES, GAMBLER_BOONS, PLAYER, MODES,
 } from '../shared/constants.js';
 
 const { Room } = await import('../server/room.js');
@@ -17,7 +17,7 @@ const { BotBrain } = await import('../server/bots.js');
 function makeRoom({ bots = 6, prep = 1, combat = 400 } = {}) {
   TIMING.prep = prep; TIMING.combat = combat; TIMING.endgame = 30; TIMING.results = 5;
   const clock = fakeClock();
-  const room = new Room({ code: 'TEST', isPublic: false });
+  const room = new Room({ code: 'TEST', isPublic: false, mode: MODES.FREE });
   room.botFillTarget = bots;
   room.resetClock();
   const stub = stubClient();

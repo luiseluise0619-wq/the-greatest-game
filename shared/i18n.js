@@ -125,6 +125,13 @@ const KO = {
   'hud.skip': '아무 키나 누르면 넘어갑니다',
   'hud.loading': '말에 안장을 얹는 중…',
 
+  // The turn
+  'turn.walk': '자리를 잡으십시오',
+  'turn.yours': '당신 차례',
+  'turn.theirs': '{name} 차례',
+  'turn.walkHint': '아무도 못 쏩니다 · 모두 움직일 수 있습니다',
+  'turn.rootedHint': '아무도 못 움직입니다',
+
   'phase.lobby': '로비',
   'phase.prep': '준비',
   'phase.combat': '교전',
@@ -245,6 +252,8 @@ const KO = {
   'deny.accuseSoon': '방금 지목했습니다 — {n}초 뒤에.',
   'deny.nothingNear': '손 닿는 곳에 아무것도 없습니다.',
   'deny.running': '전력으로 달리면서는 못 쏩니다. 속도를 줄이십시오.',
+  'deny.notYourTurn': '당신 차례가 아닙니다. 호명될 때까지 기다리십시오.',
+  'deny.walkTime': '마을이 걷는 동안에는 아무도 쏘지 않습니다.',
 
   // ------------------------------------------------------------ boot failure
   'boot.title': '오늘 밤 게임은 없습니다',

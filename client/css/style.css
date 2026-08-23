@@ -697,3 +697,38 @@ html[lang="ko"] {
   --font: "Courier New", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans CJK KR",
     "Noto Sans KR", "DejaVu Sans Mono", monospace;
 }
+
+/* ------------------------------------------------------------ THE TURN
+   A card game round a table tells you whose go it is by whose hands are
+   moving. There is no table here and eight people are all moving at once, so
+   it has to be said out loud, all the time, where nobody can miss it. */
+#turnBar {
+  position: absolute; left: 50%; top: 96px; transform: translateX(-50%);
+  text-align: center; pointer-events: none; width: min(560px, 92vw);
+}
+#turnWhat {
+  font-size: 15px; letter-spacing: .18em; color: var(--sand);
+  text-shadow: 0 1px 3px rgba(0,0,0,.9), 0 0 10px rgba(0,0,0,.7);
+}
+#turnBar.mine #turnWhat { color: var(--gold); font-size: 19px; }
+#turnBar.walk #turnWhat { color: #9fc0d8; }
+#turnClock {
+  font-size: 11px; letter-spacing: .2em; color: rgba(232,217,189,.62); margin-top: 2px;
+  text-shadow: 0 1px 3px rgba(0,0,0,.9);
+  font-variant-numeric: tabular-nums;
+}
+/* The running order, so you can count how long you have before it is you. */
+#turnOrder {
+  list-style: none; margin: 8px 0 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 4px; justify-content: center;
+}
+#turnOrder li {
+  font-size: 10px; letter-spacing: .06em; padding: 2px 7px;
+  background: rgba(12, 9, 6, .62); border: 1px solid rgba(200, 180, 140, .22);
+  color: rgba(232, 217, 189, .55); white-space: nowrap;
+}
+#turnOrder li.now { background: rgba(232, 193, 90, .22); border-color: var(--gold); color: var(--sand); }
+#turnOrder li.self { border-color: rgba(200, 180, 140, .6); color: var(--sand); }
+#turnOrder li.gone { opacity: .3; text-decoration: line-through; }
+/* Rooted: the crosshair says the feet are not going anywhere. */
+#hud.rooted #crosshair { opacity: .55; }

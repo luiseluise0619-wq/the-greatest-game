@@ -48,4 +48,5 @@ export const S = {
   SOUND: 'sound',
   REPLAY: 'replay',
   CORRECT: 'correct',
+  TURN: 'turn',
 };

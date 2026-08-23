@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
-import { TIMING, PHASE, CARD_ORDER } from '../shared/constants.js';
+import { TIMING, PHASE, CARD_ORDER, MODES } from '../shared/constants.js';
 import { C } from '../shared/protocol.js';
 
 const { Room } = await import('../server/room.js');
@@ -19,7 +19,7 @@ const { Room } = await import('../server/room.js');
 function liveRoom({ bots = 6, prep = 1 } = {}) {
   TIMING.prep = prep; TIMING.combat = 600; TIMING.endgame = 30; TIMING.results = 5;
   const clock = fakeClock();
-  const room = new Room({ code: 'FUZZ', isPublic: false });
+  const room = new Room({ code: 'FUZZ', isPublic: false, mode: MODES.FREE });
   room.botFillTarget = bots;
   room.resetClock();
   const stub = stubClient();

@@ -18,10 +18,12 @@ const MAX_ROOMS = 200;
 const now = () => Date.now() / 1000;
 
 export class RoomManager {
-  constructor() {
+  constructor(opts = {}) {
     this.rooms = new Map();
     this.timer = null;
     this.ticks = 0;
+    // Every town this manager opens plays the same game.
+    this.mode = opts.mode;
   }
 
   // ------------------------------------------------------------- lifecycle
@@ -38,7 +40,7 @@ export class RoomManager {
     if (this.rooms.size >= MAX_ROOMS) return null;
     const code = this.makeCode();
     if (!code) return null;
-    const room = new Room({ code, isPublic });
+    const room = new Room({ code, isPublic, mode: this.mode });
     room.resetClock();
     this.rooms.set(code, room);
     console.log(`[rooms] + ${code} ${isPublic ? 'public ' : 'private'} · ${this.rooms.size} open`);

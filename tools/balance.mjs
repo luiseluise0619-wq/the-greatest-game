@@ -19,7 +19,7 @@
 // faster than people do and they never lie to each other.
 
 import { fakeClock } from '../test/helpers.js';
-import { PHASE, TIMING } from '../shared/constants.js';
+import { PHASE, TIMING, MODES } from '../shared/constants.js';
 
 const { Room } = await import('../server/room.js');
 
@@ -68,7 +68,7 @@ Room.prototype.killPlayer = function instrumentedKill(victim, killer, cause, poi
 
 for (let run = 0; run < ROUNDS; run++) {
   const clock = fakeClock();
-  const room = new Room({ code: `BAL${run}`, isPublic: false });
+  const room = new Room({ code: `BAL${run}`, isPublic: false, mode: MODES.FREE });
   room.botFillTarget = TABLE;
   room.resetClock();
   room.beginMatch();

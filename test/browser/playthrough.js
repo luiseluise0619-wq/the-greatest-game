@@ -46,6 +46,10 @@ const PREP = 105, COMBAT = 20, ENDGAME = 8;
 const server = spawn('node', ['server/index.js'], {
   env: {
     ...process.env, PORT: String(PORT), HNH_TELEMETRY: '0',
+    // The free-for-all. Every check below was written against its rules -
+    // walking whenever you like, firing whenever you like - and the turn mode
+    // has a suite of its own in test/duel.test.js.
+    HNH_MODE: 'free',
     HNH_PREP: String(PREP), HNH_COMBAT: String(COMBAT), HNH_ENDGAME: String(ENDGAME),
     // The aftermath phase has to outlast the checks that run on it. On a
     // two-core runner drawing every pixel on the CPU, a screenshot alone can

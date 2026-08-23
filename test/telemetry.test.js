@@ -17,7 +17,7 @@ process.env.HNH_TELEMETRY_DIR = DIR;
 delete process.env.HNH_TELEMETRY;          // on by default
 delete process.env.HNH_TELEMETRY_NAMES;    // names off by default
 
-const { TIMING, PHASE } = await import('../shared/constants.js');
+const { TIMING, PHASE, MODES } = await import('../shared/constants.js');
 const { Room } = await import('../server/room.js');
 const { telemetry } = await import('../server/telemetry.js');
 
@@ -27,7 +27,7 @@ const FILE = path.join(DIR, 'telemetry.jsonl');
 async function roundAndLog() {
   TIMING.prep = 1; TIMING.combat = 300; TIMING.endgame = 20; TIMING.results = 5;
   const clock = fakeClock();
-  const room = new Room({ code: 'TELE', isPublic: false });
+  const room = new Room({ code: 'TELE', isPublic: false, mode: MODES.FREE });
   room.botFillTarget = 6;
   room.resetClock();
   const stub = stubClient();

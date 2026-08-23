@@ -36,6 +36,8 @@ class Game {
     this.selfId = null;
     this.phase = PHASE.LOBBY;
     this.phaseLeft = 0;
+    this.turn = null;
+    this.turnDeadline = 0;
     this.inGame = false;
     this.views = new Map();
     this.keys = new Set();
@@ -298,6 +300,9 @@ class Game {
     $('setLang').value = v.lang;
   }
 
+  /** True while the whole town is standing at its marks. */
+  rooted() { return !!this.turn && this.turn.kind !== 'reposition'; }
+
   /** This string, in the language the player asked for. */
   tr(key, english = '', params = null) {
     return t(this.settings?.get('lang') || 'en', key, english, params);
@@ -483,6 +488,11 @@ class Game {
         else this.hud.showRoleCard(msg);
         break;
 
+      case S.TURN:
+        this.turn = msg.kind ? msg : null;
+        this.turnDeadline = performance.now() / 1000 + (msg.left || 0);
+        this.hud.setTurn(this.turn);
+        break;
       case S.PHASE:
         this.phase = msg.phase;
         this.hud.setPhase(msg);
@@ -1074,6 +1084,7 @@ class Game {
     const s = this.self;
     const t = performance.now() / 1000;
     if (!s.alive || !this.inGame) return false;
+    if (this.turn && this.turn.holder !== this.selfId) return false;
     if (s.sprint && s.moving) return false;      // no shooting at a dead run
     if (s.mag <= 0 || s.reloading > 0) return false;
     if (t < s.nextFireAt || t < s.swapUntil) return false;
@@ -1088,6 +1099,12 @@ class Game {
       // shots is the gun's own rhythm. Not being able to shoot while running
       // is a rule, and rules get said out loud.
       const me = this.self;
+      if (this.turn && this.turn.holder !== this.selfId) {
+        this.deny(this.turn.kind === 'reposition'
+          ? ['deny.walkTime', 'Nobody shoots while the town is walking.']
+          : ['deny.notYourTurn', 'Not your go. Wait to be called.']);
+        return;
+      }
       if (me.alive && me.sprint && me.moving && me.mag > 0 && me.reloading <= 0) {
         this.deny(['deny.running', 'Not at a dead run. Slow up to shoot.']);
         return;
@@ -1134,7 +1151,9 @@ class Game {
     const fwd = new THREE.Vector3(-Math.sin(s.yaw), 0, -Math.cos(s.yaw));
     const right = new THREE.Vector3(Math.cos(s.yaw), 0, -Math.sin(s.yaw));
 
-    if (this.inGame && !this.chatting) {
+    // At your marks: during a turn nobody walks, including whoever's turn it is.
+    // Refused on the server too - this is here so the view does not fight it.
+    if (this.inGame && !this.chatting && !this.rooted()) {
       if (this.keys.has('KeyW')) wish.add(fwd);
       if (this.keys.has('KeyS')) wish.sub(fwd);
       if (this.keys.has('KeyD')) wish.add(right);
@@ -1286,6 +1305,7 @@ class Game {
 
       if (this.inGame) {
         this.hud.setTimer(this.phaseLeft);
+        this.hud.tickTurnClock();
         if (this.phase === PHASE.RESULTS) this.hud.setResultCountdown(this.phaseLeft);
       }
 

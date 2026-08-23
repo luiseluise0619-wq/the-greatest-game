@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
 import {
-  PHASE, TIMING, ROLES, PLAYER, ENDGAME, SOCIAL, MIN_PLAYERS, MAX_PLAYERS, CARD_DEAL,
+  PHASE, TIMING, ROLES, PLAYER, ENDGAME, SOCIAL, MIN_PLAYERS, MAX_PLAYERS, CARD_DEAL, MODES,
 } from '../shared/constants.js';
 
 const { Room } = await import('../server/room.js');
@@ -11,7 +11,7 @@ const { Room } = await import('../server/room.js');
 function makeRoom({ bots = 6, prep = 3, combat = 400 } = {}) {
   TIMING.prep = prep; TIMING.combat = combat; TIMING.endgame = 30; TIMING.results = 5;
   const clock = fakeClock();
-  const room = new Room({ code: 'TEST', isPublic: false });
+  const room = new Room({ code: 'TEST', isPublic: false, mode: MODES.FREE });
   room.botFillTarget = bots;
   room.resetClock();
   const stub = stubClient();
@@ -250,7 +250,7 @@ test('a public town deals itself in once a second person turns up', () => {
   TIMING.prep = 3; TIMING.combat = 400; TIMING.endgame = 30; TIMING.results = 5;
   TIMING.lobbyCountdown = 4;
   const clock = fakeClock();
-  const room = new Room({ code: 'PUB', isPublic: true });
+  const room = new Room({ code: 'PUB', isPublic: true, mode: MODES.FREE });
   room.botFillTarget = 6;
   room.resetClock();
   try {
@@ -290,7 +290,7 @@ test('a public town deals itself in once a second person turns up', () => {
 test('a private town waits for whoever you invited', () => {
   TIMING.prep = 3; TIMING.lobbyCountdown = 2;
   const clock = fakeClock();
-  const room = new Room({ code: 'PRIV', isPublic: false });
+  const room = new Room({ code: 'PRIV', isPublic: false, mode: MODES.FREE });
   room.botFillTarget = 6;
   room.resetClock();
   try {

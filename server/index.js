@@ -10,6 +10,7 @@ import { RoomManager } from './rooms.js';
 import { TIMING } from '../shared/constants.js';
 import { telemetry } from './telemetry.js';
 import { tokenBucket, MSG_RATE, MSG_BURST, MAX_DROPPED } from './ratelimit.js';
+import { MODES, DEFAULT_MODE } from '../shared/constants.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -76,7 +77,12 @@ for (const key of ['prep', 'combat', 'endgame', 'results', 'lobbyCountdown']) {
   if (env && Number.isFinite(Number(env))) TIMING[key] = Number(env);
 }
 
-const manager = new RoomManager();
+// Which game the rooms on this server play. The turn mode is the default; the
+// free-for-all is still here and the suite that grew up around it still runs
+// against it.
+const MODE = process.env.HNH_MODE === 'free' ? MODES.FREE : DEFAULT_MODE;
+
+const manager = new RoomManager({ mode: MODE });
 
 const server = http.createServer((req, res) => {
   const urlPath = (req.url || '/').split('?')[0];
