@@ -192,6 +192,25 @@ try {
   check(denials.abilityQuiet && denials.throwQuiet && denials.cardQuiet && denials.denied === 3,
     `keys that cannot fire say so instead of nothing (${denials.denied}/3 refused out loud)`);
 
+  // Nothing in the HUD may run off the edge of the window. The hand is the one
+  // deliberate exception - the cards are tucked into the bottom edge like cards
+  // held in a hand - and it says so in the stylesheet.
+  const spill = await A.evaluate(() => {
+    const out = [];
+    for (const el of document.querySelectorAll('#hud *')) {
+      if (el.closest('#handStrip')) continue;
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1) continue;
+      if (r.x < -0.5 || r.y < -0.5 || r.right > innerWidth + 0.5 || r.bottom > innerHeight + 0.5) {
+        out.push(`${el.tagName}${el.id ? `#${el.id}` : ''}${el.className ? `.${el.className}` : ''}`);
+      }
+    }
+    return out;
+  });
+  check(spill.length === 0, `the HUD stays inside the window${spill.length ? `: ${spill.join(', ')} spills out` : ''}`);
+
   // The shout wheel is eight tiles of prose laid out around a ring, and the
   // only way to say any of it is to read one and press its number. Tiles that
   // sit on each other, or run off the side of the window, are tiles nobody can
