@@ -9,8 +9,10 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "test": "node --test test/*.test.js",
-    "test:browser": "node test/browser/playthrough.js",
-    "balance": "node tools/balance.mjs"
+    "test:browser": "node test/browser/playthrough.js && node test/browser/turnmode.js",
+    "balance": "node tools/balance.mjs",
+    "test:browser:free": "node test/browser/playthrough.js",
+    "test:browser:duel": "node test/browser/turnmode.js"
   },
   "engines": {
     "node": ">=18"

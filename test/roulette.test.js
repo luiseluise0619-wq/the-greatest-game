@@ -47,8 +47,18 @@ function town({ bots = 5 } = {}) {
   // barrel, one takes two Missed! to get out of the way of, one is a step
   // further out than the tape says - so nobody in here is dealt one.
   for (const p of all) p.gunhand = null;
+  // Distance is seats, so the two men in any of these is a neighbour pair
+  // unless a test says otherwise. Everything in here is about what happens to
+  // a shot, not about whether it could have been taken at all.
+  all.forEach((p, i) => { p.seat = i; });
   return {
     room, clock, stub, all,
+    seats: (p, q, n) => {
+      for (const o of all) o.seat = null;
+      p.seat = 0; q.seat = n;
+      let at = 1;
+      for (const o of all) { if (o === p || o === q) continue; while (at === n) at += 1; o.seat = at++; }
+    },
     turn: (p) => { room.turn = { kind: 'turn', holder: p.id, endsAt: 1e12 }; p.bangsThisTurn = 0; },
   };
 }
@@ -97,8 +107,8 @@ test('the card only saves the man who saw it coming', () => {
   try {
     const [a, b] = all;
     turn(a);
-    a.pos = { x: 0, y: 0, z: 0 };
-    b.pos = { x: 0, y: 0, z: 6 };
+    a.pos = { x: 40, y: 0, z: 0 };
+    b.pos = { x: 40, y: 0, z: 6 };
     b.gear = [];
     b.duelHand = ['missed'];
     b.bracedUntil = 0;
@@ -133,8 +143,8 @@ test('a blank is noise, and it still costs the card', () => {
   try {
     const [a, b] = all;
     turn(a);
-    a.pos = { x: 0, y: 0, z: 0 };
-    b.pos = { x: 0, y: 0, z: 6 };
+    a.pos = { x: 40, y: 0, z: 0 };
+    b.pos = { x: 40, y: 0, z: 6 };
     b.gear = []; b.duelHand = [];
     a.roundIsLive = false;
     const held = b.health;
@@ -152,8 +162,8 @@ test('the barrel turned round: a click buys another go', () => {
     const [a, b] = all;
     turn(a);
     a.duelHand = ['bang', 'bang'];
-    a.pos = { x: 0, y: 0, z: 0 }; a.yaw = 0;
-    b.pos = { x: 0, y: 0, z: 4 };
+    a.pos = { x: 40, y: 0, z: 0 }; a.yaw = 0;
+    b.pos = { x: 40, y: 0, z: 4 };
     const [hpA, hpB] = [a.health, b.health];
 
     room.chamber = [false];
@@ -171,8 +181,8 @@ test('and a live one goes through you into whoever stood behind', () => {
     const [a, b] = all;
     turn(a);
     a.duelHand = ['bang'];
-    a.pos = { x: 0, y: 0, z: 0 }; a.yaw = 0;      // facing -z, so the back is +z
-    b.pos = { x: 0, y: 0, z: 4 };
+    a.pos = { x: 40, y: 0, z: 0 }; a.yaw = 0;      // facing -z, so the back is +z
+    b.pos = { x: 40, y: 0, z: 4 };
     const [hpA, hpB] = [a.health, b.health];
 
     room.chamber = [true];
@@ -191,9 +201,9 @@ test('the man on the end of it is told, and told when it moves off', () => {
     const me = all.find((p) => !p.bot);
     const gunman = all.find((p) => p.bot);
     room.turn = { kind: 'turn', holder: gunman.id, endsAt: 1e12 };
-    gunman.pos = { x: 0, y: 0, z: 0 };
+    gunman.pos = { x: 40, y: 0, z: 0 };
     gunman.yaw = Math.PI; gunman.pitch = 0;      // looking down +z
-    me.pos = { x: 0, y: 0, z: 10 };
+    me.pos = { x: 40, y: 0, z: 10 };
     for (const p of all) if (p !== me && p !== gunman) p.pos = { x: 900, y: 0, z: 900 };
     stub.reset();
 
@@ -224,9 +234,9 @@ test('a barrel comes off you when the go it belonged to ends', () => {
     for (const p of all) if (p !== me && p !== first && p !== second) p.pos = { x: 900, y: 0, z: 900 };
     // Not on the same spot as each other, or the first man's crosshair finds
     // the second one standing inside him rather than the man down the street.
-    me.pos = { x: 0, y: 0, z: 10 };
-    first.pos = { x: 0, y: 0, z: 0 };
-    second.pos = { x: 0, y: 0, z: -6 };
+    me.pos = { x: 40, y: 0, z: 10 };
+    first.pos = { x: 40, y: 0, z: 0 };
+    second.pos = { x: 40, y: 0, z: -6 };
     for (const g of [first, second]) { g.yaw = Math.PI; g.pitch = 0; }
 
     room.turn = { kind: 'turn', holder: first.id, endsAt: 1e12 };
@@ -239,7 +249,7 @@ test('a barrel comes off you when the go it belonged to ends', () => {
     // ever compared the new holder's target with his own last one.
     stub.reset();
     first.pos = { x: 900, y: 0, z: 900 };
-    second.pos = { x: 0, y: 0, z: 0 };
+    second.pos = { x: 40, y: 0, z: 0 };
     room.turn = { kind: 'turn', holder: second.id, endsAt: 1e12 };
     room.stepAim(Date.now() / 1000 + 0.05);
     const said = stub.of('aimed');
@@ -258,12 +268,12 @@ test('the rules apply to a fired gun, not only to the word for one', () => {
   // the word "shot". Nothing that ever comes out of a gun says "shot": it says
   // "revolver". So the chamber, the range, the barrel and the card in his hand
   // all applied to the tests and to nothing else.
-  const { room, clock, all, turn } = town();
+  const { room, clock, all, turn, seats } = town();
   try {
     const [a, b] = all;
     turn(a);
-    a.pos = { x: 0, y: 0, z: 0 };
-    b.pos = { x: 0, y: 0, z: 6 };
+    a.pos = { x: 40, y: 0, z: 0 };
+    b.pos = { x: 40, y: 0, z: 6 };
     b.gear = []; b.duelHand = [];
 
     a.roundIsLive = false;
@@ -272,14 +282,15 @@ test('the rules apply to a fired gun, not only to the word for one', () => {
     room.applyDamage(b, a, 40, 'revolver', null, 'head');
     assert.equal(b.health, held, 'a blank out of a real gun took a hit off somebody');
 
-    // And out of range is out of range for a real gun too.
+    // And out of range is out of range for a real gun too - which at a table
+    // means three seats away with the iron everybody starts holding.
     a.roundIsLive = true;
-    b.pos = { x: 0, y: 0, z: reachOfMetres(a) + 40 };
+    seats(a, b, 3);
     a.shotSerial = 2; a.shotSpent = null;
     room.applyDamage(b, a, 40, 'revolver', null, 'head');
-    assert.equal(b.health, held, 'a belt gun reached the far end of the street');
+    assert.equal(b.health, held, 'a belt gun reached three seats down the table');
 
-    b.pos = { x: 0, y: 0, z: 6 };
+    seats(a, b, 1);
     a.shotSerial = 3; a.shotSpent = null;
     room.applyDamage(b, a, 40, 'revolver', null, 'head');
     assert.equal(b.health, held - 1, 'and a good shot at a man in range found nothing');
@@ -291,8 +302,8 @@ test('one card, one shot, one man - however many pellets came out', () => {
   try {
     const [a, b, c] = all;
     turn(a);
-    a.pos = { x: 0, y: 0, z: 0 };
-    b.pos = { x: 0, y: 0, z: 6 };
+    a.pos = { x: 40, y: 0, z: 0 };
+    b.pos = { x: 40, y: 0, z: 6 };
     c.pos = { x: 3, y: 0, z: 6 };
     for (const p of [b, c]) { p.gear = []; p.duelHand = []; }
     a.roundIsLive = true;
@@ -317,22 +328,22 @@ test('standing out of the line is the whole of not being shot through', () => {
   const { room, clock, all } = town();
   try {
     const [a, b] = all;
-    a.pos = { x: 0, y: 0, z: 0 }; a.yaw = 0;
+    a.pos = { x: 40, y: 0, z: 0 }; a.yaw = 0;
     for (const p of all.slice(2)) p.pos = { x: 900, y: 0, z: 900 };
 
-    b.pos = { x: 0, y: 0, z: 4 };
+    b.pos = { x: 40, y: 0, z: 4 };
     assert.equal(room.linedUpBehind(a)?.id, b.id, 'directly behind and not found');
-    b.pos = { x: DUEL.selfShot.corridor + 1.5, y: 0, z: 4 };
+    b.pos = { x: 40 + DUEL.selfShot.corridor + 1.5, y: 0, z: 4 };
     assert.equal(room.linedUpBehind(a), null, 'a step to one side was still in the line');
-    b.pos = { x: 0, y: 0, z: DUEL.selfShot.reach + 10 };
+    b.pos = { x: 40, y: 0, z: DUEL.selfShot.reach + 10 };
     assert.equal(room.linedUpBehind(a), null, 'the round carried further than it should');
-    b.pos = { x: 0, y: 0, z: -6 };
+    b.pos = { x: 40, y: 0, z: -6 };
     assert.equal(room.linedUpBehind(a), null, 'the man in front was shot in the back');
 
     // Nearest first: a round that has been through one man does not find a second.
-    b.pos = { x: 0, y: 0, z: 4 };
+    b.pos = { x: 40, y: 0, z: 4 };
     const third = all[2];
-    third.pos = { x: 0, y: 0, z: 9 };
+    third.pos = { x: 40, y: 0, z: 9 };
     assert.equal(room.linedUpBehind(a)?.id, b.id, 'it reached past the first man in the line');
   } finally { clock.restore(); }
 });

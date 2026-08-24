@@ -13,6 +13,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
 import { PHASE, TIMING, DUEL, MODES } from '../shared/constants.js';
+import { seatAt, TABLE } from '../shared/map.js';
+
+const r1 = (n) => Math.round(n * 10) / 10;
 
 const { Room } = await import('../server/room.js');
 
@@ -138,29 +141,81 @@ test('a shot out of turn does nothing at all', () => {
   } finally { clock.restore(); }
 });
 
-test('feet are nailed down for a turn, and heads are not', () => {
+test('the feet are nailed down for the whole round, and heads are not', () => {
+  // This game is played standing at a table. The mark you were dealt is the
+  // mark you keep, and that is where the whole of the original's sense of
+  // distance comes from - the man next to you is one away and the man opposite
+  // is not. An earlier version of this mode let everybody walk a
+  // hundred-and-thirty-metre town between goes, which took that away.
   const { room, clock } = duelRoom();
   try {
     const living = [...room.players.values()].filter((p) => p.alive);
     const walker = living[0];
-    room.turn = { kind: 'turn', holder: living[1].id, endsAt: 1e12 };
-    const stood = { ...walker.pos };
-    for (let i = 1; i <= 10; i++) {
-      walker.lastInputAt = null;
-      room.onInput(walker, { pos: { x: stood.x + i, y: stood.y, z: stood.z }, yaw: 2, pitch: 0.3 });
+    for (const kind of ['turn', 'reposition']) {
+      room.turn = { kind, holder: kind === 'turn' ? living[1].id : null, endsAt: 1e12 };
+      const stood = { ...walker.pos };
+      for (let i = 1; i <= 10; i++) {
+        walker.lastInputAt = null;
+        room.onInput(walker, { pos: { x: stood.x + i, y: stood.y, z: stood.z }, yaw: 2, pitch: 0.3 });
+      }
+      assert.deepEqual(
+        { x: walker.pos.x, z: walker.pos.z }, { x: stood.x, z: stood.z },
+        `somebody walked ten metres during a ${kind}`,
+      );
+      assert.equal(walker.yaw, 2, 'and could not even look about while standing there');
+      assert.equal(walker.moving, false);
     }
-    assert.deepEqual(
-      { x: walker.pos.x, z: walker.pos.z }, { x: stood.x, z: stood.z },
-      'somebody walked ten metres during a turn',
-    );
-    assert.equal(walker.yaw, 2, 'and could not even look about while standing there');
-    assert.equal(walker.moving, false);
+  } finally { clock.restore(); }
+});
 
-    // The walk gives the feet back.
-    room.turn = { kind: 'reposition', holder: null, endsAt: 1e12 };
-    walker.lastInputAt = null;
-    room.onInput(walker, { pos: { x: stood.x + 1, y: stood.y, z: stood.z } });
-    assert.notEqual(walker.pos.x, stood.x, 'the walk did not give the feet back');
+test('everybody is dealt a mark round the table, and it faces the table', () => {
+  // A room at the moment of the deal and not a tick later: heads turn from
+  // then on, which is the whole of what anybody may still do with themselves.
+  TIMING.prep = 1; TIMING.combat = 900; TIMING.endgame = 60; TIMING.results = 5;
+  const clock = fakeClock();
+  try {
+    const room = new Room({ code: 'SEAT', isPublic: false, mode: MODES.DUEL });
+    room.botFillTarget = 6;
+    room.resetClock();
+    room.beginMatch();
+    const all = [...room.players.values()];
+    const seatsGiven = all.map((p) => p.seat).sort((a, b) => a - b);
+    assert.deepEqual(seatsGiven, all.map((_, i) => i), 'somebody was not given a mark');
+    for (const p of all) {
+      const want = seatAt(p.seat, all.length);
+      assert.equal(r1(p.pos.x), r1(want.x), `seat ${p.seat} is not where it should be`);
+      assert.equal(r1(p.pos.z), r1(want.z));
+      // Looking at the middle: the way from here to the table and the way this
+      // man is facing are the same way.
+      const toTable = Math.atan2(-(TABLE.x - p.pos.x), -(TABLE.z - p.pos.z));
+      assert.ok(Math.abs(((p.yaw - toTable + Math.PI * 3) % (Math.PI * 2)) - Math.PI) < 0.02,
+        `seat ${p.seat} has its back to the table`);
+    }
+    // And nobody is standing on anybody.
+    for (const a of all) {
+      for (const b of all) {
+        if (a === b) continue;
+        assert.ok(Math.hypot(a.pos.x - b.pos.x, a.pos.z - b.pos.z) > 1.4,
+          'two men were dealt the same mark');
+      }
+    }
+  } finally { clock.restore(); }
+});
+
+test('the man next to you is one away, and a dead man closes the circle', () => {
+  const { room, clock } = duelRoom({ bots: 6 });
+  try {
+    const ring = room.seated();
+    assert.equal(ring.length, 6, 'the table is not the size it was asked for');
+    assert.equal(room.seatsBetween(ring[0], ring[1]), 1, 'the man next to him was not next to him');
+    assert.equal(room.seatsBetween(ring[0], ring[5]), 1, 'and the table did not go round');
+    assert.equal(room.seatsBetween(ring[0], ring[3]), 3, 'the far side of the table moved');
+
+    // He goes down and the two either side of him become neighbours.
+    ring[1].alive = false;
+    assert.equal(room.seated().length, 5);
+    assert.equal(room.seatsBetween(ring[0], ring[2]), 1, 'the circle did not close over him');
+    assert.equal(room.seatsBetween(ring[0], ring[3]), 2);
   } finally { clock.restore(); }
 });
 

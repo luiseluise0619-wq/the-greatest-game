@@ -206,10 +206,30 @@ export function coverOf(player) {
   return steps * DISTANCE_UNIT;
 }
 
+/** How many seats this gun reaches, which is what the original counts. */
+export function reachSeats(player) {
+  const weapon = player?.weaponCard ? DUEL_CARDS[player.weaponCard] : null;
+  return (weapon?.reach ?? DEFAULT_REACH)
+    + (player?.gear?.includes('scope') ? 1 : 0)
+    + (trait(player, 'reach') || 0);
+}
+
+/** And how many further out a man counts as sitting than he really is. */
+export function coverSeats(player) {
+  return (player?.gear?.includes('mustang') ? 1 : 0) + (trait(player, 'cover') || 0);
+}
+
 /**
- * Can `shooter` reach `target`? The original asks whether the seats between
- * them are within the gun's range; this asks the same question of the ground.
+ * Can `shooter` reach `target`?
+ *
+ * The card game counts seats, and so does this: `seats` is how many places
+ * apart the two of them are round the table, the short way. The metres are
+ * still passed because the free-for-all has no table and no seats, and there
+ * the same question is asked of the ground.
  */
-export function inReach(shooter, target, metres) {
+export function inReach(shooter, target, metres, seats = null) {
+  if (seats != null && Number.isFinite(seats)) {
+    return seats <= reachSeats(shooter) - coverSeats(target);
+  }
   return metres <= reachOf(shooter) + 1e-9 - coverOf(target);
 }

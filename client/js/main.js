@@ -400,7 +400,7 @@ class Game {
     btn.classList.add('done');
     clearTimeout(this._copyT);
     this._copyT = setTimeout(() => {
-      btn.textContent = 'COPY INVITE LINK';
+      btn.textContent = this.tr('ui.copyLink', 'COPY INVITE LINK');
       btn.classList.remove('done');
     }, 2200);
   }

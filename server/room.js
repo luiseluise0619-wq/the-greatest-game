@@ -11,7 +11,7 @@ import {
   CARDS, CARD_ORDER, CARD_DEAL, DUEL, MODES, DEFAULT_MODE,
   MIN_PLAYERS, MAX_PLAYERS, rolesForPlayerCount, clamp, stepStamina, swapTime,
 } from '../shared/constants.js';
-import MAP, { zoneAt, SPAWNS, LOOT_SPAWNS } from '../shared/map.js';
+import MAP, { zoneAt, SPAWNS, LOOT_SPAWNS, seatAt, seatsApart } from '../shared/map.js';
 import { raycastWorld, rayPlayerBox, lineOfSight, moveAndCollide } from '../shared/collision.js';
 import { C, S } from '../shared/protocol.js';
 import { BotBrain, BOT_NAMES } from './bots.js';
@@ -510,6 +510,27 @@ export class Room {
     return g && g.mag > 0;
   }
 
+  /**
+   * Everybody still at the table, in seat order. A man who is down is out of
+   * the circle and the two either side of him become neighbours, which is the
+   * original's rule and the reason a round gets sharper as it thins.
+   */
+  seated() {
+    return [...this.players.values()]
+      .filter((p) => p.alive && p.seat != null)
+      .sort((a, b) => a.seat - b.seat);
+  }
+
+  /** How many places apart these two are, the short way round the table. */
+  seatsBetween(a, b) {
+    if (!this.duel || a?.seat == null || b?.seat == null) return null;
+    const ring = this.seated();
+    const i = ring.findIndex((p) => p.id === a.id);
+    const j = ring.findIndex((p) => p.id === b.id);
+    if (i < 0 || j < 0) return null;
+    return seatsApart(i, j, ring.length);
+  }
+
   /** Is there a shot left in this hand, and in this turn? */
   canBang(p) {
     if (!this.shotCard(p)) return false;
@@ -869,7 +890,7 @@ export class Room {
     }
     // Out of range is out of range, whatever the bullet did.
     const d = Math.hypot(victim.pos.x - attacker.pos.x, victim.pos.z - attacker.pos.z);
-    if (!inReach(attacker, victim, d)) {
+    if (!inReach(attacker, victim, d, this.seatsBetween(attacker, victim))) {
       this.emit(attacker, {
         t: S.FEED, k: 'feed.tooFar', text: 'Too far. The shot goes wide of anything that matters.', tone: 'bad',
       });
@@ -926,28 +947,28 @@ export class Room {
     if (sheriff && !sheriff.alive) {
       // The star falls: the round is over one way or the other.
       if (aliveRenegades === 1 && alive.length === 1) {
-        return this.endMatch('renegade', 'The Renegade stands alone in the dust.');
+        return this.endMatch('renegade', 'The Renegade stands alone in the dust.', 'end.renegadeDust');
       }
       if (aliveOutlaws > 0) {
-        return this.endMatch('outlaw', 'The Sheriff is dead. The gang rides out rich.');
+        return this.endMatch('outlaw', 'The Sheriff is dead. The gang rides out rich.', 'end.starDead');
       }
       if (aliveRenegades > 0) {
-        return this.endMatch('renegade', 'The star fell and the Renegade was the last hand on a trigger.');
+        return this.endMatch('renegade', 'The star fell and the Renegade was the last hand on a trigger.', 'end.starFellRenegade');
       }
-      return this.endMatch('law', 'Everyone hostile died before the Sheriff bled out. The town holds.');
+      return this.endMatch('law', 'Everyone hostile died before the Sheriff bled out. The town holds.', 'end.holdsBleeding');
     }
 
     if (aliveOutlaws === 0 && aliveRenegades === 0) {
-      return this.endMatch('law', 'Every outlaw and the renegade are buried. The law holds Perdition Flats.');
+      return this.endMatch('law', 'Every outlaw and the renegade are buried. The law holds Perdition Flats.', 'end.allBuried');
     }
     if (alive.length === 1 && aliveRenegades === 1) {
-      return this.endMatch('renegade', 'The Renegade is the last soul standing.');
+      return this.endMatch('renegade', 'The Renegade is the last soul standing.', 'end.lastSoul');
     }
     if (alive.length === 0) {
-      return this.endMatch('none', 'Nobody walked away. The buzzards win.');
+      return this.endMatch('none', 'Nobody walked away. The buzzards win.', 'end.buzzards');
     }
     if (aliveLaw === 0 && aliveOutlaws > 0 && aliveRenegades === 0 && (!sheriff || !sheriff.alive)) {
-      return this.endMatch('outlaw', 'The law is wiped out.');
+      return this.endMatch('outlaw', 'The law is wiped out.', 'end.lawGone');
     }
   }
 
@@ -1127,7 +1148,10 @@ export class Room {
           p.dynamite = Math.min(DYNAMITE.maxCarried, p.dynamite + 1);
         }
         if (boon.duration) p.buffs.until = t + boon.duration;
-        this.emit(p, { t: S.FEED, text: boon.label, tone: boon.id === 'bust' ? 'bad' : 'good' });
+        this.emit(p, {
+          t: S.FEED, k: `boon.${boon.id}`, text: boon.label,
+          tone: boon.id === 'bust' ? 'bad' : 'good',
+        });
         break;
       }
       case 'tracker': {
@@ -1234,7 +1258,8 @@ export class Room {
     // between the wheel and all-chat: T reaches the town, V reaches the street.
     // The dead hear everything, having nothing better to do.
     const shout = {
-      t: S.CHAT, from: p.name, id: p.id, text: line.text, voice: true,
+      // Shouted, so it travels as a key too - a Korean town hears it in Korean.
+      t: S.CHAT, from: p.name, id: p.id, text: line.text, k: `voice.${line.id}`, voice: true,
       x: r2(p.pos.x), y: r2(p.pos.y), z: r2(p.pos.z),
     };
     this.broadcast(shout, (o) => (
@@ -1371,8 +1396,14 @@ export class Room {
 
       case KIND.TARGET: {
         if (!target || !target.alive || target.id === p.id) { say('duel.say.noTarget', 'Nobody in mind for that.', 'bad'); return; }
-        const reach = (card.range ?? 1) * DISTANCE_UNIT;
-        if (Number.isFinite(reach) && metres(target) > reach) {
+        // Seats, the way the original counts them - Panic! reaches the man
+        // next to you and Cat Balou reaches across the table.
+        const range = card.range ?? 1;
+        const away = this.seatsBetween(p, target);
+        const tooFar = away != null
+          ? away > range
+          : Number.isFinite(range * DISTANCE_UNIT) && metres(target) > range * DISTANCE_UNIT;
+        if (tooFar) {
           say('duel.say.notClose', 'Not close enough for that.', 'bad');
           return;
         }
@@ -1696,10 +1727,21 @@ export class Room {
       p.stamina = PLAYER.staminaMax;
       p.seenAt = new Map();
       p.lastVisible = null;
-      const s = SPAWNS[spawnOrder[i % SPAWNS.length]];
-      p.pos = { x: s.x, y: s.y, z: s.z };
+      if (this.duel) {
+        // A mark on the ground round the table, and facing it. Where you stand
+        // is dealt to you like everything else, and it does not change again.
+        p.seat = i;
+        const seat = seatAt(i, all.length);
+        p.pos = { x: seat.x, y: seat.y, z: seat.z };
+        p.yaw = seat.yaw;
+      } else {
+        p.seat = null;
+        const s = SPAWNS[spawnOrder[i % SPAWNS.length]];
+        p.pos = { x: s.x, y: s.y, z: s.z };
+        p.yaw = s.yaw;
+      }
       p.vel = { x: 0, y: 0, z: 0 };
-      p.yaw = s.yaw; p.pitch = 0;
+      p.pitch = 0;
       if (p.bot) p.brain = p.brain || new BotBrain(this, p);
       if (p.bot) p.brain.reset();
     });
@@ -1892,7 +1934,7 @@ export class Room {
     }
   }
 
-  endMatch(winner, blurb) {
+  endMatch(winner, blurb, blurbKey = null) {
     if (this.phase === PHASE.RESULTS) return;
     const rows = [...this.players.values()].map((p) => ({
       id: p.id, name: p.name, bot: p.bot, role: p.role,
@@ -1914,11 +1956,11 @@ export class Room {
       .filter((e) => e.type === 'card' || e.type === 'badge' || recent.has(e))
       .slice(-40);
 
-    this.results = { winner, blurb, rows, timeline };
+    this.results = { winner, blurb, blurbKey, rows, timeline };
     telemetry.matchEnd(this, winner, blurb);
     this.setPhase(PHASE.RESULTS);
     this.broadcast({
-      t: S.RESULTS, winner, blurb, rows, timeline: this.results.timeline,
+      t: S.RESULTS, winner, blurb, blurbKey, rows, timeline: this.results.timeline,
       title: winner === 'law' ? 'THE LAW HOLDS'
         : winner === 'outlaw' ? 'THE OUTLAWS RIDE OUT'
         : winner === 'renegade' ? 'THE RENEGADE STANDS ALONE' : 'NOBODY WINS',
@@ -2008,8 +2050,13 @@ export class Room {
   /** Shorthand, because it is asked on nearly every path through this file. */
   get duel() { return this.mode === MODES.DUEL; }
 
-  /** True while nobody is allowed to walk: the town is standing at its marks. */
-  get rooted() { return this.duel && this.turn?.kind === 'turn'; }
+  /**
+   * True while nobody is allowed to walk, which in the turn mode is always:
+   * the game is played standing at a table and the mark you were given is the
+   * mark you keep. It is where the whole of the original's sense of distance
+   * comes from - the man next to you is one away and the man opposite is not.
+   */
+  get rooted() { return this.duel; }
 
   /** Whose gun is live right now, if anybody's. */
   get turnHolder() { return this.turn?.kind === 'turn' ? this.turn.holder : null; }
@@ -2588,9 +2635,9 @@ export class Room {
     if (this.phase === PHASE.ENDGAME) {
       const sheriff = [...this.players.values()].find((p) => p.role === 'sheriff');
       if (sheriff && sheriff.alive) {
-        return this.endMatch('law', 'Sundown. The Sheriff is still standing and the town keeps its name.');
+        return this.endMatch('law', 'Sundown. The Sheriff is still standing and the town keeps its name.', 'end.sundown');
       }
-      return this.endMatch('none', 'The storm took whoever was left.');
+      return this.endMatch('none', 'The storm took whoever was left.', 'end.stormTook');
     }
   }
 

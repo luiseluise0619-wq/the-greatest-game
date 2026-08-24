@@ -37,6 +37,7 @@ function table({ bots = 5 } = {}) {
     p.pos = { x: 500 + i * 40, y: 0, z: 500 };
     p.gear = [];
     p.duelHand = [];
+    p.seat = i;
   });
   return {
     room, clock, all,
@@ -47,7 +48,16 @@ function table({ bots = 5 } = {}) {
       return p;
     },
     turn: (p) => { room.turn = { kind: 'turn', holder: p.id, endsAt: Date.now() / 1000 + 1e6 }; p.bangsThisTurn = 0; },
-    face: (a, b, m) => { a.pos = { x: 0, y: 0, z: 0 }; b.pos = { x: 0, y: 0, z: m }; },
+    // Distance is seats round a table, so "face" sits these two next to each
+    // other - inside a belt gun's reach - and puts everybody else elsewhere.
+    face: (a, b, m) => {
+      a.pos = { x: 40, y: 0, z: 0 };
+      b.pos = { x: 40, y: 0, z: m };
+      for (const o of all) o.seat = null;
+      a.seat = 0; b.seat = 1;
+      let at = 2;
+      for (const o of all) { if (o === a || o === b) continue; o.seat = at++; }
+    },
   };
 }
 
@@ -88,7 +98,7 @@ test('one bleeds a card for every hit, and one takes it off whoever landed it', 
     assert.ok(b.duelHand.length > before, 'he was shot and it cost the shooter nothing');
 
     deal(c, 'scavenger');
-    c.pos = { x: 0, y: 0, z: 7 };
+    face(a, c, 7);
     c.duelHand = [];
     a.duelHand = ['bang', 'missed'];
     a.gear = [];
@@ -318,8 +328,8 @@ test('the four who do not draw off the top of the pile', () => {
 
     // Off somebody else's hand.
     deal(a, 'cutpurse');
-    a.duelHand = []; a.pos = { x: 0, y: 0, z: 0 };
-    b.duelHand = ['winchester']; b.pos = { x: 0, y: 0, z: 5 };
+    a.duelHand = []; a.pos = { x: 40, y: 0, z: 0 };
+    b.duelHand = ['winchester']; b.pos = { x: 40, y: 0, z: 5 };
     turn(a);
     room.drawForTurn(a);
     assert.equal(a.duelHand.length, DUEL.draw, 'she was dealt the wrong number');

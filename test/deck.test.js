@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
 import { TIMING, MODES, DUEL } from '../shared/constants.js';
 import {
-  DECK_SIZE, DISTANCE_UNIT, DUEL_CARDS, buildDeck, reachOf, inReach,
+  DECK_SIZE, DISTANCE_UNIT, DUEL_CARDS, buildDeck, reachOf, reachSeats, inReach,
 } from '../shared/deck.js';
 import { Pile, handLimit } from '../server/deck.js';
 import { healthOf } from '../shared/gunhands.js';
@@ -42,7 +42,24 @@ function table({ bots = 5 } = {}) {
     room, clock, all, dealt,
     give: (p, ...cards) => { p.duelHand = cards.slice(); },
     turn: (p) => { room.turn = { kind: 'turn', holder: p.id, endsAt: 1e12 }; p.bangsThisTurn = 0; },
-    apart: (p, q, m) => { p.pos = { x: 0, y: 0, z: 0 }; q.pos = { x: 0, y: 0, z: m }; },
+    apart: (p, q, m) => { p.pos = { x: 40, y: 0, z: 0 }; q.pos = { x: 40, y: 0, z: m }; },
+    // Distance in the turn mode is seats, so this is what "apart" means now:
+    // sit these two n places from each other and take everybody else out of
+    // the circle, so nothing else is between them.
+    seats: (p, q, n) => {
+      for (const o of all) o.seat = null;
+      p.seat = 0;
+      q.seat = n;
+      // Filler, so the ring is big enough for n to be the short way round.
+      let at = 1;
+      for (const o of all) {
+        if (o === p || o === q) continue;
+        while (at === n) at += 1;
+        o.seat = at++;
+      }
+      p.pos = { x: 40, y: 0, z: 0 };
+      q.pos = { x: 40, y: 0, z: 4 };
+    },
   };
 }
 
@@ -107,38 +124,42 @@ test('ammunition is cards, and one of them is a turn', () => {
 });
 
 test('a gun reaches as far as the card in front of you says', () => {
-  const { room, clock, all, give, turn, apart } = table();
+  // Seats, the way the card game counts them: the belt gun everybody starts
+  // with reaches the man next to you and nothing further.
+  const { room, clock, all, give, turn, seats } = table();
   try {
     const [a, b] = all;
     turn(a);
     give(a, 'bang', 'bang', 'bang', 'bang');
     give(b);
     b.gear = [];
+    a.roundIsLive = true;
 
-    // Bare hands: one step of ground.
-    assert.equal(Math.round(reachOf(a)), DISTANCE_UNIT);
-    apart(a, b, DISTANCE_UNIT + 5);
+    assert.equal(reachSeats(a), 1, 'a belt gun grew');
+    seats(a, b, 3);
     const far = b.health;
     room.applyDamage(b, a, 99, 'shot', null, 'head');
-    assert.equal(b.health, far, 'a shot landed from outside the gun\'s reach');
-    apart(a, b, DISTANCE_UNIT - 2);
+    assert.equal(b.health, far, 'a shot landed from three seats away with a belt gun');
+    seats(a, b, 1);
     room.applyDamage(b, a, 99, 'shot', null, 'body');
-    assert.equal(b.health, far - 1, 'a shot inside the reach did nothing');
+    assert.equal(b.health, far - 1, 'and the man next to him was out of reach');
 
-    // And the far end of the street with the right rifle.
+    // And across the table with the right rifle.
     a.weaponCard = 'winchester';
-    assert.equal(Math.round(reachOf(a)), DISTANCE_UNIT * 5);
-    apart(a, b, DISTANCE_UNIT * 4);
+    assert.equal(reachSeats(a), 5);
+    seats(a, b, 4);
     room.applyDamage(b, a, 99, 'shot', null, 'body');
     assert.equal(b.health, far - 2);
 
-    // A scope is a step nearer; a mustang is a step further out.
+    // A scope is a seat nearer; a mustang is a seat further out.
     a.weaponCard = null;
     a.gear = ['scope'];
-    assert.equal(Math.round(reachOf(a)), DISTANCE_UNIT * 2);
+    assert.equal(reachSeats(a), 2);
     b.gear = ['mustang'];
-    assert.equal(inReach(a, b, DISTANCE_UNIT * 2 - 1), false, 'the mustang did not buy a step');
-    assert.equal(inReach(a, b, DISTANCE_UNIT - 1), true);
+    assert.equal(inReach(a, b, 0, 2), false, 'the mustang did not buy a seat');
+    assert.equal(inReach(a, b, 0, 1), true);
+    // And the ground is still how the free-for-all measures it.
+    assert.equal(Math.round(reachOf(a)), DISTANCE_UNIT * 2);
   } finally { clock.restore(); }
 });
 
@@ -211,11 +232,11 @@ test('the cards that heal, and the one that will not pour for two men', () => {
 });
 
 test('taking a card off somebody, from close up and from anywhere', () => {
-  const { room, clock, all, give, turn, apart } = table();
+  const { room, clock, all, give, turn, seats } = table();
   try {
     const [a, b] = all;
     turn(a);
-    apart(a, b, 10);
+    seats(a, b, 1);
     give(b, 'bang', 'bang');
     b.gear = []; b.weaponCard = null;
     give(a, 'panic');
@@ -225,7 +246,7 @@ test('taking a card off somebody, from close up and from anywhere', () => {
 
     // Out of arm's reach it does nothing at all.
     turn(a);
-    apart(a, b, DISTANCE_UNIT * 3);
+    seats(a, b, 3);
     give(a, 'panic');
     room.onDuelCard(a, { card: 'panic', target: b.id });
     assert.deepEqual(a.duelHand, ['panic'], 'somebody picked a pocket from sixty metres');

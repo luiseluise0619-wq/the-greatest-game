@@ -281,6 +281,44 @@ export function buildWorld(scene) {
         up.castShadow = true;
         group.add(up);
       }
+    } else if (p.type === 'table') {
+      // The table the turn mode is played round. A plank top on a frame, with
+      // the marks everybody stands on burnt into the dirt around it - so that
+      // where you were dealt is a thing you can see rather than a number.
+      const topMat = new THREE.MeshLambertMaterial({ color: 0x6b4c2e });
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(p.r, p.r * 0.98, 0.16, 22), topMat);
+      top.position.set(p.x, p.y - 0.08, p.z);
+      top.castShadow = true; top.receiveShadow = true;
+      group.add(top);
+      const rimMat = new THREE.MeshLambertMaterial({ color: 0x4a3320 });
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(p.r, 0.09, 6, 26), rimMat);
+      rim.rotation.x = Math.PI / 2;
+      rim.position.set(p.x, p.y - 0.02, p.z);
+      group.add(rim);
+      // Planks across the top, so it reads as boards rather than a disc.
+      for (let i = -3; i <= 3; i++) {
+        const line = new THREE.Mesh(
+          new THREE.BoxGeometry(p.r * 1.9, 0.01, 0.05),
+          new THREE.MeshLambertMaterial({ color: 0x4a3320 }),
+        );
+        line.position.set(p.x, p.y + 0.005, p.z + i * (p.r / 3.4));
+        group.add(line);
+      }
+      const legMat = new THREE.MeshLambertMaterial({ color: 0x4a3320 });
+      for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, p.y - 0.1, 0.16), legMat);
+        leg.position.set(p.x + dx * (p.r - 0.7), (p.y - 0.1) / 2, p.z + dz * (p.r - 0.7));
+        leg.castShadow = true;
+        group.add(leg);
+      }
+      const markMat = new THREE.MeshBasicMaterial({ color: 0x3a2a1c, transparent: true, opacity: 0.5 });
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
+        const mark = new THREE.Mesh(new THREE.RingGeometry(0.44, 0.58, 18), markMat);
+        mark.rotation.x = -Math.PI / 2;
+        mark.position.set(p.x + Math.cos(a) * 5.6, 0.02, p.z + Math.sin(a) * 5.6);
+        group.add(mark);
+      }
     } else if (p.type === 'windmill') {
       const hub = new THREE.Group();
       hub.position.set(p.x, p.y, p.z + 0.5);

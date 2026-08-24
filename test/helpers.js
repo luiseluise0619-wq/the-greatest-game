@@ -57,6 +57,16 @@ export function freezeBots(room) {
   }
 }
 
+/**
+ * Sit these players round the table in this order, so that the distance between
+ * any two of them is how far apart they are in the list - which is what the turn
+ * mode counts. Anybody not in the list is taken out of the circle.
+ */
+export function seatThem(room, list) {
+  for (const p of room.players.values()) p.seat = null;
+  list.forEach((p, i) => { p.seat = i; });
+}
+
 /** Step a room forward n server ticks against the fake clock. */
 export function tick(clock, room, n) {
   for (let i = 0; i < n; i++) { clock.advance(50); room.step(); }

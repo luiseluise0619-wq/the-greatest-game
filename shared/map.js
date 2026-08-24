@@ -472,6 +472,60 @@ for (const [rx, rz, rw, rh, rd] of [
 // `id` is what the place is called when it is not being called anything: the
 // name on the wire is English prose and a Korean feed cannot use it, so a
 // client that needs to say the place somewhere else looks the id up instead.
+// ---------------------------------------------------------------------------
+// THE TABLE
+//
+// The card game is played round one, and that is not decoration: the seating is
+// the brake on the whole thing. A starting gun reaches the man next to you, so
+// most of the gang physically cannot shoot the Sheriff for several turns, and
+// where you happen to be sitting is the hand you were dealt as much as the
+// cards are.
+//
+// The first cut of the turn mode had everybody walking a hundred-and-thirty
+// metre town between goes, which took that brake clean off - the gang could
+// close on the star from anywhere, every lap. So: a table, in the middle of
+// Main Street, with a mark on the ground for every man at it. Nobody walks.
+//
+// Distance is seats, the short way round, exactly as the original counts it.
+// ---------------------------------------------------------------------------
+export const TABLE = {
+  x: -4, z: 0,             // the middle of Main Street, outside the Sheriff's office
+  radius: 3.6,             // the table itself
+  standing: 5.6,           // how far out the marks are
+  height: 1.02,
+};
+
+/** Where the nth of `count` men stands, and which way he is facing. */
+export function seatAt(i, count) {
+  const a = (i / Math.max(1, count)) * Math.PI * 2 - Math.PI / 2;
+  const x = TABLE.x + Math.cos(a) * TABLE.standing;
+  const z = TABLE.z + Math.sin(a) * TABLE.standing;
+  // Facing the middle. yaw 0 looks down -z, so this is the angle back to centre.
+  const yaw = Math.atan2(-(TABLE.x - x), -(TABLE.z - z));
+  return { x, y: 0, z, yaw };
+}
+
+/**
+ * How many seats apart two men are, counted the short way round - which is the
+ * whole of what "distance" means in the card game. Only the living are counted,
+ * because a man who is down is out of the circle and the two either side of him
+ * become neighbours.
+ */
+export function seatsApart(a, b, count) {
+  if (a == null || b == null || count < 2) return Infinity;
+  const d = Math.abs(a - b) % count;
+  return Math.min(d, count - d);
+}
+
+// The table itself, and the ring of ground round it people stand on.
+box([TABLE.x - TABLE.radius, 0.92, TABLE.z - TABLE.radius],
+  [TABLE.x + TABLE.radius, TABLE.height, TABLE.z + TABLE.radius], 'wood');
+for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+  box([TABLE.x + dx * (TABLE.radius - 0.7) - 0.14, 0, TABLE.z + dz * (TABLE.radius - 0.7) - 0.14],
+    [TABLE.x + dx * (TABLE.radius - 0.7) + 0.14, 0.92, TABLE.z + dz * (TABLE.radius - 0.7) + 0.14], 'wood');
+}
+props.push({ type: 'table', x: TABLE.x, z: TABLE.z, r: TABLE.radius, y: TABLE.height });
+
 export const ZONES = [
   { id: 'saloon', name: 'the Saloon', x0: -33, z0: -27, x1: -11, z1: -7 },
   { id: 'office', name: "the Sheriff's Office", x0: -10, z0: -23, x1: 6, z1: -7 },
@@ -648,6 +702,7 @@ export const MAP = {
   solids,
   lamps,
   props,
+  table: TABLE,
   spawns: SPAWNS,
   loot: LOOT_SPAWNS,
   nav: NAV_NODES,

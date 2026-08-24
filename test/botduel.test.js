@@ -45,6 +45,18 @@ function town({ bots = 5 } = {}) {
     // these tests are asking - one stands a step further out than the tape
     // says, one is behind a barrel, one takes two Missed! to get away from.
     // So the two men in a test are dealt none of them.
+    // Distance is seats round a table. Two men in a test are next to each
+    // other unless it says otherwise, which is inside a belt gun's reach.
+    seats: (a, b, n = 1) => {
+      for (const o of room.players.values()) o.seat = null;
+      a.seat = 0; b.seat = n;
+      let at = 1;
+      for (const o of room.players.values()) {
+        if (o === a || o === b) continue;
+        while (at === n) at += 1;
+        o.seat = at++;
+      }
+    },
     feud: (a, b) => {
       a.gunhand = null; b.gunhand = null;
       a.role = 'outlaw'; a.faction = 'outlaw';
@@ -65,34 +77,38 @@ function town({ bots = 5 } = {}) {
   };
 }
 
-test('a bot stands at its mark like everybody else', () => {
+test('a bot stands at the mark it was dealt, and never leaves it', () => {
+  // This game is played at a table. There is no walk between goes and there
+  // never was meant to be one: where you stand is dealt to you and it is what
+  // "distance" means for the rest of the round. An earlier version of the mode
+  // gave everybody fifteen seconds of open town between goes, and the fork
+  // that handles a turn only came into effect once the bell rang - so until it
+  // did, every bot walked off its mark using the other game's brain.
   const { room, clock, bots, turn } = town();
   try {
-    const [a, b] = bots();
+    const [a] = bots();
     turn(a);
-    // Somewhere to want to be, so that standing still is a decision and not
-    // simply having nothing to do.
+    // Somewhere to want to be, so standing still is a decision and not simply
+    // having nothing to do.
     for (const p of bots()) {
       p.brain.goal = { x: 60, z: 60 };
       p.brain.path = [];
     }
-    const stood = bots().map((p) => ({ id: p.id, x: p.pos.x, z: p.pos.z }));
-    secs(clock, room, 3);
-    for (const was of stood) {
-      const p = room.players.get(was.id);
-      const moved = Math.hypot(p.pos.x - was.x, p.pos.z - was.z);
-      assert.ok(moved < 0.5, `a bot walked ${moved.toFixed(1)}m while the town stood still`);
-    }
+    const stood = bots().map((p) => ({ id: p.id, x: p.pos.x, z: p.pos.z, seat: p.seat }));
+    assert.ok(stood.every((s) => s.seat != null), 'somebody was never given a mark');
 
-    // And the walk gives the feet back to all of them.
-    room.turn = { kind: 'reposition', holder: null, endsAt: Date.now() / 1000 + 1e6 };
-    secs(clock, room, 3);
-    const walked = bots().filter((p) => {
-      const was = stood.find((w) => w.id === p.id);
-      return Math.hypot(p.pos.x - was.x, p.pos.z - was.z) > 1;
-    });
-    assert.ok(walked.length >= 2, `only ${walked.length} bots moved during the walk`);
-    assert.ok(b, 'a town of one bot proves nothing');
+    for (const kind of ['turn', 'reposition']) {
+      room.turn = { kind, holder: kind === 'turn' ? a.id : null, endsAt: Date.now() / 1000 + 1e6 };
+      secs(clock, room, 3);
+      for (const was of stood) {
+        const p = room.players.get(was.id);
+        const moved = Math.hypot(p.pos.x - was.x, p.pos.z - was.z);
+        assert.ok(moved < 0.5, `a bot walked ${moved.toFixed(1)}m during a ${kind}`);
+      }
+    }
+    // And heads still turn, which is the whole of what anybody may do with
+    // themselves on somebody else's go.
+    assert.ok(bots().some((p) => Number.isFinite(p.yaw)), 'nobody has a head');
   } finally { clock.restore(); }
 });
 
@@ -115,20 +131,23 @@ test('a bot plays the eighty rather than sitting on them', () => {
 });
 
 test('a bot draws before it fires, and the draw is the warning', () => {
-  const { room, clock, bots, turn, feud } = town();
+  const { room, clock, bots, turn, feud, seats } = town();
   try {
     const [shooter, mark] = bots();
     for (const p of bots()) { p.pos = { x: 900, y: 0, z: 900 }; }
+    // Well clear of the table the mode is played round, so nothing between
+    // these two is a piece of furniture.
     turn(shooter);
-    shooter.pos = { x: 0, y: 0, z: 0 };
+    shooter.pos = { x: 40, y: 0, z: 0 };
     shooter.yaw = Math.PI;                 // looking down +z, where the mark is
-    mark.pos = { x: 0, y: 0, z: 12 };
+    mark.pos = { x: 40, y: 0, z: 12 };
     mark.duelHand = [];
     mark.gear = [];
     shooter.duelHand = ['bang'];
     // Somebody he actually wants dead, so this measures the draw and not the
     // decision - bots do not shoot strangers here any more than anywhere else.
     feud(shooter, mark);
+    seats(shooter, mark);
     // And a live round, because whether this one is live is another test's
     // question and here it would only make this one flaky.
     room.chamber = [true, true, true];
@@ -145,19 +164,22 @@ test('a bot draws before it fires, and the draw is the warning', () => {
 });
 
 test('a bot with a card in its hand moves when a gun stops on it', () => {
-  const { room, clock, bots, turn, feud } = town();
+  const { room, clock, bots, turn, feud, seats } = town();
   try {
     const [shooter, mark] = bots();
     for (const p of bots()) { p.pos = { x: 900, y: 0, z: 900 }; }
+    // Well clear of the table the mode is played round, so nothing between
+    // these two is a piece of furniture.
     turn(shooter);
-    shooter.pos = { x: 0, y: 0, z: 0 };
+    shooter.pos = { x: 40, y: 0, z: 0 };
     shooter.yaw = Math.PI;
-    mark.pos = { x: 0, y: 0, z: 12 };
+    mark.pos = { x: 40, y: 0, z: 12 };
     mark.gear = [];
     // Nothing to fire, so the barrel levels and stays levelled: what is being
     // measured is the man on the other end, not what happens to him.
     shooter.duelHand = [];
     feud(shooter, mark);
+    seats(shooter, mark);
     mark.brain.skill = 1;
     mark.duelHand = ['missed'];
 

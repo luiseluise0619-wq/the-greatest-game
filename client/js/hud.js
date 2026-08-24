@@ -73,8 +73,6 @@ export class HUD {
     const box = $('manKeys');
     if (!box) return;
     const common = [
-      ['key.move', 'WASD', 'move'],
-      ['key.pickup', 'E', 'pick up'],
       ['key.callout', 'F', 'call out'],
       ['key.shout', 'V', 'shout'],
       ['key.chat', 'T', 'chat'],
@@ -90,9 +88,12 @@ export class HUD {
       ['man.key.fire', 'LMB', 'fire — once the barrel has been on him a moment'],
       ['man.key.cards', '1…9', 'play a card'],
       ['man.key.brace', 'Space', 'get out of the way'],
+      ['man.key.look', 'mouse', 'turn your head — the feet stay put'],
       ['man.key.self', 'Q', 'turn it on yourself'],
     ];
     const freeKeys = [
+      ['key.move', 'WASD', 'move'],
+      ['key.pickup', 'E', 'pick up'],
       ['key.ability', 'Q', 'ability'],
       ['key.sprint', 'Shift', 'sprint'],
       ['key.crouch', 'Ctrl', 'crouch'],
@@ -222,7 +223,9 @@ export class HUD {
       void 0;
       ul.appendChild(li);
     }
-    if (!msg.players.length) ul.innerHTML = '<li><span>nobody yet</span></li>';
+    if (!msg.players.length) {
+      ul.innerHTML = `<li><span>${escapeHtml(this.t('ui.nobodyYet', 'nobody yet'))}</span></li>`;
+    }
     $('botCount').textContent = msg.botTarget;
     const humans = msg.players.filter((p) => !p.bot).length;
     const bots = Math.max(0, msg.botTarget - humans);
@@ -371,13 +374,13 @@ export class HUD {
     $('hud').classList.toggle('rooted', !walk);
 
     $('turnWhat').textContent = walk
-      ? this.t('turn.walk', 'FIND YOUR MARK')
+      ? this.t('turn.between', 'THE CHAMBER IS LOADED')
       : mine ? this.t('turn.yours', 'YOUR GO')
         : this.t('turn.theirs', `${this.nameOf(this.turn.holder)} HAS THE FLOOR`,
           { name: this.nameOf(this.turn.holder) });
     $('turnClock').textContent = walk
-      ? this.t('turn.walkHint', 'nobody can shoot · everybody can walk')
-      : this.t('turn.rootedHint', 'nobody can walk');
+      ? this.t('turn.betweenHint', 'count what went into it')
+      : this.t('turn.rootedHint', 'nobody may move');
 
     const ol = $('turnOrder');
     ol.innerHTML = '';
@@ -397,8 +400,8 @@ export class HUD {
     const left = Math.max(0, (this.game.turnDeadline || 0) - performance.now() / 1000);
     const el = $('turnClock');
     const label = this.turn.kind === 'reposition'
-      ? this.t('turn.walkHint', 'nobody can shoot · everybody can walk')
-      : this.t('turn.rootedHint', 'nobody can walk');
+      ? this.t('turn.betweenHint', 'count what went into it')
+      : this.t('turn.rootedHint', 'nobody may move');
     el.textContent = `${label} · ${left.toFixed(1)}s`;
   }
 
@@ -590,16 +593,16 @@ export class HUD {
     } else bar.classList.add('hidden');
 
     const chips = [];
-    if (s.badge) chips.push(['THE STAR IS ON', 'badge']);
+    if (s.badge) chips.push([this.t('chip.badge', 'THE STAR IS ON'), 'badge']);
+    const BUFFS = {
+      speedMult: 'FLEET FOOTED', damageMult: 'HOT STREAK', spreadMult: 'CALLED SHOT',
+      fireRateMult: 'HAIR TRIGGER', dust: 'DUST DEVIL', resist: 'IRON PLATE',
+    };
     for (const b of s.buffs || []) {
-      if (b === 'speedMult') chips.push(['FLEET FOOTED', '']);
-      else if (b === 'damageMult') chips.push(['HOT STREAK', '']);
-      else if (b === 'spreadMult') chips.push(['CALLED SHOT', '']);
-      else if (b === 'fireRateMult') chips.push(['HAIR TRIGGER', '']);
-      else if (b === 'dust') chips.push(['DUST DEVIL', '']);
-      else if (b === 'resist') chips.push(['IRON PLATE', '']);
+      if (BUFFS[b]) chips.push([this.t(`chip.${b}`, BUFFS[b]), '']);
     }
-    $('statusStrip').innerHTML = chips.map(([t, cls]) => `<div class="statusChip ${cls}">${t}</div>`).join('');
+    $('statusStrip').innerHTML = chips
+      .map(([t, cls]) => `<div class="statusChip ${cls}">${escapeHtml(t)}</div>`).join('');
     $('dustOverlay').style.opacity = (s.buffs || []).includes('dust') ? '1' : '0';
   }
 
@@ -912,7 +915,8 @@ export class HUD {
   showResults(msg) {
     $('resultTitle').textContent = this.t(`res.title.${msg.winner}`, msg.title);
     $('resultTitle').className = msg.winner;
-    $('resultBlurb').textContent = msg.blurb;
+    $('resultBlurb').textContent = msg.blurbKey
+      ? this.t(msg.blurbKey, msg.blurb) : msg.blurb;
     const tb = $('resultTable').querySelector('tbody');
     tb.innerHTML = '';
     for (const r of msg.rows) {

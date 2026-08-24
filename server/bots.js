@@ -370,7 +370,17 @@ export class BotBrain {
           // though - the law jumping on the first man it saw fire at the star
           // put the gang's win share UP, because a sixth of all shooting is
           // friendly fire and the law spent the round shooting each other.
-          if (data.victim?.badge) this.suspect(data.attacker.id, me.faction === 'law' ? 0.3 : 0.15);
+          // Shooting the man with the star on is the loudest thing anybody can
+          // do, and at a table it is also the most public: one gun is live at a
+          // time and everybody else is standing still watching it. Whoever
+          // pulls that trigger has told the table what he is.
+          if (data.victim?.badge) {
+            if (me.faction === 'law') {
+              this.suspect(data.attacker.id, 0.8);
+              this.target = data.attacker.id;
+              this.threatUntil = t + 30;
+            } else this.suspect(data.attacker.id, 0.15);
+          }
           if (data.victim && this.allies.has(data.victim.id)) {
             this.suspect(data.attacker.id, 0.35);
             this.target = data.attacker.id;
@@ -609,10 +619,14 @@ export class BotBrain {
     const target = fighting ? this.chooseTarget(t) : null;
     const visibleTarget = target && this.visible.includes(target) ? target : null;
 
-    // The turn mode rations the trigger rather than the feet. Everything below
-    // this line assumes a bot may shoot whenever it likes and walk while it
-    // does, and neither is true once the bell has rung, so it forks here.
-    if (this.room.duel && this.room.turn) return this.duelUpdate(t, dt, visibleTarget);
+    // The turn mode rations the trigger and nails the feet down. Everything
+    // below this line assumes a bot may shoot whenever it likes and walk while
+    // it does, and neither is ever true there, so it forks here.
+    //
+    // On the mode rather than on there being a turn in progress: the fork used
+    // to wait for the bell, and until it rang every bot walked off the mark it
+    // had been dealt using the other game's brain.
+    if (this.room.duel) return this.duelUpdate(t, dt, visibleTarget);
 
     if (t >= this.nextThink) {
       this.nextThink = t + rnd(0.25, 0.6);
@@ -645,8 +659,13 @@ export class BotBrain {
   duelUpdate(t, dt, visibleTarget) {
     const me = this.self;
     const room = this.room;
+    // Before the bell there is no floor to hold and nothing to do but stand at
+    // your mark and look at the people who are going to try to kill you.
     const mine = room.turnHolder === me.id;
     const quarry = mine ? this.duelQuarry() : null;
+    me.moving = false;
+    me.sprint = false;
+    me.vel = { x: 0, y: 0, z: 0 };
 
     // Only one man in town is pointing a gun at anybody. Everybody else is
     // watching him do it, which is also how they see it coming.
@@ -658,18 +677,6 @@ export class BotBrain {
 
     const holder = room.turnHolder ? room.players.get(room.turnHolder) : null;
     this.aim(t, dt, mine ? quarry : (holder && holder !== me ? holder : visibleTarget), mine);
-
-    if (room.rooted) {
-      me.moving = false;
-      me.sprint = false;
-      me.vel = { x: 0, y: 0, z: 0 };
-    } else {
-      if (!this.goal || this.reached(this.goal, 3)) {
-        this.state = 'ground';
-        this.setGoal(this.duelGround());
-      }
-      this.move(t, dt, null);
-    }
 
     if (mine) this.duelTurn(t, quarry);
     else this.duelWatch(t);
@@ -683,74 +690,6 @@ export class BotBrain {
       this.badgeTimer = (this.badgeTimer || 0) + dt;
       if (this.badgeTimer > this.wantBadgeAt) room.onBadge(me);
     }
-  }
-
-  /**
-   * Where to stand, which in the turn mode is the only thing anybody decides
-   * with their feet - and so is most of the game.
-   *
-   * The first version of this walked straight at whoever the bot wanted dead,
-   * which is half a decision. Standing somewhere is two questions: can I reach
-   * him, and who can reach me? A Sheriff with the star on and nobody he trusts
-   * nearby has no answer to the first and only the second matters; a gang that
-   * has found him has both. So this scores a handful of real spots and takes
-   * the best one, which is what a person does with fifteen seconds.
-   */
-  duelGround() {
-    const me = this.self;
-    const room = this.room;
-    if (room.phase === PHASE.ENDGAME) {
-      const d = Math.hypot(me.pos.x, me.pos.z);
-      if (d > (room.ringRadius || 60) - 8) return { x: rnd(-8, 8), z: rnd(-8, 8) };
-    }
-    const mark = this.duelMark();
-    const others = [...room.players.values()].filter((o) => o.alive && o.id !== me.id);
-    const reach = reachOf(me);
-
-    // Candidates: a ring round the mark at the edge of my own reach, plus a few
-    // places I already know how to get to. Cheap, and it only runs every few
-    // seconds during a walk.
-    const spots = [];
-    if (mark) {
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2 + rnd(0, 1);
-        const r = reach * rnd(0.55, 0.9) - coverOf(mark) * 0.5;
-        spots.push({ x: clamp(mark.pos.x + Math.cos(a) * r, -66, 66), z: clamp(mark.pos.z + Math.sin(a) * r, -66, 66) });
-      }
-    }
-    for (let i = 0; i < 4; i++) spots.push(this.wanderGoal());
-    spots.push({ x: me.pos.x, z: me.pos.z });
-
-    let best = null, bestScore = -Infinity;
-    for (const spot of spots) {
-      let score = 0;
-      // Can I reach him from here? That is the whole of what a go is for.
-      if (mark) {
-        const d = Math.hypot(mark.pos.x - spot.x, mark.pos.z - spot.z);
-        score += inReach(me, mark, d) ? 3 : -2;
-        score -= d / 200;                                  // and nearer is better
-      }
-      // Who can reach me from here, and how much do I mind? A man who has no
-      // reason to shoot me is not a reason to stand anywhere else.
-      for (const o of others) {
-        if (o === mark) continue;
-        const d = Math.hypot(o.pos.x - spot.x, o.pos.z - spot.z);
-        if (!inReach(o, me, d)) continue;
-        const trust = this.knownFriends.has(o.id) || o.id === this.protectee ? -0.6 : 0;
-        score -= (0.5 + this.susOf(o.id) * 1.6 + this.paranoia * 0.5 + trust);
-      }
-      // A deputy stands where his man is, which is the job.
-      if (this.protectee) {
-        const prot = room.players.get(this.protectee);
-        if (prot && prot.alive) {
-          const d = Math.hypot(prot.pos.x - spot.x, prot.pos.z - spot.z);
-          score += d < 20 ? 1.2 : -0.4;
-        }
-      }
-      score += rnd(0, 0.6);                                // nobody is a calculator
-      if (score > bestScore) { bestScore = score; best = spot; }
-    }
-    return best || this.wanderGoal();
   }
 
   /** Whoever this bot would most like to see face down, at any distance. */
@@ -773,7 +712,12 @@ export class BotBrain {
       const want = this.wantsDead(o);
       if (want <= 0) continue;
       const d = Math.hypot(o.pos.x - me.pos.x, o.pos.z - me.pos.z);
-      if (!inReach(me, o, d)) continue;
+      // Seats, which at a table is the only measure that means anything. Asking
+      // the ground instead had every bot believe it could reach every other man
+      // - the table is eleven metres across and a belt gun is twenty-two - so
+      // they spent their go and their card on shots the room then threw out as
+      // out of range. Two hundred and sixty-five of them in sixty rounds.
+      if (!inReach(me, o, d, this.room.seatsBetween(me, o))) continue;
       if (!lineOfSight(eyeOf(me), chestOf(o), MAP.solids)) continue;
       const score = want * (0.7 + this.aggression * 0.6) * (1 + (1 - o.health / o.maxHealth) * 0.6);
       if (score > bestScore) { bestScore = score; best = o; }
