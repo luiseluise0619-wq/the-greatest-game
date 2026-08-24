@@ -518,6 +518,9 @@ button.big { width: 100%; padding: 14px; font-size: 15px; letter-spacing: .22em;
   box-shadow: 0 4px 12px rgba(50, 32, 14, .38);
 }
 .handCard.live img { filter: saturate(.6) brightness(.92); box-shadow: 0 0 0 2px rgba(150,100,30,.55); }
+/* The eighty are not printed yet, so their entry on the role card is the
+   rules text with a rule down the side where the face would be. */
+.handCard.noFace { border-left: 2px solid rgba(60,42,26,.3); padding-left: 9px; }
 .handCard h5 {
   margin: 1px 0 4px; font-size: 12px; letter-spacing: .06em; color: #3c2a1a;
   display: flex; justify-content: space-between; align-items: baseline; gap: 6px;
@@ -703,8 +706,8 @@ html[lang="ko"] {
    moving. There is no table here and eight people are all moving at once, so
    it has to be said out loud, all the time, where nobody can miss it. */
 #turnBar {
-  position: absolute; left: 50%; top: 96px; transform: translateX(-50%);
-  text-align: center; pointer-events: none; width: min(560px, 92vw);
+  margin: 7px auto 0; text-align: center; pointer-events: none;
+  width: min(560px, 92vw);
 }
 #turnWhat {
   font-size: 15px; letter-spacing: .18em; color: var(--sand);
@@ -732,3 +735,65 @@ html[lang="ko"] {
 #turnOrder li.gone { opacity: .3; text-decoration: line-through; }
 /* Rooted: the crosshair says the feet are not going anywhere. */
 #hud.rooted #crosshair { opacity: .55; }
+
+/* --------------------------------------------------------- THE CHAMBER
+   One chamber for the whole town, loaded in the open. The number left is the
+   thing everybody is counting, so it sits where the eye already is. */
+#chamberBar {
+  margin-top: 5px;
+  display: flex; gap: 10px; align-items: baseline; justify-content: center;
+  pointer-events: none;
+  font-size: 11px; letter-spacing: .16em;
+  text-shadow: 0 1px 3px rgba(0,0,0,.9), 0 0 9px rgba(0,0,0,.6);
+}
+#chamberLeft { color: var(--gold); font-size: 13px; }
+#chamberMix { color: rgba(232,217,189,.6); }
+
+/* A barrel has stopped on you, and you have eight tenths of a second. */
+#aimedWarn {
+  position: absolute; left: 50%; top: 44%; transform: translateX(-50%);
+  text-align: center; pointer-events: none; z-index: 22;
+  font-size: 17px; letter-spacing: .2em; color: var(--blood);
+  text-shadow: 0 2px 8px rgba(0,0,0,.95);
+  animation: aimPulse .45s ease-in-out infinite alternate;
+}
+#aimedWarn b { display: block; font-size: 11px; letter-spacing: .14em; color: var(--sand); margin-top: 5px; }
+@keyframes aimPulse { from { opacity: .55; } to { opacity: 1; } }
+
+/* ------------------------------------------------------------- THE HAND */
+#duelHand {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+  display: flex; gap: 6px; pointer-events: none; max-width: 94vw;
+  /* One row, always. A hand can be six cards on the turn you draw and ten
+     after a Wells Fargo; a second row would either fall off the bottom of the
+     screen or put card 7 above card 1, and the number on the card is the key
+     you press. So they narrow instead of wrapping. */
+  flex-wrap: nowrap; justify-content: center; align-items: stretch;
+}
+.dCard {
+  flex: 0 1 104px; min-width: 0; padding: 7px 8px 8px; text-align: left;
+  background: linear-gradient(170deg, #efe3c8, #d9c9a6);
+  border: 1px solid #9c8a68; color: #241a12;
+  box-shadow: 0 5px 14px rgba(0,0,0,.6);
+}
+.dCard.shot { background: linear-gradient(170deg, #f0dcc4, #dcb897); }
+.dCard.reaction { background: linear-gradient(170deg, #dfe6ef, #bfcbdc); }
+.dCard.gear, .dCard.weapon, .dCard.curse { background: linear-gradient(170deg, #cfd9e8, #a9b8cd); }
+.dCard.cannot { filter: grayscale(.8) brightness(.72); }
+.dCard b {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 11.5px; letter-spacing: .02em; font-weight: bold;
+}
+.dCard b i { font-style: normal; font-size: 9px; background: #241a12; color: #efe3c8; padding: 1px 5px; }
+.dCard p { margin: 4px 0 0; font-size: 9px; line-height: 1.35; color: #4a3a2a; }
+.dCard em { display: block; margin-top: 4px; font-size: 8.5px; color: #7a6448; font-style: normal; }
+
+/* What is face up in front of you. */
+#duelGear {
+  position: absolute; right: 22px; bottom: 96px; display: flex; flex-direction: column;
+  gap: 3px; align-items: flex-end; pointer-events: none;
+}
+#duelGear span {
+  font-size: 10px; letter-spacing: .08em; padding: 2px 7px;
+  background: rgba(12,9,6,.72); border: 1px solid rgba(160,190,220,.4); color: #bfcbdc;
+}

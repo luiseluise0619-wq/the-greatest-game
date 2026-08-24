@@ -7,6 +7,7 @@ import {
 } from '../../shared/constants.js';
 import { useDefs, cardUrl } from './cardart.js';
 import { placePhrase } from '../../shared/map.js';
+import { DUEL_CARDS } from '../../shared/deck.js';
 
 useDefs(CARDS);
 
@@ -54,6 +55,9 @@ export class HUD {
     if (this.phase) this.setPhase({ phase: this.phase, alive: this.standing, total: this.standingTotal });
     if (this.hand.length || this.armed.length) this.setHand({ hand: this.hand, armed: this.armed });
     if (this.selfRole) this.setRole(this.selfRole);
+    if (this.duel) { this.renderRoleCards(); this.setDuel(this.duel); }
+    if (this.turn) this.setTurn(this.turn);
+    if (this.chamberLeft != null) this.setChamber({ left: this.chamberLeft, ...(this.chamberMix || {}) });
   }
 
   buildCharacterGrid() {
@@ -298,6 +302,72 @@ export class HUD {
 
   nameOf(id) { return this.roster.get(id)?.name || '?'; }
 
+  // ------------------------------------------------------------ the chamber
+  /** How many rounds are left in the chamber the whole town is counting. */
+  setChamber(msg) {
+    if (msg.live != null) this.chamberMix = { live: msg.live, blank: msg.blank };
+    this.chamberLeft = msg.left;
+    const bar = $('chamberBar');
+    if (this.chamberLeft == null) { bar.classList.add('hidden'); return; }
+    bar.classList.remove('hidden');
+    $('chamberLeft').textContent = this.t('cham.left', `${this.chamberLeft} IN THE CHAMBER`,
+      { n: this.chamberLeft });
+    $('chamberMix').textContent = this.chamberMix
+      ? this.t('cham.mix', `loaded ${this.chamberMix.live} live, ${this.chamberMix.blank} blank`,
+        { live: this.chamberMix.live, blank: this.chamberMix.blank })
+      : '';
+  }
+
+  /** Somebody's barrel has stopped on you, and you have a moment to move. */
+  setAimed(msg) {
+    const el = $('aimedWarn');
+    if (!msg.on) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    const held = (this.duel?.hand || []).includes('missed');
+    el.innerHTML = `${escapeHtml(this.t('aim.onYou', 'HE HAS YOU'))}`
+      + `<b>${escapeHtml(held
+        ? this.t('aim.brace', 'SPACE — move, and spend the card')
+        : this.t('aim.nothing', 'and you have nothing to answer with'))}</b>`;
+  }
+
+  // --------------------------------------------------------------- the hand
+  /**
+   * The eighty-card hand. Text for now rather than printed faces - the press
+   * in cardart.js knows six cards and these are twenty-two others.
+   */
+  setDuel(msg) {
+    const first = !this.duel;
+    this.duel = msg;
+    // The role card is on screen when the first hand lands; it was drawn
+    // before the deal reached us, so draw it again now there is something in it.
+    if (first) this.renderRoleCards();
+    const hand = $('duelHand');
+    const yours = this.game.turn && this.game.turn.holder === this.game.selfId;
+    hand.classList.toggle('hidden', !msg.hand.length);
+    hand.innerHTML = msg.hand.map((id, i) => {
+      const c = DUEL_CARDS[id];
+      if (!c) return '';
+      // Greyed when it cannot be played: not your go, or it is the card you
+      // fire with rather than press a key for.
+      const dead = !yours || c.kind === 'shot' || c.kind === 'reaction';
+      return `<div class="dCard ${c.kind}${dead ? ' cannot' : ''}">
+        <b><span>${escapeHtml(this.t(`duel.${id}.name`, c.name))}</span><i>${i + 1}</i></b>
+        <p>${escapeHtml(this.t(`duel.${id}.rules`, c.rules))}</p>
+        ${c.kind === 'target' || c.kind === 'curse'
+          ? `<em>${escapeHtml(this.t('duel.aimFirst', 'aim at somebody first'))}</em>` : ''}
+      </div>`;
+    }).join('');
+
+    const gear = $('duelGear');
+    const mine = [...(msg.gear || [])];
+    if (msg.weapon) mine.unshift(msg.weapon);
+    gear.classList.toggle('hidden', !mine.length);
+    gear.innerHTML = mine.map((id) => {
+      const c = DUEL_CARDS[id];
+      return `<span>${escapeHtml(this.t(`duel.${id}.name`, c?.name || id))}</span>`;
+    }).join('');
+  }
+
   // ------------------------------------------------------------- hud state
   setPhase(msg) {
     this.phase = msg.phase;
@@ -480,6 +550,33 @@ export class HUD {
   renderRoleCards() {
     const box = $('roleCards');
     if (!box) return;
+    // The turn mode deals from the eighty instead, and the role card is the
+    // one moment before the bell where there is time to read what you drew.
+    if (this.duel && this.duel.hand?.length) {
+      // Different cards, different keys: the eighty are played off the number
+      // row, and the line above the list has to say so or it is a lie.
+      const label = $('dealtLabel');
+      const english = 'DEALT TO YOU — the <b>number keys</b> to play';
+      if (label) {
+        // Handed to the language walker rather than painted over the top of it,
+        // so switching to Korean afterwards picks up this line and not the one
+        // about Z and X that the markup shipped with.
+        label.setAttribute('data-i18n-html', 'role.dealtDuel');
+        label.hnhEnglish = { 'data-i18n-html': english };
+        label.innerHTML = this.t('role.dealtDuel', english);
+      }
+      box.innerHTML = this.duel.hand.map((id, i) => {
+        const c = DUEL_CARDS[id];
+        if (!c) return '';
+        return `<div class="handCard noFace">
+          <div class="handText">
+            <h5><span>${escapeHtml(this.t(`duel.${id}.name`, c.name))}</span><em>${i + 1}</em></h5>
+            <div class="handKind">${escapeHtml(this.t(`duel.kind.${c.kind}`, c.kind.toUpperCase()))}</div>
+            <p>${escapeHtml(this.t(`duel.${id}.rules`, c.rules))}</p>
+          </div></div>`;
+      }).join('');
+      return;
+    }
     if (!this.hand.length && !this.armed.length) { box.innerHTML = ''; return; }
     const keys = ['Z', 'X'];
     const one = (id, key, live) => {

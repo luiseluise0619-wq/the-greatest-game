@@ -26,6 +26,7 @@ import { initCharacterModels } from './charmodels.js';
 import { cardUrl } from './cardart.js';
 import { Settings, LIMITS, motionScale } from './settings.js';
 import { t, pickLang } from '../../shared/i18n.js';
+import { DUEL_CARDS } from '../../shared/deck.js';
 
 const $ = (id) => document.getElementById(id);
 const INTERP_DELAY = 0.1;
@@ -38,6 +39,8 @@ class Game {
     this.phaseLeft = 0;
     this.turn = null;
     this.turnDeadline = 0;
+    this.duel = null;
+    this.aimedOn = false;
     this.inGame = false;
     this.views = new Map();
     this.keys = new Set();
@@ -488,6 +491,18 @@ class Game {
         else this.hud.showRoleCard(msg);
         break;
 
+      case S.DUEL:
+        this.duel = msg;
+        this.hud.setDuel(msg);
+        break;
+      case S.CHAMBER:
+        this.hud.setChamber(msg);
+        break;
+      case S.AIMED:
+        this.aimedOn = !!msg.on;
+        this.hud.setAimed(msg);
+        if (msg.on) this.audio.deny();      // a sound you learn to dread
+        break;
       case S.TURN:
         this.turn = msg.kind ? msg : null;
         this.turnDeadline = performance.now() / 1000 + (msg.left || 0);
@@ -908,12 +923,22 @@ class Game {
         return;
       }
 
+      // In the turn mode the hand is up to five cards and the number keys are
+      // the hand, not a rack of guns - the guns are cards too.
+      if (this.duel && /^Digit[1-9]$/.test(k)) { this.playDuelCard(Number(k.slice(5)) - 1); return; }
+      if (this.duel && k === 'Space') { this.send({ t: C.BRACE }); return; }
+
       switch (k) {
         case 'KeyR': this.send({ t: C.RELOAD }); break;
         case 'Digit1': this.swapTo('revolver'); break;
         case 'Digit2': this.swapTo('shotgun'); break;
         case 'Digit3': this.swapTo('rifle'); break;
-        case 'KeyQ': this.tryAbility(); break;
+        case 'KeyQ':
+          // The barrel turned round. A blank buys another go; a live round
+          // costs you a hit and whoever is stood in line behind you.
+          if (this.duel) { this.trySelfShot(); break; }
+          this.tryAbility();
+          break;
         case 'KeyE': this.tryPickup(); break;
         case 'KeyG': this.tryThrow(); break;
         case 'KeyF': this.tryAccuse(); break;
@@ -1006,6 +1031,42 @@ class Game {
     this.lastDenyText = reason;
     this.lastDenyAt = t;
     this.hud.addFeed(reason, 'bad');
+  }
+
+  /**
+   * A card off the hand. Anything that needs somebody named takes whoever is
+   * in the crosshair, which is the only way of pointing at a man this game
+   * has - no menu, no list, just look at him.
+   */
+  playDuelCard(i) {
+    const id = this.duel?.hand?.[i];
+    if (!id) { this.deny(['deny.emptyHand', 'Nothing in that slot.']); return; }
+    if (!this.turn || this.turn.holder !== this.selfId) {
+      this.deny(['deny.notYourTurn', 'Not your go. Wait to be called.']);
+      return;
+    }
+    const card = DUEL_CARDS[id];
+    if (card?.kind === 'shot') { this.deny(['deny.shootIt', 'That one you fire.']); return; }
+    if (card?.kind === 'reaction') { this.deny(['deny.reactionCard', 'That one is for being shot at.']); return; }
+    let target;
+    if (card?.kind === 'target' || card?.kind === 'curse') {
+      const at = this.playerInCrosshair(200);
+      if (!at) { this.deny(['deny.noTarget', 'Nobody in your sights to call out.']); return; }
+      target = at.id;
+    }
+    this.send({ t: C.CARD, card: id, target });
+  }
+
+  trySelfShot() {
+    if (!this.turn || this.turn.holder !== this.selfId) {
+      this.deny(['deny.notYourTurn', 'Not your go. Wait to be called.']);
+      return;
+    }
+    if (!(this.duel?.hand || []).includes('bang')) {
+      this.deny(['deny.noBang', 'Nothing in the hand to load it with.']);
+      return;
+    }
+    this.send({ t: C.SELFSHOT });
   }
 
   tryAbility() {

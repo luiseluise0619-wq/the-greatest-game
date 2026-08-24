@@ -323,3 +323,22 @@ test('nothing can be played on anybody else\'s go', () => {
     assert.deepEqual(a.duelHand, ['beer']);
   } finally { clock.restore(); }
 });
+
+test('a weapon goes on the table, and the old one goes in the discard', () => {
+  const { room, clock, all, turn } = table();
+  try {
+    const [p] = all;
+    turn(p);
+    p.duelHand = ['volcanic', 'schofield'];
+    p.weaponCard = null;
+    room.onDuelCard(p, { t: 'card', card: 'volcanic' });
+    assert.equal(p.weaponCard, 'volcanic', 'the gun was announced and never picked up');
+    assert.deepEqual(p.duelHand, ['schofield'], 'and it stayed in the hand as well');
+
+    room.onDuelCard(p, { t: 'card', card: 'schofield' });
+    assert.equal(p.weaponCard, 'schofield', 'you may only hold one, and it is the new one');
+    assert.deepEqual(p.duelHand, []);
+    assert.ok(room.pile.discard.includes('volcanic'), 'the old gun vanished rather than being thrown away');
+    assert.equal(reachOf(p), 2 * DISTANCE_UNIT, 'the new gun did not change what it reaches');
+  } finally { clock.restore(); }
+});

@@ -57,6 +57,22 @@ test('a hit is worth a hit, and the star is worth one more', () => {
   } finally { clock.restore(); }
 });
 
+test('you are shown your hand at the deal, not when your go comes round', () => {
+  // The walk before the first turn is the walk you pick your ground on, and
+  // where to stand is decided by what your gun reaches - which is a card.
+  const { room, clock, stub, me } = duelRoom();
+  try {
+    const dealt = stub.last('duel');
+    assert.ok(dealt, 'the round started and nobody was shown what they were holding');
+    assert.deepEqual(dealt.hand, me().duelHand);
+    assert.equal(dealt.hand.length, me().maxHealth, 'a hand the size of your health');
+    assert.equal(dealt.limit, me().health);
+    assert.ok(dealt.reach > 0, 'no idea how far the gun goes');
+    assert.ok(Array.isArray(dealt.table) && dealt.table.length >= 2,
+      'the gear in front of everybody else is public and was not sent');
+  } finally { clock.restore(); }
+});
+
 test('the town takes it in turns, with a walk in between', () => {
   const { room, clock } = duelRoom({ bots: 5 });
   try {

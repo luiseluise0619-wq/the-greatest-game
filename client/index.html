@@ -39,6 +39,21 @@
     <div id="timer">0:00</div>
     <div id="standing"><b>8</b> STILL STANDING</div>
     <div id="objective">Find a gun. Work out who you are dealing with.</div>
+
+    <!-- The chamber the whole town is counting down, and whose go it is: the
+         table, in a game with no table. Both live in the flow under the round
+         clock rather than at a fixed height, because the objective line above
+         them is a sentence and sentences wrap. -->
+    <div id="chamberBar" class="hidden">
+      <span id="chamberLeft"></span>
+      <span id="chamberMix"></span>
+    </div>
+
+    <div id="turnBar" class="hidden">
+      <div id="turnWhat"></div>
+      <div id="turnClock"></div>
+      <ol id="turnOrder"></ol>
+    </div>
   </div>
 
   <div id="feed"></div>
@@ -65,16 +80,15 @@
     </div>
   </div>
 
-  <!-- Whose go it is. The table, in a game with no table. -->
-  <div id="turnBar" class="hidden">
-    <div id="turnWhat"></div>
-    <div id="turnClock"></div>
-    <ol id="turnOrder"></ol>
-  </div>
+  <!-- Somebody's barrel has stopped on you. -->
+  <div id="aimedWarn" class="hidden"></div>
 
   <div id="interactPrompt" class="hidden"><b>E</b> <span data-i18n="hud.pickup">pick up</span></div>
   <div id="statusStrip"></div>
   <div id="handStrip"></div>
+  <!-- The eighty-card hand. Text rather than printed faces for now. -->
+  <div id="duelHand" class="hidden"></div>
+  <div id="duelGear" class="hidden"></div>
   <div id="reloadBar" class="hidden"><i></i></div>
 </div>
 
@@ -95,7 +109,7 @@
       <em id="roleAbility"></em>
     </div>
     <div class="deckBox">
-      <span data-i18n-html="role.dealtToYou">DEALT TO YOU — <b>Z</b> and <b>X</b> to play</span>
+      <span id="dealtLabel" data-i18n-html="role.dealtToYou">DEALT TO YOU — <b>Z</b> and <b>X</b> to play</span>
       <div id="roleCards"></div>
     </div>
     <div class="cardHint" data-i18n-html="role.hint">Hold <b>H</b> in game to look at this again · click or press <b>Space</b> to take the reins</div>

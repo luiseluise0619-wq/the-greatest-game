@@ -1553,7 +1553,9 @@ export class Room {
       p.trailGroup = groups[i];
       // Two cards each, dealt independently, so no two hands are the same and
       // nobody can reason backwards from what they were given to what you hold.
-      p.hand = shuffle(CARD_ORDER.slice()).slice(0, CARD_DEAL);
+      // The turn mode has eighty cards of its own and no room on the screen or
+      // in the round for a second hand, so it does without these entirely.
+      p.hand = this.duel ? [] : shuffle(CARD_ORDER.slice()).slice(0, CARD_DEAL);
       p.armed = new Set();
       p.cardsPlayed = [];
       p.barrelUntil = 0;
@@ -1603,9 +1605,14 @@ export class Room {
     }
 
     telemetry.matchStart(this);
-    telemetry.cardsDealt(all.length * CARD_DEAL);
+    telemetry.cardsDealt(this.duel ? 0 : all.length * CARD_DEAL);
     this.pushLobby();          // seeds every client's scoreboard roster
     this.setPhase(PHASE.PREP);
+    // The hand is dealt face down to everybody else and face up to you, and it
+    // is dealt now rather than when your first turn comes round: the walk you
+    // spend before anybody may fire is the walk you spend deciding where to
+    // stand, and you cannot decide that without knowing how far your gun goes.
+    this.pushDuelAll();
     this.broadcast({
       t: S.FEED,
       text: 'Roles dealt. Guns stay holstered until the church bell rings.',
