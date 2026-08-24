@@ -179,6 +179,57 @@ test('a dead player is passed over rather than waited for', () => {
   } finally { clock.restore(); }
 });
 
+test('there is no second kind of dynamite lying in a shed', () => {
+  // The card's blast is the one cause allowed past the one-hit rule, because
+  // three hits is what the card says. A thrown stick carries the same cause,
+  // so a looted one was worth about a hundred hits to a man who has four.
+  const { room, clock, plain } = duelRoom();
+  try {
+    plain();
+    assert.deepEqual(room.loot.filter((l) => l.type === 'dynamite'), [],
+      'a stick of it was lying about in a game where it is a card');
+    // And the free-for-all keeps its shed.
+    const free = new Room({ code: 'SHED', isPublic: false, mode: MODES.FREE });
+    assert.ok(free.loot.some((l) => l.type === 'dynamite'),
+      'the free-for-all lost the dynamite it is built around');
+  } finally { clock.restore(); }
+});
+
+test('a refresh mid-round hands the whole game back', () => {
+  // A reload used to give you your body, your role and six information cards
+  // the turn mode does not use, and none of your eighty. You came back to an
+  // empty screen in a game where the hand IS the ammunition.
+  const { room, clock, stub, me } = duelRoom();
+  try {
+    const p = me();
+    const token = p.token;
+    const hand = [...p.duelHand];
+    room.turn = { kind: 'turn', holder: p.id, endsAt: Date.now() / 1000 + 4 };
+    room.chamber = [true, false, true];
+    room.chamberMix = { live: 2, blank: 1 };
+
+    // The tab goes away and a new one comes back with the same token.
+    room.removeConnection(stub.client);
+    const back = stubClient();
+    room.addConnection(back.client);
+    room.handleMessage(back.client, { t: 'join', name: 'Tester', token });
+
+    const dealt = back.last('duel');
+    assert.ok(dealt, 'he came back and was never told what he was holding');
+    assert.deepEqual(dealt.hand, hand, 'and it was not the hand he left with');
+
+    const turn = back.last('turn');
+    assert.ok(turn, 'nor whose go it was');
+    assert.equal(turn.holder, p.id);
+    assert.deepEqual(turn.order, room.turnOrder.filter((id) => room.players.get(id)?.alive));
+
+    const cham = back.last('chamber');
+    assert.ok(cham, 'nor what was left in the chamber');
+    assert.equal(cham.left, 3);
+    assert.equal(cham.live, 2, 'and not what went into it either');
+  } finally { clock.restore(); }
+});
+
 test('the free-for-all is still the free-for-all', () => {
   // The mode is a mode. Asking for the old one has to get the old one, whole.
   TIMING.prep = 1; TIMING.combat = 900; TIMING.endgame = 60; TIMING.results = 5;

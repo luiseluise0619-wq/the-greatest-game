@@ -545,19 +545,43 @@ export class HUD {
     $('staminaFill').style.transform = `scaleX(${stamPct})`;
 
     const w = WEAPONS[s.weapon];
-    $('weaponName').textContent = w ? w.short : '';
-    $('mag').textContent = s.mag;
-    $('reserve').textContent = `/ ${s.reserve}`;
-    $('ammo').classList.toggle('empty', s.mag === 0);
-    $('dynCount').classList.toggle('hidden', s.dyn <= 0);
-    $('dynCount').innerHTML = `${escapeHtml(this.t('hud.dynamite', `DYNAMITE x${s.dyn}`, { n: s.dyn }))} <em>G</em>`;
+    const duel = !!this.duel;
+    if (duel) {
+      // The magazine is not the ammunition here - the cards are, and they are
+      // already on screen. What the corner is for in this mode is the two
+      // numbers that decide a go: what you are holding it with, and how far it
+      // reaches. A belt gun and thirty spare rounds is a lie in a game where
+      // you cannot fire without a card.
+      const gun = this.duel.weapon ? DUEL_CARDS[this.duel.weapon] : null;
+      $('weaponName').textContent = gun
+        ? this.t(`duel.${this.duel.weapon}.name`, gun.name).toUpperCase()
+        : this.t('hud.beltGun', 'BELT GUN');
+      $('mag').textContent = String(Math.round(this.duel.reach || 0));
+      $('reserve').textContent = this.t('hud.metres', 'm of reach');
+      $('ammo').classList.remove('empty');
+      $('dynCount').classList.add('hidden');
+    } else {
+      $('weaponName').textContent = w ? w.short : '';
+      $('mag').textContent = s.mag;
+      $('reserve').textContent = `/ ${s.reserve}`;
+      $('ammo').classList.toggle('empty', s.mag === 0);
+      $('dynCount').classList.toggle('hidden', s.dyn <= 0);
+      $('dynCount').innerHTML = `${escapeHtml(this.t('hud.dynamite', `DYNAMITE x${s.dyn}`, { n: s.dyn }))} <em>G</em>`;
+    }
 
+    // The ability ring is the six's cooldown in one mode and the sixteen's
+    // gunhand in the other, where only one of them has anything to press.
+    const g = this.selfRole?.gunhand ? GUNHANDS[this.selfRole.gunhand] : null;
     const c = CHARACTERS[this.game.character];
-    const cdPct = s.cd > 0 ? 1 - s.cd / (s.cdMax || 1) : 1;
+    const cdPct = duel ? 1 : (s.cd > 0 ? 1 - s.cd / (s.cdMax || 1) : 1);
     $('cdRing').querySelector('.fg').style.strokeDashoffset = String(126 * (1 - cdPct));
-    $('abilityName').textContent = c.ability.toUpperCase();
-    $('abilityWrap').classList.toggle('ready', s.cd <= 0);
-    $('abilityWrap').classList.toggle('active', s.active > 0);
+    $('abilityName').textContent = duel
+      ? (g ? this.t(`gun.${g.id}.ability`, g.ability).toUpperCase() : '')
+      : c.ability.toUpperCase();
+    $('abilityKey').textContent = duel ? (g?.when === 'active' ? 'G' : '') : 'Q';
+    $('abilityWrap').classList.toggle('hidden', duel && !g);
+    $('abilityWrap').classList.toggle('ready', duel ? !!g : s.cd <= 0);
+    $('abilityWrap').classList.toggle('active', duel ? false : s.active > 0);
 
     const bar = $('reloadBar');
     if (s.reloading > 0) {

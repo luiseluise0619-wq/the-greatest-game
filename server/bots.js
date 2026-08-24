@@ -9,6 +9,7 @@ import {
   PLAYER, WEAPONS, CHARACTERS, CARDS, PHASE, VISION, DUEL, clamp, stepStamina, canSprint,
 } from '../shared/constants.js';
 import { DUEL_CARDS, DISTANCE_UNIT, inReach, reachOf, coverOf } from '../shared/deck.js';
+import { trait } from '../shared/gunhands.js';
 import MAP, { NAV_NODES, zoneAt, placeParts } from '../shared/map.js';
 import { moveAndCollide, lineOfSight } from '../shared/collision.js';
 
@@ -917,7 +918,16 @@ export class BotBrain {
     if (this.room.aimedAt !== me.id) { this.braceRolled = false; this.braceAt = 0; return; }
     if (!this.braceRolled) {
       this.braceRolled = true;
-      this.braceAt = (me.duelHand || []).includes('missed')
+      // Whatever this man can spend to not be there, which for one of the
+      // sixteen is a Bang! - asking the room rather than the hand means a
+      // gunhand added later does not have to be added here as well.
+      const answer = this.room.answerCard(me);
+      // And the man shooting at him may be the one it takes two to get out of
+      // the way of, in which case one is worth nothing and he keeps it.
+      const need = trait(this.room.players.get(this.room.turnHolder), 'needsTwo') ? 2 : 1;
+      const held = (me.duelHand || []).filter((c) => c === 'missed'
+        || (trait(me, 'swap') && c === 'bang')).length;
+      this.braceAt = answer && held >= need
         && Math.random() < 0.28 + this.skill * 0.55
         ? t + rnd(0.1, 0.4) : 0;
     }

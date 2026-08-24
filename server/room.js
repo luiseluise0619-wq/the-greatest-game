@@ -323,11 +323,13 @@ export class Room {
     this.send(client, this.welcomeMsg(p.id, p.token));
     if (p.role) this.sendRole(p, { resumed: true });   // also snaps the camera to the body
     this.pushCards(p);
+    this.resumeDuel(p);
     this.sendPhaseTo(client);
     this.pushSelf(p);
     this.pushLobby();
     this.emit(p, {
       t: S.FEED,
+      k: p.alive ? 'feed.backAlive' : 'feed.backDead',
       text: p.alive
         ? 'You are back. Your body never left the street - hope nobody used the quiet.'
         : 'You are back, and still dead.',
@@ -953,10 +955,16 @@ export class Room {
   // Loot
   // -------------------------------------------------------------------------
   resetLoot() {
-    this.loot = LOOT_SPAWNS.map((l, i) => ({
+    // In the turn mode a stick of dynamite is a card - one of them, lit, going
+    // round the table - and there is no second kind lying in a shed. A thrown
+    // one carries the cause the card's blast carries, which is the one cause
+    // that is allowed past the one-hit rule, so a looted stick was worth about
+    // a hundred hits to a man who has four.
+    const spawns = this.duel ? LOOT_SPAWNS.filter((l) => l.type !== 'dynamite') : LOOT_SPAWNS;
+    this.loot = spawns.map((l, i) => ({
       id: i + 1, x: l.x, y: l.y, z: l.z, type: l.type, active: true, respawnAt: 0, dropped: false,
     }));
-    this.nextLootId = LOOT_SPAWNS.length + 1;
+    this.nextLootId = spawns.length + 1;
   }
 
   spawnLoot(x, y, z, type, dropped = false) {
@@ -2011,9 +2019,13 @@ export class Room {
     this.pushTurn();
   }
 
-  pushTurn() {
-    if (!this.duel) return;
-    this.broadcast({
+  /**
+   * Whose go it is, the running order and the clock. Broadcast when it changes
+   * and sent to one client when they turn up in the middle of a round, which
+   * is the same packet either way.
+   */
+  turnMsg() {
+    return {
       t: S.TURN,
       kind: this.turn ? this.turn.kind : null,
       holder: this.turn ? this.turn.holder : null,
@@ -2023,7 +2035,35 @@ export class Room {
       left: this.turn ? r2(Math.max(0, this.turn.endsAt - now())) : 0,
       // The whole running order, so every screen can show the same table.
       order: this.turnOrder.filter((id) => this.players.get(id)?.alive),
-    });
+    };
+  }
+
+  pushTurn() {
+    if (!this.duel) return;
+    this.broadcast(this.turnMsg());
+  }
+
+  /**
+   * Everything the turn mode has that a refresh would otherwise lose: the hand,
+   * whose go it is, and how much is left in the chamber.
+   *
+   * A reload used to hand you back your body, your role and your six
+   * information cards - none of which the turn mode uses - and none of your
+   * eighty. You came back to an empty screen in a game where the hand IS the
+   * ammunition, and the round was over for you.
+   */
+  resumeDuel(p) {
+    if (!this.duel || !p.client) return;
+    this.send(p.client, this.turnMsg());
+    if (this.chamber) {
+      this.send(p.client, {
+        t: S.CHAMBER,
+        live: this.chamberMix ? this.chamberMix.live : undefined,
+        blank: this.chamberMix ? this.chamberMix.blank : undefined,
+        left: this.chamber.length,
+      });
+    }
+    this.pushDuel(p);
   }
 
   /**
@@ -2365,6 +2405,9 @@ export class Room {
       ...Array(live).fill(true),
       ...Array(rounds - live).fill(false),
     ]);
+    // What went in, kept - so somebody who reloads mid-lap is told the same
+    // thing everybody else was told rather than a bare number left.
+    this.chamberMix = { live, blank: rounds - live };
     this.broadcast({ t: S.CHAMBER, live, blank: rounds - live, left: this.chamber.length });
     this.broadcast({
       t: S.FEED,
@@ -2396,14 +2439,26 @@ export class Room {
     const p = this.turnHolder ? this.players.get(this.turnHolder) : null;
     if (!p || !p.alive) {
       if (this.aimedAt) { this.tellAimed(this.aimedAt, false); this.aimedAt = null; }
+      this.aimedBy = null;
       return;
+    }
+    // Whose gun this is, as well as who it is on. A go ending is a barrel
+    // coming off somebody whether or not the next man happens to be pointing
+    // at the same person, and comparing against the new holder's own stale
+    // aimAt meant the warning stayed up - so a player could be told HE HAS YOU
+    // while the screen also said YOUR GO.
+    if (this.aimedBy !== p.id) {
+      p.aimAt = null;
+      p.aimSince = t;
+      if (this.aimedAt) { this.tellAimed(this.aimedAt, false); this.aimedAt = null; }
+      this.aimedBy = p.id;
     }
     const found = this.playerInCrosshair(p, reachOf(p));
     const onto = found ? found.id : null;
-    if (onto !== p.aimAt) {
+    if (onto !== this.aimedAt) {
       p.aimAt = onto;
       p.aimSince = t;
-      if (this.aimedAt && this.aimedAt !== onto) this.tellAimed(this.aimedAt, false);
+      if (this.aimedAt) this.tellAimed(this.aimedAt, false);
       this.aimedAt = onto;
       if (onto) this.tellAimed(onto, true, p);
     }

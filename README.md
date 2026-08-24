@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 193 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 197 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -644,7 +644,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 193 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 197 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -747,7 +747,11 @@ They are grouped by what they protect:
   applying them: nothing that comes out of a gun says "shot" — it says
   "revolver" — so the chamber, the range, the barrel and the card in his hand
   applied to the tests and to nothing else; and a coach gun's nine pellets took
-  nine hits off one man for the single Bang! that paid for them.
+  nine hits off one man for the single Bang! that paid for them. A third: the
+  warning coming *off* somebody when the go it belonged to ended, which the room
+  decided by comparing the new holder's target with his own last one rather than
+  with the room's — two men in a row pointing at the same third man and the
+  third man was never told, so he could read HE HAS YOU under the words YOUR GO.
 - **`test/deck.test.js`** — the eighty cards: that the deck is printed in the
   right proportions, that a hand is dealt the size of your health and shrinks
   with it, that ammunition is cards and one of them is a turn, that a gun

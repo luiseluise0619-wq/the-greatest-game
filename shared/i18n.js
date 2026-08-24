@@ -261,6 +261,8 @@ const KO = {
   'bot.la1': '당신들이 뭘 믿든, 나는 법 쪽입니다.',
   'bot.la2': '내려놓으십시오. 오늘 아무도 묻히지 않아도 됩니다.',
   'hud.deadTag': '(사망)',
+  'hud.beltGun': '벨트 총',
+  'hud.metres': 'm 사거리',
 
   // ------------------------------------------------------ the timeline
   // The round's public account, on the aftermath screen. Everything here has
@@ -345,6 +347,8 @@ const KO = {
   'feed.glass': '유리를 눈에 댑니다. 몇 초 동안 이 마을에서 울리는 모든 총성에 얼굴이 붙습니다.',
   'feed.poster': '{a} — 교회 문에 수배 전단을 박았습니다. 이름은 {b}.',
   'feed.postered': '당신 이름이 방금 교회 문에 걸렸습니다. 마을 전체가 읽을 수 있습니다.',
+  'feed.backAlive': '돌아왔습니다. 몸은 거리에서 한 발짝도 움직이지 않았습니다 — 그 조용한 틈을 아무도 쓰지 않았기를.',
+  'feed.backDead': '돌아왔습니다. 그리고 여전히 죽어 있습니다.',
   'feed.rolesDealt': '역할이 배분되었습니다. 교회 종이 울릴 때까지 총은 총집에.',
   'feed.bell': '종이 울립니다. 이제 총집에 있는 것은 없습니다.',
   'feed.storm': '모래폭풍이 마을 광장으로 조여옵니다. 들어오거나, 숨이 막히거나.',

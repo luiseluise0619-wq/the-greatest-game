@@ -128,6 +128,46 @@ test('one reads a Missed! as a shot, and fires it', () => {
   } finally { clock.restore(); }
 });
 
+test('a bot spends what it can spend, and keeps what would be wasted', () => {
+  // The nerve check used to ask the hand for a Missed! by name. One of the
+  // sixteen gets out of the way with a Bang!, and one of them makes a single
+  // Missed! worth nothing - so it asks the room instead.
+  const { room, clock, all, deal, turn, face } = table();
+  try {
+    const [shooter, mark] = all;
+    turn(shooter);
+    face(shooter, mark, 8);
+    shooter.duelHand = [];
+    room.aimedAt = mark.id;
+    mark.brain.skill = 1;
+
+    const rolls = (hand) => {
+      let moved = 0;
+      for (let i = 0; i < 14; i++) {
+        mark.duelHand = [...hand];
+        mark.bracedUntil = 0;
+        mark.brain.braceRolled = false;
+        mark.brain.braceAt = 0;
+        for (let k = 0; k < 20; k++) {
+          tick(clock, room, 1);
+          room.aimedAt = mark.id;
+          if ((mark.bracedUntil || 0) > Date.now() / 1000) { moved += 1; break; }
+        }
+      }
+      return moved;
+    };
+
+    deal(mark, 'ambidexter');
+    assert.ok(rolls(['bang']) >= 6, 'he could get out of the way with it and did not try');
+
+    // And against the man who puts two in, one card is worth nothing.
+    deal(shooter, 'butcher');
+    deal(mark, null);
+    assert.equal(rolls(['missed']), 0, 'he spent his last card on a shot it could not stop');
+    assert.ok(rolls(['missed', 'missed']) >= 6, 'and would not spend two when two was the price');
+  } finally { clock.restore(); }
+});
+
 test('one takes two to get out of the way of', () => {
   const { room, clock, all, deal, turn, face } = table();
   try {

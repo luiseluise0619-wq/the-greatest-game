@@ -212,6 +212,47 @@ test('the man on the end of it is told, and told when it moves off', () => {
   } finally { clock.restore(); }
 });
 
+test('a barrel comes off you when the go it belonged to ends', () => {
+  // The warning was cleared by comparing against the holder's own last target
+  // rather than against the room's. Two men in a row pointing at the same
+  // third man, and the third man was never told the first gun had come off him
+  // - so a player could be reading HE HAS YOU under the words YOUR GO.
+  const { room, clock, all, stub } = town();
+  try {
+    const me = all.find((p) => !p.bot);
+    const [first, second] = all.filter((p) => p.bot);
+    for (const p of all) if (p !== me && p !== first && p !== second) p.pos = { x: 900, y: 0, z: 900 };
+    // Not on the same spot as each other, or the first man's crosshair finds
+    // the second one standing inside him rather than the man down the street.
+    me.pos = { x: 0, y: 0, z: 10 };
+    first.pos = { x: 0, y: 0, z: 0 };
+    second.pos = { x: 0, y: 0, z: -6 };
+    for (const g of [first, second]) { g.yaw = Math.PI; g.pitch = 0; }
+
+    room.turn = { kind: 'turn', holder: first.id, endsAt: 1e12 };
+    room.stepAim(Date.now() / 1000);
+    assert.equal(stub.last('aimed')?.on, true, 'the first gun never reached him');
+    assert.equal(room.aimedAt, me.id);
+
+    // The go ends and the next man is pointing at exactly the same person -
+    // which is the case that used to say nothing at all, because the room only
+    // ever compared the new holder's target with his own last one.
+    stub.reset();
+    first.pos = { x: 900, y: 0, z: 900 };
+    second.pos = { x: 0, y: 0, z: 0 };
+    room.turn = { kind: 'turn', holder: second.id, endsAt: 1e12 };
+    room.stepAim(Date.now() / 1000 + 0.05);
+    const said = stub.of('aimed');
+    assert.ok(said.length >= 2, 'the barrel changed hands and he was told nothing');
+    assert.equal(said[0].on, false, 'the first gun never came off him');
+    assert.equal(said[said.length - 1].on, true, 'and the second one never went on');
+    assert.equal(said[said.length - 1].by, second.id, 'and he was told the wrong man was holding it');
+
+    // And the draw starts again rather than carrying on from the last man's.
+    assert.ok(second.aimDwell < 0.2, `the new man inherited ${second.aimDwell}s of somebody else's draw`);
+  } finally { clock.restore(); }
+});
+
 test('the rules apply to a fired gun, not only to the word for one', () => {
   // Every rule in this file hangs off one branch, and that branch was reading
   // the word "shot". Nothing that ever comes out of a gun says "shot": it says
