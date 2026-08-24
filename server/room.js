@@ -15,6 +15,8 @@ import MAP, { zoneAt, SPAWNS, LOOT_SPAWNS } from '../shared/map.js';
 import { raycastWorld, rayPlayerBox, lineOfSight, moveAndCollide } from '../shared/collision.js';
 import { C, S } from '../shared/protocol.js';
 import { BotBrain, BOT_NAMES } from './bots.js';
+import { Pile, handLimit, drawCheck } from './deck.js';
+import { DUEL_CARDS, KIND, inReach, reachOf, DISTANCE_UNIT } from '../shared/deck.js';
 import { telemetry } from './telemetry.js';
 import { randomUUID } from 'node:crypto';
 
@@ -493,14 +495,38 @@ export class Room {
     // The whole point of the mode: one gun is live at a time, and the town can
     // see whose. During a walk nobody's is.
     if (this.duel && this.turnHolder !== p.id) return false;
+    // And ammunition is cards. Without one of these in hand the hammer falls on
+    // nothing, however full the cylinder is - and one a turn unless the gun in
+    // front of you says otherwise.
+    if (this.duel && !this.canBang(p)) return false;
     if (t < p.swapUntil || t < p.nextFireAt) return false;
     if (p.reloading) return false;
     const g = p.guns[p.slot];
     return g && g.mag > 0;
   }
 
+  /** Is there a shot left in this hand, and in this turn? */
+  canBang(p) {
+    if (!(p.duelHand || []).includes('bang')) return false;
+    const gun = p.weaponCard ? DUEL_CARDS[p.weaponCard] : null;
+    if (gun?.unlimited) return true;
+    return (p.bangsThisTurn || 0) < 1;
+  }
+
+  /** Spend one, face up, where the discard pile can see it. */
+  spendBang(p) {
+    const at = p.duelHand.indexOf('bang');
+    if (at < 0) return false;
+    p.duelHand.splice(at, 1);
+    this.pile.put('bang');
+    p.bangsThisTurn = (p.bangsThisTurn || 0) + 1;
+    this.pushDuel(p);
+    return true;
+  }
+
   onShoot(p, msg) {
     if (!this.canFire(p)) return;
+    if (this.duel && !this.spendBang(p)) return;
     const w = WEAPONS[p.slot];
     const g = p.guns[p.slot];
     const t = now();
@@ -599,8 +625,11 @@ export class Room {
   applyDamage(victim, attacker, amount, cause, point, part = 'body') {
     if (!victim.alive) return;
     // Where you put the shot decides whether it lands, not what it is worth.
-    // The storm is the one thing that still works in points.
-    if (this.duel && cause !== 'storm') amount = DUEL.damagePerHit;
+    // The storm and a lit stick are the two things that still work in points.
+    if (this.duel && cause !== 'storm' && cause !== 'dynamite') {
+      amount = DUEL.damagePerHit;
+      if (attacker && attacker !== victim && !this.duelShotLands(victim, attacker, cause)) return;
+    }
     if (this.phase === PHASE.PREP) return;                       // guns are noise only in prep
     if (this.phase !== PHASE.COMBAT && this.phase !== PHASE.ENDGAME) return;
 
@@ -761,6 +790,39 @@ export class Room {
 
     this.emit(victim, { t: S.SELF, dead: true });
     this.checkVictory();
+  }
+
+  /**
+   * A shot has found somebody. Between the bullet and the wound there are two
+   * things that can happen instead: the barrel it hits, and the card they were
+   * holding for exactly this. Both are spent here rather than asked about -
+   * there is no pausing a first-person game to offer somebody a decision.
+   */
+  duelShotLands(victim, attacker, cause) {
+    if (cause !== 'shot') return true;
+    // Out of range is out of range, whatever the bullet did.
+    const d = Math.hypot(victim.pos.x - attacker.pos.x, victim.pos.z - attacker.pos.z);
+    if (!inReach(attacker, victim, d)) {
+      this.emit(attacker, {
+        t: S.FEED, text: 'Too far. The shot goes wide of anything that matters.', tone: 'bad',
+      });
+      return false;
+    }
+    if ((victim.gear || []).includes('barrel') && drawCheck('barrel')) {
+      this.emit(victim, { t: S.FEED, text: 'It goes into the barrel.', tone: 'good' });
+      this.emit(attacker, { t: S.FEED, text: 'Wood, not meat.', tone: 'bad' });
+      return false;
+    }
+    const at = (victim.duelHand || []).indexOf('missed');
+    if (at >= 0) {
+      victim.duelHand.splice(at, 1);
+      this.pile.put('missed');
+      this.emit(victim, { t: S.FEED, text: 'You were not standing where he thought.', tone: 'good' });
+      this.emit(attacker, { t: S.FEED, text: 'Missed. He had one ready.', tone: 'bad' });
+      this.pushDuel(victim);
+      return false;
+    }
+    return true;
   }
 
   checkVictory() {
@@ -1117,8 +1179,195 @@ export class Room {
   // finger is its cost; the other five are silent on purpose, because a card
   // everybody watched you play cannot manipulate anybody.
   // -------------------------------------------------------------------------
+  /**
+   * A card, played off your own hand, on your own go.
+   *
+   * Two of the originals ask the table a question and wait for an answer -
+   * whether you will spend a Bang! to survive a duel, which card you take off
+   * the store shelf. There is no pausing a first-person game to ask, so those
+   * resolve the way a player with any sense would answer: spend the card if you
+   * are holding one, take the hit if you are not.
+   */
+  onDuelCard(p, msg) {
+    if (!p.alive || !this.pile) return;
+    if (this.turnHolder !== p.id) return;      // your own go, nobody else's
+    const id = String(msg.card || '');
+    const card = DUEL_CARDS[id];
+    if (!card) return;
+    const at = (p.duelHand || []).indexOf(id);
+    if (at < 0) return;
+
+    const target = msg.target != null ? this.players.get(msg.target) : null;
+    const spend = () => { p.duelHand.splice(at, 1); this.pile.put(id); };
+    const say = (text, tone = 'system') => this.emit(p, { t: S.FEED, text, tone });
+    const tell = (text, tone = 'system') => this.broadcast({ t: S.FEED, text, tone });
+    const metres = (o) => Math.hypot(o.pos.x - p.pos.x, o.pos.z - p.pos.z);
+
+    switch (card.kind) {
+      case KIND.SHOT:
+        return;                                 // fired with the mouse, not with a key
+
+      case KIND.REACTION:
+        say('That one is for when somebody shoots at you.', 'bad');
+        return;
+
+      case KIND.WEAPON: {
+        spend();
+        if (p.weaponCard) this.pile.put(p.weaponCard);
+        p.weaponCard = id;
+        tell(`${p.name} lays a ${card.name} on the table.`);
+        break;
+      }
+
+      case KIND.GEAR: {
+        if ((p.gear || []).includes(id)) { say('You already have one of those out.', 'bad'); return; }
+        spend();
+        if (id === 'dynamite') {
+          p.hasDynamite = true;
+          tell(`${p.name} lights a stick and sets it down.`, 'bad');
+        } else {
+          p.gear.push(id);
+          tell(`${p.name} puts a ${card.name} in front of them.`);
+        }
+        break;
+      }
+
+      case KIND.CURSE: {
+        if (!target || !target.alive || target.id === p.id) { say('Nobody to put that on.', 'bad'); return; }
+        if (card.notOn && target.role === card.notOn) { say('Not the man wearing the star.', 'bad'); return; }
+        if ((target.gear || []).includes(id)) { say('They are already in one.', 'bad'); return; }
+        spend();
+        target.gear.push(id);
+        target.jailed = true;
+        tell(`${p.name} locks ${target.name} up.`, 'bad');
+        break;
+      }
+
+      case KIND.TARGET: {
+        if (!target || !target.alive || target.id === p.id) { say('Nobody in mind for that.', 'bad'); return; }
+        const reach = (card.range ?? 1) * DISTANCE_UNIT;
+        if (Number.isFinite(reach) && metres(target) > reach) {
+          say('Not close enough for that.', 'bad');
+          return;
+        }
+        if (id === 'panic' || id === 'catbalou') {
+          const taken = this.stripCard(target);
+          if (!taken) { say('They have nothing to take.', 'bad'); return; }
+          spend();
+          if (id === 'panic') { p.duelHand.push(taken); } else { this.pile.put(taken); }
+          tell(id === 'panic'
+            ? `${p.name} takes something off ${target.name}.`
+            : `${p.name} makes ${target.name} throw a card away.`, 'bad');
+        } else if (id === 'duel') {
+          spend();
+          this.resolveDuel(p, target);
+        }
+        break;
+      }
+
+      case KIND.PLAY: {
+        if (id === 'beer') {
+          const alive = [...this.players.values()].filter((o) => o.alive).length;
+          if (alive <= 2) { say('Nobody is pouring with two men left.', 'bad'); return; }
+          if (p.health >= p.maxHealth) { say('You are not hurt enough to want it.', 'bad'); return; }
+          spend();
+          p.health = Math.min(p.maxHealth, p.health + card.heal);
+          say('One hit back.', 'good');
+        } else if (id === 'saloon') {
+          spend();
+          for (const o of this.players.values()) {
+            if (o.alive) o.health = Math.min(o.maxHealth, o.health + card.healAll);
+          }
+          tell(`${p.name} buys the house a round.`, 'good');
+        } else if (card.draw) {
+          spend();
+          p.duelHand.push(...this.pile.takeMany(card.draw));
+          say(`${card.draw} more cards.`, 'good');
+        } else if (id === 'store') {
+          spend();
+          this.resolveStore(p);
+        } else if (id === 'indians') {
+          spend();
+          tell(`${p.name} points at the ridge.`, 'bad');
+          for (const o of this.players.values()) {
+            if (!o.alive || o.id === p.id) continue;
+            const bang = (o.duelHand || []).indexOf('bang');
+            if (bang >= 0) { o.duelHand.splice(bang, 1); this.pile.put('bang'); } else {
+              this.applyDamage(o, p, 1, 'indians', null);
+            }
+          }
+        } else if (id === 'gatling') {
+          spend();
+          tell(`${p.name} opens up on the whole street.`, 'bad');
+          for (const o of this.players.values()) {
+            if (!o.alive || o.id === p.id) continue;
+            const miss = (o.duelHand || []).indexOf('missed');
+            if (miss >= 0) { o.duelHand.splice(miss, 1); this.pile.put('missed'); } else {
+              this.applyDamage(o, p, 1, 'gatling', null);
+            }
+          }
+        }
+        break;
+      }
+
+      default: return;
+    }
+
+    for (const o of this.players.values()) if (o.alive) this.pushSelf(o);
+    this.pushDuelAll();
+    this.checkVictory();
+  }
+
+  /** Take one card off somebody: from the table in front of them, or the hand. */
+  stripCard(target) {
+    if ((target.gear || []).length) return target.gear.pop();
+    if (target.weaponCard) { const w = target.weaponCard; target.weaponCard = null; return w; }
+    if ((target.duelHand || []).length) {
+      const at = Math.floor(Math.random() * target.duelHand.length);
+      return target.duelHand.splice(at, 1)[0];
+    }
+    return null;
+  }
+
+  /**
+   * Called out. You each put a Bang! down in turn, the man called out going
+   * first, and whoever runs out of them takes the hit.
+   */
+  resolveDuel(caller, target) {
+    this.broadcast({ t: S.FEED, text: `${caller.name} calls out ${target.name}.`, tone: 'bad' });
+    let turn = target;
+    let other = caller;
+    for (let round = 0; round < 40; round++) {
+      const at = (turn.duelHand || []).indexOf('bang');
+      if (at < 0) {
+        this.applyDamage(turn, other, 1, 'duel', null);
+        return;
+      }
+      turn.duelHand.splice(at, 1);
+      this.pile.put('bang');
+      [turn, other] = [other, turn];
+    }
+  }
+
+  /**
+   * One card turned up for every man alive, and everybody takes one starting
+   * with whoever laid the store out. The original lets you look and choose;
+   * six seconds is not long enough to ask eight people what they want, so the
+   * shelf is dealt out in turn order instead.
+   */
+  resolveStore(p) {
+    const living = this.turnOrder.map((id) => this.players.get(id)).filter((o) => o && o.alive);
+    const shelf = this.pile.takeMany(living.length);
+    const from = Math.max(0, living.findIndex((o) => o.id === p.id));
+    for (let i = 0; i < living.length && shelf.length; i++) {
+      living[(from + i) % living.length].duelHand.push(shelf.shift());
+    }
+    this.broadcast({ t: S.FEED, text: `${p.name} lays the store out.`, tone: 'system' });
+  }
+
   onCard(p, msg) {
     const t = now();
+    if (this.duel) return this.onDuelCard(p, msg);
     if (!p.alive) return;
     if (this.phase !== PHASE.PREP && this.phase !== PHASE.COMBAT && this.phase !== PHASE.ENDGAME) return;
     if (t - (p.lastCardAt || 0) < SOCIAL.cardCooldown) return;
@@ -1314,6 +1563,20 @@ export class Room {
     this.turnOrder = this.duel ? shuffle(all.map((p) => p.id)) : [];
     this.turnPtr = -1;
     this.turn = null;
+
+    if (this.duel) {
+      // Eighty cards, and a starting hand the size of your health - so the
+      // Sheriff opens one card richer as well as one hit harder to kill.
+      this.pile = new Pile();
+      for (const p of all) {
+        p.duelHand = this.pile.takeMany(p.maxHealth);
+        p.gear = [];
+        p.weaponCard = null;
+        p.bangsThisTurn = 0;
+        p.jailed = false;
+        p.hasDynamite = false;
+      }
+    }
 
     telemetry.matchStart(this);
     telemetry.cardsDealt(all.length * CARD_DEAL);
@@ -1568,6 +1831,8 @@ export class Room {
   }
 
   advanceTurn(t) {
+    // Whoever just had their go throws away what they cannot hold on to.
+    if (this.turnHolder) this.onTurnEnd(this.players.get(this.turnHolder));
     // Walk the order looking for the next living player. Running off the end is
     // the end of the round of turns, and everybody gets up and moves again.
     for (let guard = this.turnOrder.length + 1; guard > 0; guard -= 1) {
@@ -1589,14 +1854,104 @@ export class Room {
     this.setTurn({ kind: 'reposition', holder: null, endsAt: t + DUEL.reposition });
   }
 
-  /** Your go. Everything you are given for it arrives here. */
+  /** Your go. Everything you are given for it arrives here, in order. */
   onTurnStart(p) {
     // Standing still is not resting, but it is not running either.
     p.stamina = PLAYER.staminaMax;
     p.sprint = false;
     p.moving = false;
     p.vel = { x: 0, y: 0, z: 0 };
+    p.bangsThisTurn = 0;
+    if (!this.pile) { this.pushSelf(p); return; }
+
+    // 1. The lit stick, if it stopped with you. It travels with the turn, so
+    //    this is the moment it either goes off or moves on.
+    if (p.hasDynamite) {
+      p.hasDynamite = false;
+      if (drawCheck('dynamite')) {
+        this.pile.put('dynamite');
+        this.broadcast({ t: S.FEED, text: `The stick goes off in ${p.name}'s hands.`, tone: 'bad' });
+        this.applyDamage(p, null, DUEL_CARDS.dynamite.blast, 'dynamite', null);
+        if (!p.alive) { this.pushDuelAll(); return; }
+      } else {
+        const next = this.nextLivingAfter(p.id);
+        if (next && next.id !== p.id) {
+          next.hasDynamite = true;
+          this.emit(p, { t: S.FEED, text: 'The fuse is still going. You pass it on.', tone: 'system' });
+          this.emit(next, { t: S.FEED, text: 'Somebody hands you a lit stick of dynamite.', tone: 'bad' });
+        } else {
+          p.hasDynamite = true;
+        }
+      }
+    }
+
+    // 2. A cell costs you the whole go, unless you talk your way out of it.
+    if (p.jailed) {
+      p.jailed = false;
+      p.gear = (p.gear || []).filter((g) => g !== 'jail');
+      this.pile.put('jail');
+      if (drawCheck('jail')) {
+        this.broadcast({ t: S.FEED, text: `${p.name} is out of the cell.`, tone: 'system' });
+      } else {
+        this.broadcast({ t: S.FEED, text: `${p.name} spends their go behind bars.`, tone: 'system' });
+        this.pushDuelAll();
+        this.advanceTurn(now());
+        return;
+      }
+    }
+
+    // 3. Two cards.
+    p.duelHand.push(...this.pile.takeMany(DUEL.draw));
+    this.pushDuelAll();
     this.pushSelf(p);
+  }
+
+  /**
+   * The end of a go: you may not be holding more cards than you have health.
+   * The quiet cruelty of the whole system - the closer you are to dying, the
+   * less you are allowed to do about it.
+   */
+  onTurnEnd(p) {
+    if (!this.duel || !p || !this.pile) return;
+    const limit = handLimit(p);
+    while (p.duelHand.length > limit) this.pile.put(p.duelHand.pop());
+    this.pushDuel(p);
+  }
+
+  /** Whoever is next in the running order and still breathing. */
+  nextLivingAfter(id) {
+    const at = this.turnOrder.indexOf(id);
+    if (at < 0) return null;
+    for (let i = 1; i <= this.turnOrder.length; i++) {
+      const p = this.players.get(this.turnOrder[(at + i) % this.turnOrder.length]);
+      if (p && p.alive) return p;
+    }
+    return null;
+  }
+
+  /** Your hand and what is on the table in front of everybody. Not their hands. */
+  pushDuel(p) {
+    if (!this.duel || p.bot || !p.client) return;
+    this.send(p.client, {
+      t: S.DUEL,
+      hand: p.duelHand || [],
+      gear: p.gear || [],
+      weapon: p.weaponCard || null,
+      reach: r2(reachOf(p)),
+      limit: handLimit(p),
+      bangs: p.bangsThisTurn || 0,
+      pile: this.pile ? this.pile.remaining : 0,
+      // Gear is played face up, so this much is public. Hands are a count.
+      table: [...this.players.values()].filter((o) => o.alive).map((o) => ({
+        id: o.id, gear: o.gear || [], weapon: o.weaponCard || null,
+        cards: (o.duelHand || []).length, dynamite: !!o.hasDynamite,
+      })),
+    });
+  }
+
+  pushDuelAll() {
+    if (!this.duel) return;
+    for (const p of this.players.values()) this.pushDuel(p);
   }
 
   advancePhase() {

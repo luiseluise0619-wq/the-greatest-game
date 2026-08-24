@@ -42,9 +42,14 @@ test('a hit is worth a hit, and the star is worth one more', () => {
       assert.equal(p.maxHealth, want, `${p.role} started on ${p.maxHealth}`);
       assert.equal(p.health, want);
     }
-    // Whatever the gun says, one landed shot is one hit off the four.
+    // Whatever the gun says, one landed shot is one hit off the four. Close
+    // enough to reach and holding nothing to answer it with, so that what is
+    // being measured here is the damage and only the damage.
     const [a, b] = [...room.players.values()];
     room.turn = { kind: 'turn', holder: a.id, endsAt: 1e12 };
+    a.pos = { x: 0, y: 0, z: 0 };
+    b.pos = { x: 0, y: 0, z: 6 };
+    b.duelHand = []; b.gear = [];
     room.applyDamage(b, a, 58, 'shot', null, 'head');
     assert.equal(b.health, b.maxHealth - 1, 'a rifle round to the head took more than a hit');
     room.applyDamage(b, a, 3, 'shot', null, 'leg');
@@ -76,6 +81,9 @@ test('one gun is live at a time, and during a walk none are', () => {
   const { room, clock } = duelRoom();
   try {
     const living = [...room.players.values()].filter((p) => p.alive);
+    // Everybody armed and everybody's gun cooled off, so the only thing left
+    // deciding who may fire is whose go it is.
+    for (const p of living) { p.duelHand = ['bang']; p.bangsThisTurn = 0; p.nextFireAt = 0; }
     for (const holder of living) {
       room.turn = { kind: 'turn', holder: holder.id, endsAt: 1e12 };
       const armed = living.filter((p) => room.canFire(p)).map((p) => p.id);

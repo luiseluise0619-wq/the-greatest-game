@@ -49,4 +49,5 @@ export const S = {
   REPLAY: 'replay',
   CORRECT: 'correct',
   TURN: 'turn',
+  DUEL: 'duel',
 };

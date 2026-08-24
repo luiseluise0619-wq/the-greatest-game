@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 146 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 159 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 ```
@@ -477,7 +477,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 146 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 159 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -569,6 +569,14 @@ They are grouped by what they protect:
   turn doing nothing and not even costing ammunition, a corpse being passed
   over rather than waited six seconds for, and the free-for-all still being the
   free-for-all when a room asks for it.
+- **`test/deck.test.js`** — the eighty cards: that the deck is printed in the
+  right proportions, that a hand is dealt the size of your health and shrinks
+  with it, that ammunition is cards and one of them is a turn, that a gun
+  reaches exactly as far as the card in front of you says and a scope and a
+  horse move that line in opposite directions, that a shot can be answered by
+  the card you were holding for it, and every effect on the rest of the deck -
+  including the beer that will not pour once there are two men left and the
+  cell that the man wearing the star is above.
 - **`test/i18n.test.js`** — the Korean overlay. There is only ever one English
   copy of any string — the one in the HTML, in `constants.js`, or in the
   sentence the server built — and Korean is keyed to it, so two English copies
