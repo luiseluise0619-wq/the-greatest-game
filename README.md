@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 169 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 175 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 ```
@@ -477,7 +477,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 169 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 175 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -585,6 +585,15 @@ They are grouped by what they protect:
   the card you were holding for it, and every effect on the rest of the deck -
   including the beer that will not pour once there are two men left and the
   cell that the man wearing the star is above.
+- **`test/botduel.test.js`** — the five men at the table who are not people.
+  Five of every six gunhands is a bot, so whether the turn mode is a game or a
+  screensaver is a question of what they do with a go: that their feet obey the
+  same rule everybody else's do rather than walking circles round a town
+  standing at its marks, that they play the eighty rather than sitting on them,
+  that they level the gun and hold it long enough for the man on the other end
+  to have seen it coming, and that when it is pointed at them they take that
+  warning often enough to be worth giving — but not so often that they cannot
+  be shot.
 - **`test/i18n.test.js`** — the Korean overlay. There is only ever one English
   copy of any string — the one in the HTML, in `constants.js`, or in the
   sentence the server built — and Korean is keyed to it, so two English copies

@@ -6,8 +6,9 @@
 // Everything below is built around a per-bot suspicion table plus a faction goal.
 
 import {
-  PLAYER, WEAPONS, CHARACTERS, CARDS, PHASE, VISION, clamp, stepStamina, canSprint,
+  PLAYER, WEAPONS, CHARACTERS, CARDS, PHASE, VISION, DUEL, clamp, stepStamina, canSprint,
 } from '../shared/constants.js';
+import { DUEL_CARDS, DISTANCE_UNIT, inReach, reachOf } from '../shared/deck.js';
 import MAP, { NAV_NODES, zoneAt } from '../shared/map.js';
 import { moveAndCollide, lineOfSight } from '../shared/collision.js';
 
@@ -142,6 +143,15 @@ function envNumber(key, fallback) {
 
 const HOSTILITY_THRESHOLD = BOT_TUNING.hostility;
 
+/**
+ * The same line, for a game where the gun is only live for six seconds in
+ * every lap. A bot with the floor, a Bang! in hand and somebody in range has
+ * one decision to make and one go to make it in, so it is a good deal readier
+ * than it would be with all afternoon - but it still is not readiness on
+ * sight: a stranger scores about 0.3 and stays alive.
+ */
+const DUEL_HOSTILITY = envNumber('HNH_DUEL_HOSTILITY', 0.5);
+
 function weightedPick(items, weightOf) {
   let total = 0;
   const weights = items.map((it) => { const w = Math.max(0.001, weightOf(it)); total += w; return w; });
@@ -193,6 +203,12 @@ export class BotBrain {
     this.primeSuspect = null;       // outlaws pick someone to lean on
     this.protecteeThreat = null;    // deputies remember who went for their man
     this.nextProbeAt = 0;
+    this.nextDuelActAt = 0;
+    this.braceRolled = false;
+    this.braceAt = 0;
+    // Nobody levels a gun for exactly as long as anybody else, so the moment
+    // the shot comes is not a number the man on the other end can learn.
+    this.drawPatience = rnd(0.04, 0.5);
     this.sheriffness = new Map();   // id -> "looks like the law" score
     this.glassBumped = new Map();   // id -> t, so the Long Glass cannot stack suspicion per bullet
     // Skill spread so a lobby of bots does not feel like one machine.
@@ -572,6 +588,11 @@ export class BotBrain {
     const target = fighting ? this.chooseTarget(t) : null;
     const visibleTarget = target && this.visible.includes(target) ? target : null;
 
+    // The turn mode rations the trigger rather than the feet. Everything below
+    // this line assumes a bot may shoot whenever it likes and walk while it
+    // does, and neither is true once the bell has rung, so it forks here.
+    if (this.room.duel && this.room.turn) return this.duelUpdate(t, dt, visibleTarget);
+
     if (t >= this.nextThink) {
       this.nextThink = t + rnd(0.25, 0.6);
       this.think(t, target, visibleTarget);
@@ -590,6 +611,184 @@ export class BotBrain {
       this.badgeTimer = (this.badgeTimer || 0) + dt;
       if (this.badgeTimer > this.wantBadgeAt) this.room.onBadge(me);
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // The turn mode
+  //
+  // Three states, and the round is nothing but these three going round: it is
+  // your go, it is somebody else's go, or everybody is walking. A bot has one
+  // decision in each - who to point at, whether to move when somebody points
+  // at you, and where to stand so that the first two go your way.
+  // -------------------------------------------------------------------------
+  duelUpdate(t, dt, visibleTarget) {
+    const me = this.self;
+    const room = this.room;
+    const mine = room.turnHolder === me.id;
+    const quarry = mine ? this.duelQuarry() : null;
+
+    // Only one man in town is pointing a gun at anybody. Everybody else is
+    // watching him do it, which is also how they see it coming.
+    const holder = room.turnHolder ? room.players.get(room.turnHolder) : null;
+    this.aim(t, dt, mine ? quarry : (holder && holder !== me ? holder : visibleTarget), mine);
+
+    if (room.rooted) {
+      me.moving = false;
+      me.sprint = false;
+      me.vel = { x: 0, y: 0, z: 0 };
+    } else {
+      if (!this.goal || this.reached(this.goal, 3)) {
+        this.state = 'ground';
+        this.setGoal(this.duelGround());
+      }
+      this.move(t, dt, null);
+    }
+
+    if (mine) this.duelTurn(t, quarry);
+    else this.duelWatch(t);
+    this.social(t, dt);
+  }
+
+  /**
+   * Where to stand, which in the turn mode is the only thing anybody decides
+   * with their feet - and so is most of the game. Close enough that your gun
+   * reaches the man you want; no closer, because his reaches back.
+   */
+  duelGround() {
+    const me = this.self;
+    if (this.room.phase === PHASE.ENDGAME) {
+      const d = Math.hypot(me.pos.x, me.pos.z);
+      if (d > (this.room.ringRadius || 60) - 8) return { x: rnd(-8, 8), z: rnd(-8, 8) };
+    }
+    const mark = this.duelMark();
+    if (!mark) return this.wanderGoal();
+    const want = reachOf(me) * rnd(0.5, 0.85);
+    let dx = me.pos.x - mark.pos.x, dz = me.pos.z - mark.pos.z;
+    const len = Math.hypot(dx, dz) || 1;
+    return {
+      x: clamp(mark.pos.x + (dx / len) * want + rnd(-5, 5), -66, 66),
+      z: clamp(mark.pos.z + (dz / len) * want + rnd(-5, 5), -66, 66),
+    };
+  }
+
+  /** Whoever this bot would most like to see face down, at any distance. */
+  duelMark() {
+    let best = null, bestWant = 0.35;
+    for (const o of this.room.players.values()) {
+      if (o.id === this.self.id || !o.alive) continue;
+      const want = this.wantsDead(o);
+      if (want > bestWant) { bestWant = want; best = o; }
+    }
+    return best;
+  }
+
+  /** The same man, but only if the gun actually reaches him and can see him. */
+  duelQuarry() {
+    const me = this.self;
+    let best = null, bestScore = DUEL_HOSTILITY;
+    for (const o of this.room.players.values()) {
+      if (o.id === me.id || !o.alive) continue;
+      const want = this.wantsDead(o);
+      if (want <= 0) continue;
+      const d = Math.hypot(o.pos.x - me.pos.x, o.pos.z - me.pos.z);
+      if (!inReach(me, o, d)) continue;
+      if (!lineOfSight(eyeOf(me), chestOf(o), MAP.solids)) continue;
+      const score = want * (0.7 + this.aggression * 0.6) * (1 + (1 - o.health / o.maxHealth) * 0.6);
+      if (score > bestScore) { bestScore = score; best = o; }
+    }
+    return best;
+  }
+
+  /** Your go: a card on the table, then the gun. In that order, and once each. */
+  duelTurn(t, quarry) {
+    if (t < this.nextDuelActAt) return;
+    if (this.duelPlayCard(t, quarry)) { this.nextDuelActAt = t + rnd(0.3, 0.9); return; }
+    this.duelShoot(t, quarry);
+  }
+
+  /**
+   * What to play, in the order a man who wanted to live would play it. Every
+   * one of these goes through Room.onDuelCard, so a bot cannot play a card a
+   * player could not - and a refusal simply falls through to the next line.
+   */
+  duelPlayCard(t, quarry) {
+    const me = this.self;
+    const room = this.room;
+    const hand = me.duelHand || [];
+    if (!hand.length) return false;
+    const has = (id) => hand.includes(id);
+    const out = (id) => (me.gear || []).includes(id);
+    const count = (id) => (me.duelHand || []).filter((c) => c === id).length;
+    // Truth is whether the card left the hand, not whether we asked: the room
+    // turns down plenty of these and the next line down is usually still good.
+    const play = (id, target) => {
+      const before = count(id);
+      room.onDuelCard(me, { card: id, target: target ? target.id : undefined });
+      return count(id) < before;
+    };
+    const alive = [...room.players.values()].filter((o) => o.alive).length;
+
+    // Still being alive comes before anything you might do with the turn.
+    if (has('beer') && me.health < me.maxHealth && alive > 2 && play('beer')) return true;
+    // The lit stick only punishes the man still holding it, so it goes down.
+    if (has('dynamite') && !me.hasDynamite && play('dynamite')) return true;
+    // A gun that reaches further beats any single shot you could take with the
+    // one you have, because it decides every shot for the rest of the round.
+    const held = DUEL_CARDS[me.weaponCard]?.reach || 1;
+    for (const id of ['winchester', 'carabine', 'remington', 'schofield', 'volcanic']) {
+      if (has(id) && (DUEL_CARDS[id].reach || 1) > held && play(id)) return true;
+    }
+    // More cards is more of everything else on this list.
+    if (has('wells') && play('wells')) return true;
+    if (has('stagecoach') && play('stagecoach')) return true;
+    if (has('store') && play('store')) return true;
+    // Ground: something to stand behind, something to see with, and distance.
+    if (has('barrel') && !out('barrel') && play('barrel')) return true;
+    if (has('mustang') && !out('mustang') && play('mustang')) return true;
+    if (has('scope') && !out('scope') && play('scope')) return true;
+
+    const mark = quarry || this.duelMark();
+    if (mark) {
+      if (has('jail') && play('jail', mark)) return true;
+      // Calling somebody out is only sensible if you brought more bullets.
+      if (has('duel') && count('bang') >= 2 && play('duel', mark)) return true;
+      if (has('catbalou') && play('catbalou', mark)) return true;
+      if (has('panic') && play('panic', mark)) return true;
+    }
+    // The two that point at the whole street, worth it while the street is full.
+    if (has('gatling') && alive > 2 && play('gatling')) return true;
+    if (has('indians') && alive > 2 && play('indians')) return true;
+    return false;
+  }
+
+  /**
+   * The draw. The gun has to be on him and it has to have been on him long
+   * enough for him to have done something about it - that wait is the mode,
+   * and skipping it would take the only warning anybody gets away from them.
+   */
+  duelShoot(t, quarry) {
+    const me = this.self;
+    if (!quarry || !this.room.canBang(me)) return;
+    if (me.aimAt !== quarry.id) return;
+    if ((me.aimDwell || 0) < DUEL.drawTime + this.drawPatience) return;
+    this.room.onShoot(me, { dir: this.forward() });
+  }
+
+  /**
+   * Somebody else's go, and his barrel has stopped on you. You have the length
+   * of his draw and a card that only works if you spend it before the shot.
+   * A bot that always ducked would be unhittable, so this is a nerve check.
+   */
+  duelWatch(t) {
+    const me = this.self;
+    if (this.room.aimedAt !== me.id) { this.braceRolled = false; this.braceAt = 0; return; }
+    if (!this.braceRolled) {
+      this.braceRolled = true;
+      this.braceAt = (me.duelHand || []).includes('missed')
+        && Math.random() < 0.28 + this.skill * 0.55
+        ? t + rnd(0.1, 0.4) : 0;
+    }
+    if (this.braceAt && t >= this.braceAt) { this.braceAt = 0; this.room.onBrace(me); }
   }
 
   think(t, target, visibleTarget) {
@@ -823,9 +1022,25 @@ export class BotBrain {
   // -------------------------------------------------------------------------
   // Aim + fire
   // -------------------------------------------------------------------------
-  aim(t, dt, target) {
+  aim(t, dt, target, steady = false) {
     const me = this.self;
     let wantYaw = me.yaw, wantPitch = me.pitch;
+
+    if (target && steady) {
+      // Levelling a gun and holding it is a deliberate act, not a snapshot. If
+      // the crosshair wobbled off him the draw would keep restarting and the
+      // shot would never come - and in this mode the wobble is not where the
+      // uncertainty lives anyway. It lives in what he does about it.
+      const eye = eyeOf(me);
+      const c = chestOf(target);
+      const dx = c.x - eye.x, dy = c.y - eye.y, dz = c.z - eye.z;
+      wantYaw = Math.atan2(-dx, -dz);
+      wantPitch = Math.atan2(dy, Math.hypot(dx, dz) || 0.001);
+      const turn = 4.4 * (0.5 + this.skill) * dt;
+      me.yaw = angleTowards(me.yaw, wantYaw, turn);
+      me.pitch = clamp(me.pitch + clamp(wantPitch - me.pitch, -turn, turn), -1.3, 1.3);
+      return;
+    }
 
     if (target) {
       const eye = eyeOf(me);

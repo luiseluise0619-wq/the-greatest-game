@@ -21,10 +21,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
 import { TIMING, MODES, DUEL } from '../shared/constants.js';
+import { reachOf } from '../shared/deck.js';
 
 const { Room } = await import('../server/room.js');
 
 const secs = (clock, room, n) => tick(clock, room, Math.round(n * 20));
+const reachOfMetres = (p) => reachOf(p);
 
 function town({ bots = 5 } = {}) {
   TIMING.prep = 1; TIMING.combat = 900; TIMING.endgame = 60; TIMING.results = 5;
@@ -173,6 +175,66 @@ test('and a live one goes through you into whoever stood behind', () => {
     room.onSelfShot(a);
     assert.equal(a.health, hpA - 1, 'it went off and missed the man holding it');
     assert.equal(b.health, hpB - 1, 'and stopped before the man lined up behind him');
+  } finally { clock.restore(); }
+});
+
+test('the rules apply to a fired gun, not only to the word for one', () => {
+  // Every rule in this file hangs off one branch, and that branch was reading
+  // the word "shot". Nothing that ever comes out of a gun says "shot": it says
+  // "revolver". So the chamber, the range, the barrel and the card in his hand
+  // all applied to the tests and to nothing else.
+  const { room, clock, all, turn } = town();
+  try {
+    const [a, b] = all;
+    turn(a);
+    a.pos = { x: 0, y: 0, z: 0 };
+    b.pos = { x: 0, y: 0, z: 6 };
+    b.gear = []; b.duelHand = [];
+
+    a.roundIsLive = false;
+    const held = b.health;
+    a.shotSerial = 1; a.shotSpent = null;
+    room.applyDamage(b, a, 40, 'revolver', null, 'head');
+    assert.equal(b.health, held, 'a blank out of a real gun took a hit off somebody');
+
+    // And out of range is out of range for a real gun too.
+    a.roundIsLive = true;
+    b.pos = { x: 0, y: 0, z: reachOfMetres(a) + 40 };
+    a.shotSerial = 2; a.shotSpent = null;
+    room.applyDamage(b, a, 40, 'revolver', null, 'head');
+    assert.equal(b.health, held, 'a belt gun reached the far end of the street');
+
+    b.pos = { x: 0, y: 0, z: 6 };
+    a.shotSerial = 3; a.shotSpent = null;
+    room.applyDamage(b, a, 40, 'revolver', null, 'head');
+    assert.equal(b.health, held - 1, 'and a good shot at a man in range found nothing');
+  } finally { clock.restore(); }
+});
+
+test('one card, one shot, one man - however many pellets came out', () => {
+  const { room, clock, all, turn } = town();
+  try {
+    const [a, b, c] = all;
+    turn(a);
+    a.pos = { x: 0, y: 0, z: 0 };
+    b.pos = { x: 0, y: 0, z: 6 };
+    c.pos = { x: 3, y: 0, z: 6 };
+    for (const p of [b, c]) { p.gear = []; p.duelHand = []; }
+    a.roundIsLive = true;
+    const [hpB, hpC] = [b.health, c.health];
+
+    // A coach gun is nine pellets and one card. The card is what is being
+    // spent, so eight of them are smoke.
+    a.shotSerial = 7; a.shotSpent = null;
+    for (let i = 0; i < 9; i++) room.applyDamage(b, a, 30, 'shotgun', null, 'body');
+    assert.equal(b.health, hpB - 1, 'nine pellets took nine hits off one man');
+    for (let i = 0; i < 9; i++) room.applyDamage(c, a, 30, 'shotgun', null, 'body');
+    assert.equal(c.health, hpC, 'and the same blast went through a second man as well');
+
+    // The next pull of the trigger is a different card and a different shot.
+    a.shotSerial = 8; a.shotSpent = null;
+    room.applyDamage(b, a, 30, 'shotgun', null, 'body');
+    assert.equal(b.health, hpB - 2, 'and the next shot found nobody at all');
   } finally { clock.restore(); }
 });
 

@@ -536,6 +536,10 @@ export class Room {
       if ((p.aimDwell || 0) < DUEL.drawTime) return;
       if (!this.spendBang(p)) return;
       p.roundIsLive = this.nextRound();
+      // A number for this pull of the trigger, so that however many pellets
+      // come out of the barrel only the first one to find anybody counts.
+      p.shotSerial = (p.shotSerial || 0) + 1;
+      p.shotSpent = null;
     }
     const w = WEAPONS[p.slot];
     const g = p.guns[p.slot];
@@ -638,7 +642,17 @@ export class Room {
     // The storm and a lit stick are the two things that still work in points.
     if (this.duel && cause !== 'storm' && cause !== 'dynamite') {
       amount = DUEL.damagePerHit;
-      if (attacker && attacker !== victim && !this.duelShotLands(victim, attacker, cause)) return;
+      if (attacker && attacker !== victim) {
+        // One card, one shot, one man. A coach gun throws nine pellets and the
+        // card being spent for them is a single Bang!, so the first pellet to
+        // reach anybody is the shot and the other eight are smoke - whether it
+        // landed, went into a barrel or turned out to be a blank.
+        if (WEAPONS[cause]) {
+          if (attacker.shotSpent === attacker.shotSerial) return;
+          attacker.shotSpent = attacker.shotSerial;
+        }
+        if (!this.duelShotLands(victim, attacker, cause)) return;
+      }
     }
     if (this.phase === PHASE.PREP) return;                       // guns are noise only in prep
     if (this.phase !== PHASE.COMBAT && this.phase !== PHASE.ENDGAME) return;
@@ -809,7 +823,11 @@ export class Room {
    * there is no pausing a first-person game to offer somebody a decision.
    */
   duelShotLands(victim, attacker, cause) {
-    if (cause !== 'shot') return true;
+    // Anything a trigger sent. The cause a fired gun carries is the gun's own
+    // name rather than the word "shot", which is how the chamber, the range,
+    // the barrel and the card in his hand all quietly stopped applying to
+    // actual gunfire and only ever applied to the tests.
+    if (cause !== 'shot' && !WEAPONS[cause]) return true;
     // The chamber is shared and nobody knows the order. A blank is a bang and
     // a puff of smoke and nothing else, and it still cost a card.
     if (attacker.roundIsLive === false) {
@@ -1559,6 +1577,8 @@ export class Room {
       p.armed = new Set();
       p.cardsPlayed = [];
       p.barrelUntil = 0;
+      p.shotSerial = 0;
+      p.shotSpent = null;
       p.dmgCarry = 0;
       p.noPrintsUntil = 0;
       p.glassUntil = 0;
