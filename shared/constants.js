@@ -442,6 +442,29 @@ export const DUEL = {
   // A hit is a hit. Where you put it decides whether it lands, not what it is
   // worth - which is the rule the card game runs on.
   damagePerHit: 1,
+
+  // ---------------------------------------------------------- the chamber
+  //
+  // One chamber for the whole town, loaded at the start of every walk and
+  // announced: four live and two blank, or whatever it came to. Nobody is told
+  // the order. Every shot anybody fires draws the next one, so six people
+  // spend the lap counting the same six rounds - which is the whole of it.
+  //
+  // `liveShare` is how much of the chamber is live before rounding, and the
+  // loader guarantees at least one of each so that counting is always worth
+  // doing.
+  liveShare: 0.65,
+  // Pointing it at yourself. A blank buys you another go; a live round costs
+  // you a hit and does not stop there - it carries on through and takes
+  // whoever was standing in line behind you, which is why where you stand
+  // during the walk is about more than how far your gun reaches.
+  selfShot: {
+    corridor: 2.2,      // metres either side of the line out of your back
+    reach: 30,          // how far the round carries once it is through you
+  },
+  // How long the barrel has to be steady on somebody before it will fire, and
+  // how long they have known about it by then.
+  drawTime: 0.8,
 };
 
 export const MODES = { FREE: 'free', DUEL: 'duel' };

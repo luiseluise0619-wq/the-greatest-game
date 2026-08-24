@@ -140,11 +140,16 @@ test('a shot can be answered by the card you were holding for it', () => {
     give(a, 'bang', 'bang');
     b.gear = [];
     give(b, 'missed');
+    // Answered, not answered for: the card comes out of the hand of somebody
+    // who watched the barrel swing onto them and moved. See roulette.test.js
+    // for the deciding half; this is the card doing its job once it is spent.
+    b.bracedUntil = 1e12;
     const held = b.health;
     room.applyDamage(b, a, 99, 'shot', null, 'head');
     assert.equal(b.health, held, 'the Missed! did not');
     assert.deepEqual(b.duelHand, [], 'and it was not spent');
-    // With nothing left it lands.
+    // With nothing left it lands, braced or not.
+    b.bracedUntil = 1e12;
     room.applyDamage(b, a, 99, 'shot', null, 'head');
     assert.equal(b.health, held - 1);
   } finally { clock.restore(); }

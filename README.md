@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 159 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 167 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 ```
@@ -477,7 +477,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 159 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 167 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -569,6 +569,14 @@ They are grouped by what they protect:
   turn doing nothing and not even costing ammunition, a corpse being passed
   over rather than waited six seconds for, and the free-for-all still being the
   free-for-all when a room asks for it.
+- **`test/roulette.test.js`** — the chamber, the draw and the barrel turned
+  round: that the chamber is the town's rather than yours and is loaded in the
+  open so everybody spends the lap counting the same rounds, that a gun will
+  not fire until it has been steady long enough for the man on the other end
+  to have seen it, that the card in his hand only saves him if he saw it and
+  moved, and that pointing it at your own head buys another go on a click and
+  costs two men a hit on a live round — you, and whoever chose to stand in the
+  line behind you.
 - **`test/deck.test.js`** — the eighty cards: that the deck is printed in the
   right proportions, that a hand is dealt the size of your health and shrinks
   with it, that ammunition is cards and one of them is a turn, that a gun

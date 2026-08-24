@@ -237,6 +237,8 @@ export class Room {
       case C.VOICE: return this.onVoice(p, msg);
       case C.BADGE: return this.onBadge(p);
       case C.CARD: return this.onCard(p, msg);
+      case C.SELFSHOT: return this.onSelfShot(p);
+      case C.BRACE: return this.onBrace(p);
       case C.ADD_BOT: return this.onAddBot(p, msg);
       case C.START: return this.onStart(p, msg);
       case C.RESTART: return this.onRestart(p);
@@ -526,7 +528,15 @@ export class Room {
 
   onShoot(p, msg) {
     if (!this.canFire(p)) return;
-    if (this.duel && !this.spendBang(p)) return;
+    if (this.duel) {
+      // The barrel has to have been steady on somebody long enough for them to
+      // have seen it coming. This is the draw, and it is the only warning
+      // anybody gets - so it is also the only thing to watch on somebody
+      // else's go.
+      if ((p.aimDwell || 0) < DUEL.drawTime) return;
+      if (!this.spendBang(p)) return;
+      p.roundIsLive = this.nextRound();
+    }
     const w = WEAPONS[p.slot];
     const g = p.guns[p.slot];
     const t = now();
@@ -800,6 +810,13 @@ export class Room {
    */
   duelShotLands(victim, attacker, cause) {
     if (cause !== 'shot') return true;
+    // The chamber is shared and nobody knows the order. A blank is a bang and
+    // a puff of smoke and nothing else, and it still cost a card.
+    if (attacker.roundIsLive === false) {
+      this.emit(attacker, { t: S.FEED, text: 'A blank. Smoke and noise.', tone: 'bad' });
+      this.emit(victim, { t: S.FEED, text: 'A blank, aimed at you.', tone: 'good' });
+      return false;
+    }
     // Out of range is out of range, whatever the bullet did.
     const d = Math.hypot(victim.pos.x - attacker.pos.x, victim.pos.z - attacker.pos.z);
     if (!inReach(attacker, victim, d)) {
@@ -813,14 +830,21 @@ export class Room {
       this.emit(attacker, { t: S.FEED, text: 'Wood, not meat.', tone: 'bad' });
       return false;
     }
+    // And the card in your hand only helps if you saw it coming and moved.
+    // Spending it for you would be doing the only decision anybody gets to
+    // make on somebody else's turn.
     const at = (victim.duelHand || []).indexOf('missed');
-    if (at >= 0) {
+    if (at >= 0 && (victim.bracedUntil || 0) > now()) {
+      victim.bracedUntil = 0;
       victim.duelHand.splice(at, 1);
       this.pile.put('missed');
       this.emit(victim, { t: S.FEED, text: 'You were not standing where he thought.', tone: 'good' });
-      this.emit(attacker, { t: S.FEED, text: 'Missed. He had one ready.', tone: 'bad' });
+      this.emit(attacker, { t: S.FEED, text: 'Missed. He was ready for it.', tone: 'bad' });
       this.pushDuel(victim);
       return false;
+    }
+    if (at >= 0) {
+      this.emit(victim, { t: S.FEED, text: 'You had one in your hand and never moved.', tone: 'bad' });
     }
     return true;
   }
@@ -1665,6 +1689,7 @@ export class Room {
       // Straight into a walk: nobody has chosen where to stand yet.
       this.turnPtr = -1;
       this.setTurn({ kind: 'reposition', holder: null, endsAt: now() + DUEL.reposition });
+      this.loadChamber();
     }
     if (phase !== PHASE.COMBAT && phase !== PHASE.ENDGAME) this.turn = null;
     if (phase === PHASE.COMBAT) {
@@ -1756,7 +1781,7 @@ export class Room {
       this.stepDynamite(t, dt);
       this.stepLoot(t);
       if (this.phase === PHASE.ENDGAME) this.stepRing(t, dt);
-      if (this.phase !== PHASE.PREP) this.stepTurns(t);
+      if (this.phase !== PHASE.PREP) { this.stepAim(t); this.stepTurns(t); }
       if (t >= this.phaseEndsAt) this.advancePhase();
     } else if (this.phase === PHASE.RESULTS) {
       if (t >= this.phaseEndsAt) this.toLobby();
@@ -1841,6 +1866,7 @@ export class Room {
         this.turnPtr = -1;
         this.setTurn({ kind: 'reposition', holder: null, endsAt: t + DUEL.reposition });
         this.broadcast({ t: S.SOUND, sound: 'bell' });
+        this.loadChamber();
         return;
       }
       const p = this.players.get(this.turnOrder[this.turnPtr]);
@@ -1916,6 +1942,139 @@ export class Room {
     const limit = handLimit(p);
     while (p.duelHand.length > limit) this.pile.put(p.duelHand.pop());
     this.pushDuel(p);
+  }
+
+  // ------------------------------------------------------------- the chamber
+  /**
+   * Load the chamber for a lap and tell the town what went into it - how many
+   * live and how many blank, never the order. One round per man alive, so by
+   * the time it comes back round to you everybody has been counting.
+   */
+  loadChamber() {
+    const living = [...this.players.values()].filter((p) => p.alive).length;
+    const rounds = Math.max(2, living);
+    // At least one of each, or there is nothing to count and nothing to gamble.
+    const live = Math.min(rounds - 1, Math.max(1, Math.round(rounds * DUEL.liveShare)));
+    this.chamber = shuffle([
+      ...Array(live).fill(true),
+      ...Array(rounds - live).fill(false),
+    ]);
+    this.broadcast({ t: S.CHAMBER, live, blank: rounds - live, left: this.chamber.length });
+    this.broadcast({
+      t: S.FEED,
+      text: `The chamber is loaded: ${live} live, ${rounds - live} blank. Nobody is told the order.`,
+      tone: 'system',
+    });
+  }
+
+  /**
+   * Getting ready to not be there. Costs nothing if no shot comes; spends the
+   * card in your hand if one does. The only move anybody makes on somebody
+   * else's turn, which is the point of it.
+   */
+  onBrace(p) {
+    if (!this.duel || !p.alive) return;
+    if (this.turnHolder === p.id) return;         // your own go is for shooting
+    p.bracedUntil = now() + DUEL.drawTime + 0.35;
+    this.emit(p, { t: S.FEED, text: 'You shift your weight.', tone: 'system' });
+  }
+
+  /**
+   * Watch the barrel. While somebody has a go, whoever they are pointing at is
+   * told - and how long it has been steady decides whether the gun will fire
+   * at all.
+   */
+  stepAim(t) {
+    if (!this.duel) return;
+    const p = this.turnHolder ? this.players.get(this.turnHolder) : null;
+    if (!p || !p.alive) {
+      if (this.aimedAt) { this.tellAimed(this.aimedAt, false); this.aimedAt = null; }
+      return;
+    }
+    const found = this.playerInCrosshair(p, reachOf(p));
+    const onto = found ? found.id : null;
+    if (onto !== p.aimAt) {
+      p.aimAt = onto;
+      p.aimSince = t;
+      if (this.aimedAt && this.aimedAt !== onto) this.tellAimed(this.aimedAt, false);
+      this.aimedAt = onto;
+      if (onto) this.tellAimed(onto, true, p);
+    }
+    p.aimDwell = onto ? t - p.aimSince : 0;
+  }
+
+  tellAimed(id, on, by = null) {
+    const target = this.players.get(id);
+    if (!target || target.bot || !target.client) return;
+    this.send(target.client, { t: S.AIMED, on, by: by ? by.id : null });
+  }
+
+  /** The next round out of the shared chamber. Reloaded rather than run dry. */
+  nextRound() {
+    if (!this.chamber || !this.chamber.length) this.loadChamber();
+    const live = this.chamber.pop();
+    this.broadcast({ t: S.CHAMBER, left: this.chamber.length });
+    return live;
+  }
+
+  /**
+   * The barrel turned round. A blank buys another go; a live round is a hit,
+   * and it does not stop at you - it carries on out of your back and takes
+   * whoever chose to stand in line behind you.
+   */
+  onSelfShot(p) {
+    if (!this.duel || !p.alive) return;
+    if (this.turnHolder !== p.id) return;
+    if (!this.canBang(p)) return;
+    if (!this.spendBang(p)) return;
+
+    const live = this.nextRound();
+    this.broadcast({ t: S.SOUND, sound: 'gunshot', pos: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z)] });
+    if (!live) {
+      this.broadcast({ t: S.FEED, text: `${p.name} puts it to their own head. It clicks.`, tone: 'good' });
+      // A blank costs you a card and nothing else - and the floor is yours again.
+      this.setTurn({ kind: 'turn', holder: p.id, endsAt: now() + DUEL.turn });
+      p.bangsThisTurn = 0;
+      this.pushDuelAll();
+      return;
+    }
+
+    this.broadcast({ t: S.FEED, text: `${p.name} puts it to their own head. It was not a blank.`, tone: 'bad' });
+    const behind = this.linedUpBehind(p);
+    this.applyDamage(p, p, 1, 'selfshot', null);
+    if (behind) {
+      this.broadcast({
+        t: S.FEED,
+        text: `It goes straight through and finds ${behind.name} stood behind them.`,
+        tone: 'bad',
+      });
+      this.applyDamage(behind, p, 1, 'selfshot', null);
+    }
+    this.pushDuelAll();
+  }
+
+  /**
+   * Whoever is standing in the corridor out of this player's back. Nearest
+   * first: a round that has already been through one man does not go through
+   * a second.
+   */
+  linedUpBehind(p) {
+    const back = forwardOf(p);
+    let best = null;
+    let bestD = DUEL.selfShot.reach;
+    for (const o of this.players.values()) {
+      if (o === p || !o.alive) continue;
+      const dx = o.pos.x - p.pos.x;
+      const dz = o.pos.z - p.pos.z;
+      // Behind means the wrong side of them, so the sign is flipped.
+      const along = -(dx * back.x + dz * back.z);
+      if (along <= 0 || along > bestD) continue;
+      const off = Math.abs(dx * -back.z + dz * back.x);
+      if (off > DUEL.selfShot.corridor) continue;
+      best = o;
+      bestD = along;
+    }
+    return best;
   }
 
   /** Whoever is next in the running order and still breathing. */

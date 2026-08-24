@@ -15,6 +15,8 @@ export const C = {
   VOICE: 'voice',
   BADGE: 'badge',
   CARD: 'card',
+  SELFSHOT: 'selfshot',
+  BRACE: 'brace',
   ADD_BOT: 'addBot',
   START: 'start',
   RESTART: 'restart',
@@ -50,4 +52,6 @@ export const S = {
   CORRECT: 'correct',
   TURN: 'turn',
   DUEL: 'duel',
+  CHAMBER: 'chamber',
+  AIMED: 'aimed',
 };
