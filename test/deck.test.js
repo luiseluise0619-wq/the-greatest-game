@@ -13,6 +13,7 @@ import {
   DECK_SIZE, DISTANCE_UNIT, DUEL_CARDS, buildDeck, reachOf, inReach,
 } from '../shared/deck.js';
 import { Pile, handLimit } from '../server/deck.js';
+import { healthOf } from '../shared/gunhands.js';
 
 const { Room } = await import('../server/room.js');
 
@@ -31,6 +32,11 @@ function table({ bots = 5 } = {}) {
   secs(clock, room, 2);
   freezeBots(room);
   const all = [...room.players.values()];
+  // Six of the sixteen bend a rule this file is about - one reaches a step
+  // further, one stands a step out, one is behind a barrel he never found.
+  // Every test below is measuring the rule rather than the men who bend it,
+  // except the one that counts what was dealt.
+  for (const p of all) if (p.role !== 'sheriff') p.gunhand = null;
   return {
     room, clock, all,
     give: (p, ...cards) => { p.duelHand = cards.slice(); },
@@ -69,8 +75,12 @@ test('you are dealt a hand the size of your health', () => {
     for (const p of all) {
       assert.equal(p.duelHand.length, p.maxHealth, `${p.role} was dealt ${p.duelHand.length}`);
     }
+    // The star is a hit and a card better off than the same man without it -
+    // which is not a fixed number any more, because two of the sixteen only
+    // have three hits in them to start with.
     const sheriff = all.find((p) => p.role === 'sheriff');
-    assert.equal(sheriff.duelHand.length, DUEL.sheriffHealth,
+    const bare = healthOf(sheriff.gunhand, DUEL.health);
+    assert.equal(sheriff.duelHand.length, bare + (DUEL.sheriffHealth - DUEL.health),
       'the star is one card as well as one hit better off');
     assert.equal(room.pile.remaining, 80 - all.reduce((n, p) => n + p.maxHealth, 0));
   } finally { clock.restore(); }

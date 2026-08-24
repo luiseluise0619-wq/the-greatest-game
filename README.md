@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 181 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 193 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 ```
@@ -129,6 +129,29 @@ On your own go you may put the barrel against your own head with **Q**. A blank
 buys you another go on the spot. A live round costs you a hit and **carries on
 out of your back** into whoever chose to stand in line behind you. Which is why
 where everybody stood during the walk is worth looking at.
+
+### The sixteen
+
+As well as a role you are dealt one of **sixteen gunhands**, and it is half of
+what makes a hand interesting: the same four cards are a different game in front
+of a man who draws one back every time he is hit than in front of a man who only
+needs one card to stop you. All sixteen effects are the card game's, in
+`shared/gunhands.js` — one bleeds a card into his own hand for every hit, one
+takes it off whoever landed it, one reads a `Missed!` as a shot and fires it, one
+takes two to get out of the way of, one is born behind a barrel, one is never
+holding nothing, one goes through the pockets of everybody who goes down, and
+four of them do not draw off the top of the pile at all.
+
+They are the one thing here with no names. The card game's characters *are* the
+person you play; here you already are somebody — the name you typed, or one of
+the town's — so a gunhand is a thing about you rather than a second person. The
+first cut of that file gave all sixteen names out of the same pool the bots draw
+from, and the first round dealt somebody an ability called Calla Vance and then
+told him he recognised Calla Vance.
+
+The free-for-all keeps its own six. They are abilities for a game where you can
+shoot whenever you like, and they mean nothing in one where the whole question is
+whose go it is.
 
 ### The eighty
 
@@ -604,7 +627,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 181 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 193 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -716,6 +739,17 @@ They are grouped by what they protect:
   the card you were holding for it, and every effect on the rest of the deck -
   including the beer that will not pour once there are two men left and the
   cell that the man wearing the star is above.
+- **`test/gunhands.test.js`** — the sixteen. All sixteen effects of the card
+  game's characters, each checked from the server's side, because each of them
+  is a rule some other file in this suite is deliberately measuring without: the
+  man who bleeds a card into his own hand for every hit, the man who takes one
+  off whoever landed it, the man who reads a `Missed!` as a shot and fires it,
+  the man it takes two to get out of the way of, the man born behind a barrel,
+  the woman everybody reaches a step short of, the man with no limit of one shot
+  a turn, the man the game asks twice every time it asks, the woman who is never
+  holding nothing, the man who goes through the pockets of everybody who goes
+  down, the surgeon who buys a hit back with two cards — and the four who do not
+  draw off the top of the pile at all.
 - **`test/botduel.test.js`** — the five men at the table who are not people.
   Five of every six gunhands is a bot, so whether the turn mode is a game or a
   screensaver is a question of what they do with a go: that their feet obey the

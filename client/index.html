@@ -104,7 +104,7 @@
     <div class="objBox"><span data-i18n="role.objective">OBJECTIVE</span><p id="roleObjective"></p></div>
     <div class="intelBox"><span data-i18n="role.whatYouKnow">WHAT YOU KNOW</span><p id="roleIntel"></p></div>
     <div class="charBox">
-      <span data-i18n="role.youArePlaying">YOU ARE PLAYING</span>
+      <span id="charLabel" data-i18n="role.youArePlaying">YOU ARE PLAYING</span>
       <p id="roleCharacter"></p>
       <em id="roleAbility"></em>
     </div>
@@ -187,9 +187,13 @@
         <button id="openSettings" class="ghost wide" data-i18n="ui.settings">SETTINGS</button>
       </section>
 
-      <section class="mCol wide">
-        <label class="fieldLabel" data-i18n="ui.pickGunhand">PICK YOUR GUNHAND</label>
-        <div id="charGrid"></div>
+      <section class="mCol wide" id="menuWide">
+        <label class="fieldLabel freeOnly" data-i18n="ui.pickGunhand">PICK YOUR GUNHAND</label>
+        <label class="fieldLabel duelOnly" data-i18n="ui.dealtGunhand">YOUR GUNHAND IS DEALT</label>
+        <p class="deckLead duelOnly" data-i18n-html="ui.sixteenLead">Sixteen of them, one each, and nobody
+        chooses. One bleeds a card into his own hand every time he is hit; one takes two <b>Missed!</b> to
+        get out of the way of; one is never holding nothing. Yours is on your role card.</p>
+        <div id="charGrid" class="freeOnly"></div>
 
         <div class="rules" id="lobbyRules">
           <h3 data-i18n="ui.howItGoes">HOW A ROUND GOES</h3>
@@ -302,6 +306,13 @@
         with <b>Q</b>. A blank buys you another go on the spot. A live round costs you a hit and
         <b>carries on out of your back</b> into whoever chose to stand in line behind you. Which
         is why where everybody stood during the walk is worth looking at.</p>
+
+        <h3 class="duelOnly" data-i18n="man.handTitle">THE MAN YOU WERE DEALT</h3>
+        <p class="duelOnly" data-i18n-html="man.hand">As well as a role you are dealt one of
+        <b>sixteen gunhands</b>, and it is on your role card. One of them bleeds a card into his own
+        hand every time he is hit. One takes two <b>Missed!</b> to get out of the way of. One is never
+        holding nothing. One goes through the pockets of everybody who goes down. Nobody is told which
+        one anybody else got — but most of them are visible the first time they matter.</p>
 
         <h3 class="duelOnly" data-i18n="man.cardsTitle">THE EIGHTY</h3>
         <p class="duelOnly" data-i18n-html="man.cards">Your hand is the size of your health, and you draw

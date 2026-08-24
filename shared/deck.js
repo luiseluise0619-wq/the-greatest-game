@@ -20,6 +20,8 @@
 // in your hand, and you may only play one on your go. Ammunition is cards.
 // Everything else on this list exists to bend that rule or to survive it.
 
+import { trait } from './gunhands.js';
+
 export const DISTANCE_UNIT = 22;        // metres per "seat" of the original
 
 /** Kinds, which decide when a card may be played and what happens to it. */
@@ -192,13 +194,16 @@ export const DECK_SIZE = buildDeck().length;
 /** How far this player's gun reaches, in metres. */
 export function reachOf(player) {
   const weapon = player?.weaponCard ? DUEL_CARDS[player.weaponCard] : null;
-  const steps = (weapon?.reach ?? DEFAULT_REACH) + (player?.gear?.includes('scope') ? 1 : 0);
+  const steps = (weapon?.reach ?? DEFAULT_REACH)
+    + (player?.gear?.includes('scope') ? 1 : 0)
+    + (trait(player, 'reach') || 0);
   return steps * DISTANCE_UNIT;
 }
 
 /** How far away this player counts as, in metres, whatever the tape says. */
 export function coverOf(player) {
-  return (player?.gear?.includes('mustang') ? 1 : 0) * DISTANCE_UNIT;
+  const steps = (player?.gear?.includes('mustang') ? 1 : 0) + (trait(player, 'cover') || 0);
+  return steps * DISTANCE_UNIT;
 }
 
 /**

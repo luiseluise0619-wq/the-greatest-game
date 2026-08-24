@@ -17,6 +17,7 @@ import { C, S } from '../shared/protocol.js';
 import { BotBrain, BOT_NAMES } from './bots.js';
 import { Pile, handLimit, drawCheck } from './deck.js';
 import { DUEL_CARDS, KIND, inReach, reachOf, DISTANCE_UNIT } from '../shared/deck.js';
+import { GUNHANDS, GUNHAND_ORDER, healthOf, trait } from '../shared/gunhands.js';
 import { telemetry } from './telemetry.js';
 import { randomUUID } from 'node:crypto';
 
@@ -509,19 +510,41 @@ export class Room {
 
   /** Is there a shot left in this hand, and in this turn? */
   canBang(p) {
-    if (!(p.duelHand || []).includes('bang')) return false;
+    if (!this.shotCard(p)) return false;
     const gun = p.weaponCard ? DUEL_CARDS[p.weaponCard] : null;
-    if (gun?.unlimited) return true;
+    if (gun?.unlimited || trait(p, 'unlimited')) return true;
     return (p.bangsThisTurn || 0) < 1;
+  }
+
+  /**
+   * Which card in this hand is a shot. One man on the table reads a Missed! as
+   * a Bang! and a Bang! as a Missed!, so "have you got one" is a question about
+   * the man as well as the hand.
+   */
+  shotCard(p) {
+    const hand = p.duelHand || [];
+    if (hand.includes('bang')) return 'bang';
+    if (trait(p, 'swap') && hand.includes('missed')) return 'missed';
+    return null;
+  }
+
+  /** And the other way round: what he can spend to not be there. */
+  answerCard(p) {
+    const hand = p.duelHand || [];
+    if (hand.includes('missed')) return 'missed';
+    if (trait(p, 'swap') && hand.includes('bang')) return 'bang';
+    return null;
   }
 
   /** Spend one, face up, where the discard pile can see it. */
   spendBang(p) {
-    const at = p.duelHand.indexOf('bang');
+    const card = this.shotCard(p);
+    const at = card ? p.duelHand.indexOf(card) : -1;
     if (at < 0) return false;
     p.duelHand.splice(at, 1);
-    this.pile.put('bang');
+    this.pile.put(card);
     p.bangsThisTurn = (p.bangsThisTurn || 0) + 1;
+    this.checkEmptyHand(p);
     this.pushDuel(p);
     return true;
   }
@@ -704,6 +727,7 @@ export class Room {
       victim.lastHitBy = attacker.id;
       victim.lastHitAt = now();
     }
+    if (this.duel) this.onHitTaken(victim, attacker, dmg);
 
     this.emit(victim, {
       t: S.DAMAGE, amount: dmg, hp: Math.max(0, victim.health),
@@ -728,6 +752,8 @@ export class Room {
     victim.health = 0;
     victim.deaths += 1;
     if (killer && killer !== victim) killer.kills += 1;
+    // What was in his hands does not go in the ground with him.
+    this.onDeathSpoils(victim);
 
     const place = zoneAt(victim.pos.x, victim.pos.z, victim.pos.y);
 
@@ -844,23 +870,39 @@ export class Room {
       });
       return false;
     }
-    if ((victim.gear || []).includes('barrel') && drawCheck('barrel')) {
+    if (((victim.gear || []).includes('barrel') || trait(victim, 'barrel'))
+      && this.drawFor(victim, 'barrel')) {
       this.emit(victim, { t: S.FEED, k: 'feed.intoBarrel', text: 'It goes into the barrel.', tone: 'good' });
       this.emit(attacker, { t: S.FEED, k: 'feed.woodNotMeat', text: 'Wood, not meat.', tone: 'bad' });
       return false;
     }
     // And the card in your hand only helps if you saw it coming and moved.
     // Spending it for you would be doing the only decision anybody gets to
-    // make on somebody else's turn.
-    const at = (victim.duelHand || []).indexOf('missed');
-    if (at >= 0 && (victim.bracedUntil || 0) > now()) {
+    // make on somebody else's turn. One man's shot takes two of them.
+    const need = trait(attacker, 'needsTwo') ? 2 : 1;
+    const answers = [];
+    for (const card of ['missed', 'bang']) {
+      if (card === 'bang' && !trait(victim, 'swap')) continue;
+      for (const c of (victim.duelHand || [])) if (c === card) answers.push(card);
+    }
+    const at = answers.length ? 0 : -1;
+    if (answers.length >= need && (victim.bracedUntil || 0) > now()) {
       victim.bracedUntil = 0;
-      victim.duelHand.splice(at, 1);
-      this.pile.put('missed');
+      for (let i = 0; i < need; i++) {
+        const idx = victim.duelHand.indexOf(answers[i]);
+        if (idx >= 0) { victim.duelHand.splice(idx, 1); this.pile.put(answers[i]); }
+      }
       this.emit(victim, { t: S.FEED, k: 'feed.notThere', text: 'You were not standing where he thought.', tone: 'good' });
       this.emit(attacker, { t: S.FEED, k: 'feed.heWasReady', text: 'Missed. He was ready for it.', tone: 'bad' });
+      this.checkEmptyHand(victim);
       this.pushDuel(victim);
       return false;
+    }
+    if (answers.length && answers.length < need && (victim.bracedUntil || 0) > now()) {
+      this.emit(victim, {
+        t: S.FEED, k: 'feed.needTwo',
+        text: 'One was not enough. He puts two in.', tone: 'bad',
+      });
     }
     if (at >= 0) {
       this.emit(victim, { t: S.FEED, k: 'feed.neverMoved', text: 'You had one in your hand and never moved.', tone: 'bad' });
@@ -1008,6 +1050,8 @@ export class Room {
 
   onAbility(p) {
     if (!p.alive) return;
+    // The turn mode has its own sixteen and one of them has something to press.
+    if (this.duel) return this.onGunhandAbility(p);
     const t = now();
     if (t < p.abilityReadyAt) return;
     const c = CHARACTERS[p.character];
@@ -1409,13 +1453,17 @@ export class Room {
     let turn = target;
     let other = caller;
     for (let round = 0; round < 40; round++) {
-      const at = (turn.duelHand || []).indexOf('bang');
+      // Whatever this man reads as a shot, which for one of the sixteen is not
+      // only the card with Bang! printed on it.
+      const card = this.shotCard(turn);
+      const at = card ? turn.duelHand.indexOf(card) : -1;
       if (at < 0) {
         this.applyDamage(turn, other, 1, 'duel', null);
         return;
       }
       turn.duelHand.splice(at, 1);
-      this.pile.put('bang');
+      this.pile.put(card);
+      this.checkEmptyHand(turn);
       [turn, other] = [other, turn];
     }
   }
@@ -1580,15 +1628,22 @@ export class Room {
     const roles = shuffle(rolesForPlayerCount(all.length));
     const spawnOrder = shuffle(SPAWNS.map((s, i) => i));
     const groups = shuffle(all.map((_, i) => i));
+    // Sixteen gunhands and at most eight men, dealt without repeats.
+    const gunhands = shuffle(GUNHAND_ORDER.slice());
 
     all.forEach((p, i) => {
       p.role = roles[i];
       p.faction = ROLES[p.role].faction;
       p.alive = true;
       if (this.duel) {
-        // Hits, not hit points. One shot is a quarter of a life.
-        p.maxHealth = p.role === 'sheriff' ? DUEL.sheriffHealth : DUEL.health;
+        // Hits, not hit points. One shot is a quarter of a life - and which
+        // quarter depends on the man, because two of the sixteen only have
+        // three of them and are harder to reach for it.
+        p.gunhand = gunhands[i % gunhands.length];
+        const base = healthOf(p.gunhand, DUEL.health);
+        p.maxHealth = base + (p.role === 'sheriff' ? DUEL.sheriffHealth - DUEL.health : 0);
       } else {
+        p.gunhand = null;
         p.maxHealth = PLAYER.maxHealth + (ROLES[p.role].bonusHealth || 0);
       }
       p.health = p.maxHealth;
@@ -1743,6 +1798,8 @@ export class Room {
       intelK: p.intel?.k || null,
       intelP: p.intel?.p || null,
       character: p.character,
+      // Which of the sixteen you were dealt, in the mode that deals them.
+      gunhand: p.gunhand || null,
       canBadge: p.role === 'sheriff',
       tp: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z)],
       yaw: r2(p.yaw),
@@ -1983,7 +2040,7 @@ export class Room {
     //    this is the moment it either goes off or moves on.
     if (p.hasDynamite) {
       p.hasDynamite = false;
-      if (drawCheck('dynamite')) {
+      if (this.drawFor(p, 'dynamite')) {
         this.pile.put('dynamite');
         this.broadcast({
           t: S.FEED, k: 'feed.stickGoesOff', p: { name: p.name },
@@ -2008,7 +2065,7 @@ export class Room {
       p.jailed = false;
       p.gear = (p.gear || []).filter((g) => g !== 'jail');
       this.pile.put('jail');
-      if (drawCheck('jail')) {
+      if (this.drawFor(p, 'jail')) {
         this.broadcast({
           t: S.FEED, k: 'feed.outOfCell', p: { name: p.name },
           text: `${p.name} is out of the cell.`, tone: 'system',
@@ -2024,10 +2081,226 @@ export class Room {
       }
     }
 
-    // 3. Two cards.
-    p.duelHand.push(...this.pile.takeMany(DUEL.draw));
+    // 3. Two cards - or whatever this man's two cards are, which for six of
+    //    the sixteen is not two off the top of the pile.
+    this.drawForTurn(p);
     this.pushDuelAll();
     this.pushSelf(p);
+  }
+
+  /**
+   * The two cards at the top of a go, dealt the way this man is dealt them.
+   * Six of the sixteen take theirs from somewhere other than the top of the
+   * pile, and all six are here rather than scattered through the draw.
+   */
+  drawForTurn(p) {
+    const take = (n) => p.duelHand.push(...this.pile.takeMany(n));
+    if (trait(p, 'id') === undefined && !p.gunhand) { take(DUEL.draw); return; }
+    switch (p.gunhand) {
+      case 'cutpurse': {
+        // Off somebody else's hand rather than the pile. The nearest man
+        // holding anything, because a bot has to choose and so does a player
+        // with six seconds - and near is the one thing they can both see.
+        const from = this.nearestHolding(p);
+        if (from) {
+          const at = Math.floor(Math.random() * from.duelHand.length);
+          p.duelHand.push(from.duelHand.splice(at, 1)[0]);
+          this.emit(from, {
+            t: S.FEED, k: 'feed.lifted', p: { name: p.name },
+            text: `${p.name} lifted one out of your hand.`, tone: 'bad',
+          });
+          take(DUEL.draw - 1);
+        } else take(DUEL.draw);
+        break;
+      }
+      case 'ragpicker': {
+        // Off the top of the discard, face up, which is the whole point: the
+        // town watched it go in there and can watch it come back out.
+        const off = this.pile.discard.pop();
+        if (off) {
+          p.duelHand.push(off);
+          this.broadcast({
+            t: S.FEED, k: 'feed.offTheFloor', p: { name: p.name, card: DUEL_CARDS[off]?.name || off, cardKey: `duel.${off}.name` },
+            text: `${p.name} takes a ${DUEL_CARDS[off]?.name || off} back off the floor.`, tone: 'system',
+          });
+          take(DUEL.draw - 1);
+        } else take(DUEL.draw);
+        break;
+      }
+      case 'cardsharp': {
+        // The second one face up, and a red one buys another - also face up.
+        take(1);
+        for (let guard = 0; guard < 6; guard += 1) {
+          const card = this.pile.take();
+          if (!card) break;
+          p.duelHand.push(card);
+          const red = Math.random() < 0.5;
+          this.broadcast({
+            t: S.FEED, k: red ? 'feed.showsRed' : 'feed.showsBlack',
+            p: { name: p.name, card: DUEL_CARDS[card]?.name || card, cardKey: `duel.${card}.name` },
+            text: red
+              ? `${p.name} turns a ${DUEL_CARDS[card]?.name || card} face up. Red - she takes another.`
+              : `${p.name} turns a ${DUEL_CARDS[card]?.name || card} face up. Black, and that is that.`,
+            tone: 'system',
+          });
+          if (!red) break;
+        }
+        break;
+      }
+      case 'surveyor': {
+        // Three off the top, two kept. The original lets you look and choose;
+        // six seconds is not long enough to ask, so the one that goes back is
+        // the one a player with any sense would put back.
+        const three = this.pile.takeMany(DUEL.draw + 1);
+        three.sort((a, b) => this.cardWorth(p, b) - this.cardWorth(p, a));
+        p.duelHand.push(...three.slice(0, DUEL.draw));
+        for (const back of three.slice(DUEL.draw)) this.pile.draw.push(back);
+        break;
+      }
+      default:
+        take(DUEL.draw);
+    }
+  }
+
+  /** The nearest man with anything in his hand at all. */
+  nearestHolding(p) {
+    let best = null, bestD = Infinity;
+    for (const o of this.players.values()) {
+      if (o.id === p.id || !o.alive || !(o.duelHand || []).length) continue;
+      const d = Math.hypot(o.pos.x - p.pos.x, o.pos.z - p.pos.z);
+      if (d < bestD) { bestD = d; best = o; }
+    }
+    return best;
+  }
+
+  /**
+   * Roughly what a card is worth to this man, for the two places the server has
+   * to choose on somebody's behalf. Ammunition first, then not dying, then the
+   * cards that buy more cards. It is a heuristic and it is meant to be.
+   */
+  cardWorth(p, id) {
+    if (id === 'bang') return this.canBang(p) || trait(p, 'unlimited') ? 9 : 7;
+    if (id === 'missed') return 8;
+    if (id === 'beer') return p.health < p.maxHealth ? 8.5 : 3;
+    const card = DUEL_CARDS[id];
+    if (!card) return 0;
+    if (card.kind === 'weapon') return (card.reach || 1) > 2 ? 7.5 : 5;
+    if (card.draw) return 6.5;
+    if (card.kind === 'gear') return 6;
+    return 4;
+  }
+
+  /** A "draw!", asked twice for the man who gets asked twice. */
+  drawFor(p, which) {
+    const once = drawCheck(which);
+    if (!trait(p, 'lucky')) return once;
+    return once || drawCheck(which);
+  }
+
+  /**
+   * A hit has landed. Two of the sixteen are worth more the more they are shot:
+   * one bleeds a card into his own hand for every hit and the other takes one
+   * off whoever put it there. Both are the same argument - shooting a man is
+   * supposed to cost you something.
+   */
+  onHitTaken(victim, attacker, dmg) {
+    if (!this.pile || !victim.alive) return;
+    const hits = Math.max(1, Math.round(dmg));
+    if (victim.gunhand === 'ironhide') {
+      victim.duelHand.push(...this.pile.takeMany(hits));
+      this.emit(victim, {
+        t: S.FEED, k: 'feed.bleedsSlow', p: { n: hits },
+        text: `That is ${hits} more card${hits === 1 ? '' : 's'} in your hand.`, tone: 'good',
+      });
+      this.pushDuel(victim);
+    }
+    if (victim.gunhand === 'scavenger' && attacker && attacker !== victim) {
+      for (let i = 0; i < hits; i += 1) {
+        const taken = this.stripCard(attacker);
+        if (!taken) break;
+        victim.duelHand.push(taken);
+      }
+      this.emit(attacker, {
+        t: S.FEED, k: 'feed.takesItBack', p: { name: victim.name },
+        text: `${victim.name} takes one off you for it.`, tone: 'bad',
+      });
+      this.pushDuelAll();
+    }
+  }
+
+  /**
+   * The one of the sixteen with a key to press: two cards off the table buys a
+   * hit back. On his own go, as often as he can pay for it.
+   */
+  onGunhandAbility(p) {
+    if (!this.pile || !p.alive) return;
+    if (p.gunhand !== 'fieldsurgeon') {
+      this.emit(p, {
+        t: S.FEED, k: 'gun.nothingToPress',
+        text: 'Your hand does its work without being asked.', tone: 'bad', deny: true,
+      });
+      return;
+    }
+    if (this.turnHolder !== p.id) {
+      this.emit(p, {
+        t: S.FEED, k: 'gun.notYourGo', text: 'Not on somebody else\'s go.', tone: 'bad', deny: true,
+      });
+      return;
+    }
+    if (p.health >= p.maxHealth) {
+      this.emit(p, { t: S.FEED, k: 'duel.say.notHurt', text: 'You are not hurt enough to want it.', tone: 'bad', deny: true });
+      return;
+    }
+    if ((p.duelHand || []).length < 2) {
+      this.emit(p, {
+        t: S.FEED, k: 'gun.needTwoCards', text: 'That costs two cards and you have not got them.',
+        tone: 'bad', deny: true,
+      });
+      return;
+    }
+    // The two it can most afford to lose, by the same reckoning the rest of
+    // this file uses when it has to choose for somebody.
+    const order = p.duelHand
+      .map((id, i) => ({ id, i, worth: this.cardWorth(p, id) }))
+      .sort((a, b) => a.worth - b.worth)
+      .slice(0, 2)
+      .sort((a, b) => b.i - a.i);
+    for (const { i } of order) this.pile.put(p.duelHand.splice(i, 1)[0]);
+    p.health = Math.min(p.maxHealth, p.health + 1);
+    this.emit(p, { t: S.FEED, k: 'gun.twoForOne', text: 'Two off the table, one hit back.', tone: 'good' });
+    this.checkEmptyHand(p);
+    this.pushSelf(p);
+    this.pushDuelAll();
+  }
+
+  /** Everything in a dead man's hands ends up in one man's. */
+  onDeathSpoils(victim) {
+    if (!this.duel || !this.pile) return;
+    const sam = [...this.players.values()].find((o) => o.alive && o.gunhand === 'undertaker' && o !== victim);
+    const hand = [...(victim.duelHand || [])];
+    victim.duelHand = [];
+    if (!hand.length) return;
+    if (!sam) { this.pile.putMany(hand); return; }
+    sam.duelHand.push(...hand);
+    this.emit(sam, {
+      t: S.FEED, k: 'feed.pockets', p: { name: victim.name, n: hand.length },
+      text: `You go through ${victim.name}'s pockets. ${hand.length} more in your hand.`, tone: 'good',
+    });
+    this.pushDuel(sam);
+  }
+
+  /** Her hand is empty and she is never holding nothing. */
+  checkEmptyHand(p) {
+    if (!this.duel || !this.pile || !p.alive) return;
+    if (p.gunhand !== 'emptyhand' || (p.duelHand || []).length) return;
+    const card = this.pile.take();
+    if (!card) return;
+    p.duelHand.push(card);
+    this.emit(p, {
+      t: S.FEED, k: 'feed.neverEmpty',
+      text: 'Your hand went empty and something was already in it.', tone: 'good',
+    });
+    this.pushDuel(p);
   }
 
   /**

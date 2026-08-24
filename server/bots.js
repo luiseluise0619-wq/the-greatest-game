@@ -739,6 +739,13 @@ export class BotBrain {
     };
     const alive = [...room.players.values()].filter((o) => o.alive).length;
 
+    // The one of the sixteen with something to press: two cards for a hit
+    // back, which is worth it while he can still spare two.
+    if (me.gunhand === 'fieldsurgeon' && me.health < me.maxHealth && hand.length >= 4) {
+      const before = me.health;
+      room.onGunhandAbility(me);
+      if (me.health > before) return true;
+    }
     // Still being alive comes before anything you might do with the turn.
     if (has('beer') && me.health < me.maxHealth && alive > 2 && play('beer')) return true;
     // The lit stick only punishes the man still holding it, so it goes down.

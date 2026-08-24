@@ -506,10 +506,13 @@ class Game {
           const was = this.duelMode;
           this.duelMode = msg.mode === 'duel';
           if (was !== this.duelMode) this.hud.buildDeckStrip();
-          const lob = $('lobbyRules');
-          if (lob) {
-            lob.classList.toggle('duel', this.duelMode);
-            lob.classList.toggle('free', !this.duelMode);
+          // The whole right-hand column, not only the rules under it: in the
+          // turn mode there is no gunhand to pick and no six-card deck.
+          for (const id of ['lobbyRules', 'menuWide']) {
+            const el = $(id);
+            if (!el) continue;
+            el.classList.toggle('duel', this.duelMode);
+            el.classList.toggle('free', !this.duelMode);
           }
         }
         this.hud.setLobby(msg);
@@ -977,6 +980,10 @@ class Game {
       // the hand, not a rack of guns - the guns are cards too.
       if (this.duel && /^Digit[1-9]$/.test(k)) { this.playDuelCard(Number(k.slice(5)) - 1); return; }
       if (this.duel && k === 'Space') { this.send({ t: C.BRACE }); return; }
+      // G is dynamite in the free-for-all, where dynamite is a thing you carry.
+      // Here it is a card, so the key is free for the one gunhand in sixteen
+      // that has something to press.
+      if (this.duel && k === 'KeyG') { this.send({ t: C.ABILITY }); return; }
 
       switch (k) {
         case 'KeyR': this.send({ t: C.RELOAD }); break;

@@ -41,7 +41,12 @@ function town({ bots = 5 } = {}) {
     // Roles are dealt at random and half of them would not draw on this man at
     // all, which is the point of the free-for-all and noise here. So the two
     // sides of every test below are set against each other on purpose.
+    // Sixteen gunhands, and half of them change the answer to the question
+    // these tests are asking - one stands a step further out than the tape
+    // says, one is behind a barrel, one takes two Missed! to get away from.
+    // So the two men in a test are dealt none of them.
     feud: (a, b) => {
+      a.gunhand = null; b.gunhand = null;
       a.role = 'outlaw'; a.faction = 'outlaw';
       a.brain.knownFriends.clear();
       a.brain.protectee = null;

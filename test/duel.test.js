@@ -31,12 +31,27 @@ function duelRoom({ bots = 5, prep = 1 } = {}) {
   room.beginMatch();
   secs(clock, room, prep + 1);
   freezeBots(room);
-  return { room, clock, stub, me: () => [...room.players.values()].find((p) => !p.bot) };
+  return {
+    room, clock, stub,
+    me: () => [...room.players.values()].find((p) => !p.bot),
+    // Sixteen gunhands, and one of them stands behind a barrel he did not have
+    // to find while another is a step further out than the tape says. Every
+    // test in this file is about the rules the sixteen bend, so it measures
+    // them on men who are not bending any.
+    plain: () => {
+      for (const p of room.players.values()) {
+        p.gunhand = null;
+        p.maxHealth = p.role === 'sheriff' ? DUEL.sheriffHealth : DUEL.health;
+        p.health = p.maxHealth;
+      }
+    },
+  };
 }
 
 test('a hit is worth a hit, and the star is worth one more', () => {
-  const { room, clock } = duelRoom();
+  const { room, clock, plain } = duelRoom();
   try {
+    plain();
     for (const p of room.players.values()) {
       const want = p.role === 'sheriff' ? DUEL.sheriffHealth : DUEL.health;
       assert.equal(p.maxHealth, want, `${p.role} started on ${p.maxHealth}`);

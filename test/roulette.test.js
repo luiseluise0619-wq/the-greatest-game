@@ -43,6 +43,10 @@ function town({ bots = 5 } = {}) {
   const all = [...room.players.values()];
   // Everybody out of everybody else's way unless a test puts them somewhere.
   all.forEach((p, i) => { p.pos = { x: 400 + i * 40, y: 0, z: 400 }; });
+  // The sixteen bend most of the rules this file is about - one is behind a
+  // barrel, one takes two Missed! to get out of the way of, one is a step
+  // further out than the tape says - so nobody in here is dealt one.
+  for (const p of all) p.gunhand = null;
   return {
     room, clock, stub, all,
     turn: (p) => { room.turn = { kind: 'turn', holder: p.id, endsAt: 1e12 }; p.bangsThisTurn = 0; },

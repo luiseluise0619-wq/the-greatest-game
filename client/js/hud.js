@@ -8,6 +8,7 @@ import {
 import { useDefs, cardUrl } from './cardart.js';
 import { placePhrase, placeParts, ZONES } from '../../shared/map.js';
 import { line } from '../../shared/i18n.js';
+import { GUNHANDS } from '../../shared/gunhands.js';
 import { DUEL_CARDS, DUEL_CARD_ORDER } from '../../shared/deck.js';
 import { duelCardUrl } from './duelart.js';
 
@@ -308,9 +309,32 @@ export class HUD {
     $('roleIntel').textContent = msg.intelK
       ? this.t(msg.intelK, msg.intel, msg.intelP)
       : (msg.intel || this.t('role.blind', 'Nothing. You are working blind.'));
-    $('roleCharacter').textContent = `${this.t(`char.${msg.character}.role`, c.role)} — ${c.name}`;
-    $('roleAbility').textContent = `${this.t(`char.${msg.character}.ability`, c.ability)}: `
-      + this.t(`char.${msg.character}.desc`, c.desc);
+    // Two games, two sets of gunhands. The six in constants.js are abilities
+    // for a game where you shoot when you like; the sixteen are for one where
+    // the only question is whose go it is, and they have nothing to say to
+    // each other - so whichever the server dealt is the one shown.
+    const g = msg.gunhand ? GUNHANDS[msg.gunhand] : null;
+    const label = $('charLabel');
+    if (g) {
+      // Not a person: a thing about the person you already are. The label
+      // above it says so, or the card reads as somebody else's name card.
+      if (label) {
+        label.setAttribute('data-i18n', 'role.yourHands');
+        label.hnhEnglish = { 'data-i18n': 'WHAT YOUR HANDS DO' };
+        label.textContent = this.t('role.yourHands', 'WHAT YOUR HANDS DO');
+      }
+      $('roleCharacter').textContent = this.t(`gun.${g.id}.ability`, g.ability);
+      $('roleAbility').textContent = this.t(`gun.${g.id}.desc`, g.desc);
+    } else {
+      if (label) {
+        label.setAttribute('data-i18n', 'role.youArePlaying');
+        label.hnhEnglish = { 'data-i18n': 'YOU ARE PLAYING' };
+        label.textContent = this.t('role.youArePlaying', 'YOU ARE PLAYING');
+      }
+      $('roleCharacter').textContent = `${this.t(`char.${msg.character}.role`, c.role)} — ${c.name}`;
+      $('roleAbility').textContent = `${this.t(`char.${msg.character}.ability`, c.ability)}: `
+        + this.t(`char.${msg.character}.desc`, c.desc);
+    }
     this.setObjective(objective);
   }
 
