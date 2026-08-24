@@ -669,6 +669,7 @@ export class Room {
         victim.barrelUntil = tb + CARDS.barrel.soak;
         this.emit(victim, {
           t: S.FEED,
+          k: 'feed.barrelSoak',
           text: 'The rain barrel takes it. Whoever fired that is certain they missed.',
           tone: 'good',
         });
@@ -741,8 +742,8 @@ export class Room {
       killer.armed.delete('witness');
       witnesses.add(killer.id);   // the killer obviously still knows
       this.pushCards(killer);
-      this.emit(killer, { t: S.FEED, text: 'Nobody saw a thing. Money well spent.', tone: 'good' });
-      this.emit(victim, { t: S.FEED, text: 'A shot out of the dark. You never saw the face behind it.', tone: 'bad' });
+      this.emit(killer, { t: S.FEED, k: 'feed.bought', text: 'Nobody saw a thing. Money well spent.', tone: 'good' });
+      this.emit(victim, { t: S.FEED, k: 'feed.outOfDark', text: 'A shot out of the dark. You never saw the face behind it.', tone: 'bad' });
     } else if (killer && killer !== victim) {
       witnesses.add(killer.id);
       witnesses.add(victim.id);   // you always know who shot you
@@ -769,7 +770,7 @@ export class Room {
         if (!p.alive || witnesses.has(p.id) || !p.armed || !p.armed.has('ledger')) continue;
         p.armed.delete('ledger');
         witnesses.add(p.id);
-        this.emit(p, { t: S.FEED, text: 'The ledger writes itself. You know who did that one.', tone: 'good' });
+        this.emit(p, { t: S.FEED, k: 'feed.ledger', text: 'The ledger writes itself. You know who did that one.', tone: 'good' });
         this.pushCards(p);
       }
     }
@@ -831,21 +832,21 @@ export class Room {
     // The chamber is shared and nobody knows the order. A blank is a bang and
     // a puff of smoke and nothing else, and it still cost a card.
     if (attacker.roundIsLive === false) {
-      this.emit(attacker, { t: S.FEED, text: 'A blank. Smoke and noise.', tone: 'bad' });
-      this.emit(victim, { t: S.FEED, text: 'A blank, aimed at you.', tone: 'good' });
+      this.emit(attacker, { t: S.FEED, k: 'feed.blankMine', text: 'A blank. Smoke and noise.', tone: 'bad' });
+      this.emit(victim, { t: S.FEED, k: 'feed.blankAtYou', text: 'A blank, aimed at you.', tone: 'good' });
       return false;
     }
     // Out of range is out of range, whatever the bullet did.
     const d = Math.hypot(victim.pos.x - attacker.pos.x, victim.pos.z - attacker.pos.z);
     if (!inReach(attacker, victim, d)) {
       this.emit(attacker, {
-        t: S.FEED, text: 'Too far. The shot goes wide of anything that matters.', tone: 'bad',
+        t: S.FEED, k: 'feed.tooFar', text: 'Too far. The shot goes wide of anything that matters.', tone: 'bad',
       });
       return false;
     }
     if ((victim.gear || []).includes('barrel') && drawCheck('barrel')) {
-      this.emit(victim, { t: S.FEED, text: 'It goes into the barrel.', tone: 'good' });
-      this.emit(attacker, { t: S.FEED, text: 'Wood, not meat.', tone: 'bad' });
+      this.emit(victim, { t: S.FEED, k: 'feed.intoBarrel', text: 'It goes into the barrel.', tone: 'good' });
+      this.emit(attacker, { t: S.FEED, k: 'feed.woodNotMeat', text: 'Wood, not meat.', tone: 'bad' });
       return false;
     }
     // And the card in your hand only helps if you saw it coming and moved.
@@ -856,13 +857,13 @@ export class Room {
       victim.bracedUntil = 0;
       victim.duelHand.splice(at, 1);
       this.pile.put('missed');
-      this.emit(victim, { t: S.FEED, text: 'You were not standing where he thought.', tone: 'good' });
-      this.emit(attacker, { t: S.FEED, text: 'Missed. He was ready for it.', tone: 'bad' });
+      this.emit(victim, { t: S.FEED, k: 'feed.notThere', text: 'You were not standing where he thought.', tone: 'good' });
+      this.emit(attacker, { t: S.FEED, k: 'feed.heWasReady', text: 'Missed. He was ready for it.', tone: 'bad' });
       this.pushDuel(victim);
       return false;
     }
     if (at >= 0) {
-      this.emit(victim, { t: S.FEED, text: 'You had one in your hand and never moved.', tone: 'bad' });
+      this.emit(victim, { t: S.FEED, k: 'feed.neverMoved', text: 'You had one in your hand and never moved.', tone: 'bad' });
     }
     return true;
   }
@@ -958,7 +959,10 @@ export class Room {
 
     if (!took) {
       // Silence here reads as a broken keybind. Say why instead.
-      this.emit(p, { t: S.FEED, text: NO_ROOM[item.type] || 'You have no use for that.', tone: 'bad', deny: true });
+      this.emit(p, {
+        t: S.FEED, k: NO_ROOM[item.type] ? `deny.full.${item.type}` : 'deny.full.other',
+        text: NO_ROOM[item.type] || 'You have no use for that.', tone: 'bad', deny: true,
+      });
       return;
     }
     item.active = false;
@@ -1024,13 +1028,22 @@ export class Room {
         if (target) {
           target.health = Math.min(target.maxHealth, target.health + c.heal);
           payload.target = target.id;
-          this.emit(target, { t: S.FEED, text: `${p.name} patched you up (+${c.heal}).`, tone: 'good' });
-          this.emit(p, { t: S.FEED, text: `You patched up ${target.name}.`, tone: 'good' });
+          this.emit(target, {
+            t: S.FEED, k: 'feed.patchedYou', p: { name: p.name, n: c.heal },
+            text: `${p.name} patched you up (+${c.heal}).`, tone: 'good',
+          });
+          this.emit(p, {
+            t: S.FEED, k: 'feed.youPatched', p: { name: target.name },
+            text: `You patched up ${target.name}.`, tone: 'good',
+          });
           this.pushSelf(target);
           this.notifyBots('healed', { medic: p, target });
         } else {
           p.health = Math.min(p.maxHealth, p.health + c.selfHeal);
-          this.emit(p, { t: S.FEED, text: `You bandaged yourself (+${c.selfHeal}).`, tone: 'good' });
+          this.emit(p, {
+            t: S.FEED, k: 'feed.bandagedSelf', p: { n: c.selfHeal },
+            text: `You bandaged yourself (+${c.selfHeal}).`, tone: 'good',
+          });
         }
         break;
       }
@@ -1189,6 +1202,7 @@ export class Room {
     telemetry.social(this, 'accuse');
     this.broadcast({
       t: S.FEED,
+      k: 'feed.callsOut', p: { a: p.name, b: target.name },
       text: `${p.name} calls out ${target.name}.`,
       tone: 'accuse', from: p.id, target: target.id,
     });
@@ -1205,6 +1219,7 @@ export class Room {
     this.broadcast({ t: S.BADGE, id: p.id, name: p.name });
     this.broadcast({
       t: S.FEED,
+      k: 'feed.pinsStar', p: { name: p.name },
       text: `${p.name} pins on the star and claims the law. Believe it at your own risk.`,
       tone: 'badge',
     });
@@ -1241,8 +1256,15 @@ export class Room {
 
     const target = msg.target != null ? this.players.get(msg.target) : null;
     const spend = () => { p.duelHand.splice(at, 1); this.pile.put(id); };
-    const say = (text, tone = 'system') => this.emit(p, { t: S.FEED, text, tone });
-    const tell = (text, tone = 'system') => this.broadcast({ t: S.FEED, text, tone });
+    // Key, English, holes. The English is the line; the key is how the same
+    // line gets said in Korean, where the card names decline and the verb is
+    // at the end - which is why the holes travel as data rather than as a
+    // sentence with somebody else's word order baked into it.
+    const say = (k, text, tone = 'system', holes = null) =>
+      this.emit(p, { t: S.FEED, k, p: holes, text, tone });
+    const tell = (k, text, tone = 'system', holes = null) =>
+      this.broadcast({ t: S.FEED, k, p: holes, text, tone });
+    const cardName = (cid) => `duel.${cid}.name`;
     const metres = (o) => Math.hypot(o.pos.x - p.pos.x, o.pos.z - p.pos.z);
 
     switch (card.kind) {
@@ -1250,56 +1272,60 @@ export class Room {
         return;                                 // fired with the mouse, not with a key
 
       case KIND.REACTION:
-        say('That one is for when somebody shoots at you.', 'bad');
+        say('duel.say.reaction', 'That one is for when somebody shoots at you.', 'bad');
         return;
 
       case KIND.WEAPON: {
         spend();
         if (p.weaponCard) this.pile.put(p.weaponCard);
         p.weaponCard = id;
-        tell(`${p.name} lays a ${card.name} on the table.`);
+        tell('duel.tell.weapon', `${p.name} lays a ${card.name} on the table.`, 'system',
+          { name: p.name, card: card.name, cardKey: cardName(id) });
         break;
       }
 
       case KIND.GEAR: {
-        if ((p.gear || []).includes(id)) { say('You already have one of those out.', 'bad'); return; }
+        if ((p.gear || []).includes(id)) { say('duel.say.gearOut', 'You already have one of those out.', 'bad'); return; }
         spend();
         if (id === 'dynamite') {
           p.hasDynamite = true;
-          tell(`${p.name} lights a stick and sets it down.`, 'bad');
+          tell('duel.tell.lights', `${p.name} lights a stick and sets it down.`, 'bad', { name: p.name });
         } else {
           p.gear.push(id);
-          tell(`${p.name} puts a ${card.name} in front of them.`);
+          tell('duel.tell.gear', `${p.name} puts a ${card.name} in front of them.`, 'system',
+            { name: p.name, card: card.name, cardKey: cardName(id) });
         }
         break;
       }
 
       case KIND.CURSE: {
-        if (!target || !target.alive || target.id === p.id) { say('Nobody to put that on.', 'bad'); return; }
-        if (card.notOn && target.role === card.notOn) { say('Not the man wearing the star.', 'bad'); return; }
-        if ((target.gear || []).includes(id)) { say('They are already in one.', 'bad'); return; }
+        if (!target || !target.alive || target.id === p.id) { say('duel.say.noCurseTarget', 'Nobody to put that on.', 'bad'); return; }
+        if (card.notOn && target.role === card.notOn) { say('duel.say.notTheStar', 'Not the man wearing the star.', 'bad'); return; }
+        if ((target.gear || []).includes(id)) { say('duel.say.alreadyIn', 'They are already in one.', 'bad'); return; }
         spend();
         target.gear.push(id);
         target.jailed = true;
-        tell(`${p.name} locks ${target.name} up.`, 'bad');
+        tell('duel.tell.jail', `${p.name} locks ${target.name} up.`, 'bad', { a: p.name, b: target.name });
         break;
       }
 
       case KIND.TARGET: {
-        if (!target || !target.alive || target.id === p.id) { say('Nobody in mind for that.', 'bad'); return; }
+        if (!target || !target.alive || target.id === p.id) { say('duel.say.noTarget', 'Nobody in mind for that.', 'bad'); return; }
         const reach = (card.range ?? 1) * DISTANCE_UNIT;
         if (Number.isFinite(reach) && metres(target) > reach) {
-          say('Not close enough for that.', 'bad');
+          say('duel.say.notClose', 'Not close enough for that.', 'bad');
           return;
         }
         if (id === 'panic' || id === 'catbalou') {
           const taken = this.stripCard(target);
-          if (!taken) { say('They have nothing to take.', 'bad'); return; }
+          if (!taken) { say('duel.say.nothingToTake', 'They have nothing to take.', 'bad'); return; }
           spend();
           if (id === 'panic') { p.duelHand.push(taken); } else { this.pile.put(taken); }
-          tell(id === 'panic'
-            ? `${p.name} takes something off ${target.name}.`
-            : `${p.name} makes ${target.name} throw a card away.`, 'bad');
+          tell(id === 'panic' ? 'duel.tell.panic' : 'duel.tell.catbalou',
+            id === 'panic'
+              ? `${p.name} takes something off ${target.name}.`
+              : `${p.name} makes ${target.name} throw a card away.`,
+            'bad', { a: p.name, b: target.name });
         } else if (id === 'duel') {
           spend();
           this.resolveDuel(p, target);
@@ -1310,27 +1336,27 @@ export class Room {
       case KIND.PLAY: {
         if (id === 'beer') {
           const alive = [...this.players.values()].filter((o) => o.alive).length;
-          if (alive <= 2) { say('Nobody is pouring with two men left.', 'bad'); return; }
-          if (p.health >= p.maxHealth) { say('You are not hurt enough to want it.', 'bad'); return; }
+          if (alive <= 2) { say('duel.say.noPouring', 'Nobody is pouring with two men left.', 'bad'); return; }
+          if (p.health >= p.maxHealth) { say('duel.say.notHurt', 'You are not hurt enough to want it.', 'bad'); return; }
           spend();
           p.health = Math.min(p.maxHealth, p.health + card.heal);
-          say('One hit back.', 'good');
+          say('duel.say.oneBack', 'One hit back.', 'good');
         } else if (id === 'saloon') {
           spend();
           for (const o of this.players.values()) {
             if (o.alive) o.health = Math.min(o.maxHealth, o.health + card.healAll);
           }
-          tell(`${p.name} buys the house a round.`, 'good');
+          tell('duel.tell.saloon', `${p.name} buys the house a round.`, 'good', { name: p.name });
         } else if (card.draw) {
           spend();
           p.duelHand.push(...this.pile.takeMany(card.draw));
-          say(`${card.draw} more cards.`, 'good');
+          say('duel.say.moreCards', `${card.draw} more cards.`, 'good', { n: card.draw });
         } else if (id === 'store') {
           spend();
           this.resolveStore(p);
         } else if (id === 'indians') {
           spend();
-          tell(`${p.name} points at the ridge.`, 'bad');
+          tell('duel.tell.indians', `${p.name} points at the ridge.`, 'bad', { name: p.name });
           for (const o of this.players.values()) {
             if (!o.alive || o.id === p.id) continue;
             const bang = (o.duelHand || []).indexOf('bang');
@@ -1340,7 +1366,7 @@ export class Room {
           }
         } else if (id === 'gatling') {
           spend();
-          tell(`${p.name} opens up on the whole street.`, 'bad');
+          tell('duel.tell.gatling', `${p.name} opens up on the whole street.`, 'bad', { name: p.name });
           for (const o of this.players.values()) {
             if (!o.alive || o.id === p.id) continue;
             const miss = (o.duelHand || []).indexOf('missed');
@@ -1376,7 +1402,10 @@ export class Room {
    * first, and whoever runs out of them takes the hit.
    */
   resolveDuel(caller, target) {
-    this.broadcast({ t: S.FEED, text: `${caller.name} calls out ${target.name}.`, tone: 'bad' });
+    this.broadcast({
+      t: S.FEED, k: 'feed.callsOut', p: { a: caller.name, b: target.name },
+      text: `${caller.name} calls out ${target.name}.`, tone: 'bad',
+    });
     let turn = target;
     let other = caller;
     for (let round = 0; round < 40; round++) {
@@ -1404,7 +1433,10 @@ export class Room {
     for (let i = 0; i < living.length && shelf.length; i++) {
       living[(from + i) % living.length].duelHand.push(shelf.shift());
     }
-    this.broadcast({ t: S.FEED, text: `${p.name} lays the store out.`, tone: 'system' });
+    this.broadcast({
+      t: S.FEED, k: 'feed.storeOut', p: { name: p.name },
+      text: `${p.name} lays the store out.`, tone: 'system',
+    });
   }
 
   onCard(p, msg) {
@@ -1425,7 +1457,7 @@ export class Room {
     if (card.target === 'aim') {
       target = this.playerInCrosshair(p, card.range);
       if (!target || !target.alive) {
-        this.emit(p, { t: S.FEED, text: 'Nobody in your sights to put a name to.', tone: 'bad' });
+        this.emit(p, { t: S.FEED, k: 'feed.noSights', text: 'Nobody in your sights to put a name to.', tone: 'bad' });
         return;
       }
     }
@@ -1440,7 +1472,7 @@ export class Room {
       case 'witness':
       case 'ledger':
         p.armed.add(id);
-        this.emit(p, { t: S.FEED, text: ARMED_LINE[id], tone: 'good' });
+        this.emit(p, { t: S.FEED, k: `card.${id}.armed`, text: ARMED_LINE[id], tone: 'good' });
         break;
 
       case 'tracks':
@@ -1448,6 +1480,7 @@ export class Room {
         p.noPrintsUntil = t + card.duration;
         this.emit(p, {
           t: S.FEED,
+          k: 'feed.swept',
           text: 'You sweep the street behind you. Every print you left is gone, and you leave none for a while.',
           tone: 'good',
         });
@@ -1458,6 +1491,7 @@ export class Room {
         if (!p.glassMarks) p.glassMarks = new Map();
         this.emit(p, {
           t: S.FEED,
+          k: 'feed.glass',
           text: 'Glass to your eye. For the next few seconds every shot fired in this town has a face on it.',
           tone: 'good',
         });
@@ -1467,6 +1501,7 @@ export class Room {
         const star = target.role === 'sheriff';
         this.broadcast({
           t: S.FEED,
+          k: 'feed.poster', p: { a: p.name, b: target.name },
           text: `${p.name} nails a wanted poster to the church door with ${target.name}'s name on it.`,
           tone: 'accuse', from: p.id, target: target.id,
         });
@@ -1479,6 +1514,7 @@ export class Room {
         });
         this.emit(target, {
           t: S.FEED,
+          k: 'feed.postered',
           text: 'Your name just went up on the church door. Everyone in town can read it.',
           tone: 'bad',
         });
@@ -1635,6 +1671,7 @@ export class Room {
     this.pushDuelAll();
     this.broadcast({
       t: S.FEED,
+      k: 'feed.rolesDealt',
       text: 'Roles dealt. Guns stay holstered until the church bell rings.',
       tone: 'system',
     });
@@ -1654,19 +1691,34 @@ export class Room {
       const decoyPool = others.filter((o) => o.role !== 'sheriff' && o.role !== 'deputy');
       const decoy = pick(decoyPool.length ? decoyPool : others);
       const pair = shuffle([sheriff?.name, decoy?.name].filter(Boolean));
-      return { kind: 'pair', text: `The Sheriff is one of these two: ${pair.join('  or  ')}.` };
+      return {
+        kind: 'pair', k: 'intel.pair', p: { a: pair[0], b: pair[1] },
+        text: `The Sheriff is one of these two: ${pair.join('  or  ')}.`,
+      };
     }
     if (p.role === 'outlaw') {
       const mates = others.filter((o) => o.role === 'outlaw');
-      if (!mates.length) return { kind: 'none', text: 'You ride alone. The rest of the gang never made it.' };
-      return { kind: 'name', text: `You recognise one face from the gang: ${pick(mates).name}.` };
+      if (!mates.length) {
+        return { kind: 'none', k: 'intel.alone', text: 'You ride alone. The rest of the gang never made it.' };
+      }
+      const mate = pick(mates).name;
+      return { kind: 'name', k: 'intel.mate', p: { name: mate }, text: `You recognise one face from the gang: ${mate}.` };
     }
     if (p.role === 'renegade') {
       const lawmen = others.filter((o) => o.faction === 'law');
-      if (!lawmen.length) return { kind: 'none', text: 'You know nothing about anyone here. Good.' };
-      return { kind: 'name', text: `You know ${pick(lawmen).name} wears a badge of some kind - star or not.` };
+      if (!lawmen.length) {
+        return { kind: 'none', k: 'intel.nothing', text: 'You know nothing about anyone here. Good.' };
+      }
+      const lawman = pick(lawmen).name;
+      return {
+        kind: 'name', k: 'intel.lawman', p: { name: lawman },
+        text: `You know ${lawman} wears a badge of some kind - star or not.`,
+      };
     }
-    return { kind: 'none', text: 'Nobody knows your face. Keep it that way, or pin on the star and dare them.' };
+    return {
+      kind: 'none', k: 'intel.sheriff',
+      text: 'Nobody knows your face. Keep it that way, or pin on the star and dare them.',
+    };
   }
 
   sendRole(p, opts = {}) {
@@ -1686,6 +1738,10 @@ export class Room {
       objective: r.objective,
       blurb: r.blurb,
       intel: p.intel?.text || '',
+      // The one sentence that decides your whole round, so it travels as a key
+      // and its names as holes rather than as English prose.
+      intelK: p.intel?.k || null,
+      intelP: p.intel?.p || null,
       character: p.character,
       canBadge: p.role === 'sheriff',
       tp: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z)],
@@ -1720,7 +1776,7 @@ export class Room {
     }
     if (phase !== PHASE.COMBAT && phase !== PHASE.ENDGAME) this.turn = null;
     if (phase === PHASE.COMBAT) {
-      this.broadcast({ t: S.FEED, text: 'The bell rings. Nothing is holstered now.', tone: 'system' });
+      this.broadcast({ t: S.FEED, k: 'feed.bell', text: 'The bell rings. Nothing is holstered now.', tone: 'system' });
       this.broadcast({ t: S.SOUND, sound: 'bell' });
       // Somebody can leave during preparation - the Sheriff, even - and their
       // corpse settles a faction's win condition before a shot is fired.
@@ -1729,7 +1785,10 @@ export class Room {
       this.checkVictory();
     }
     if (phase === PHASE.ENDGAME) {
-      this.broadcast({ t: S.FEED, text: 'A dust storm closes on the town square. Get in or choke.', tone: 'bad' });
+      this.broadcast({
+        t: S.FEED, k: 'feed.storm',
+        text: 'A dust storm closes on the town square. Get in or choke.', tone: 'bad',
+      });
     }
   }
 
@@ -1926,15 +1985,18 @@ export class Room {
       p.hasDynamite = false;
       if (drawCheck('dynamite')) {
         this.pile.put('dynamite');
-        this.broadcast({ t: S.FEED, text: `The stick goes off in ${p.name}'s hands.`, tone: 'bad' });
+        this.broadcast({
+          t: S.FEED, k: 'feed.stickGoesOff', p: { name: p.name },
+          text: `The stick goes off in ${p.name}'s hands.`, tone: 'bad',
+        });
         this.applyDamage(p, null, DUEL_CARDS.dynamite.blast, 'dynamite', null);
         if (!p.alive) { this.pushDuelAll(); return; }
       } else {
         const next = this.nextLivingAfter(p.id);
         if (next && next.id !== p.id) {
           next.hasDynamite = true;
-          this.emit(p, { t: S.FEED, text: 'The fuse is still going. You pass it on.', tone: 'system' });
-          this.emit(next, { t: S.FEED, text: 'Somebody hands you a lit stick of dynamite.', tone: 'bad' });
+          this.emit(p, { t: S.FEED, k: 'feed.fusePassed', text: 'The fuse is still going. You pass it on.', tone: 'system' });
+          this.emit(next, { t: S.FEED, k: 'feed.handedStick', text: 'Somebody hands you a lit stick of dynamite.', tone: 'bad' });
         } else {
           p.hasDynamite = true;
         }
@@ -1947,9 +2009,15 @@ export class Room {
       p.gear = (p.gear || []).filter((g) => g !== 'jail');
       this.pile.put('jail');
       if (drawCheck('jail')) {
-        this.broadcast({ t: S.FEED, text: `${p.name} is out of the cell.`, tone: 'system' });
+        this.broadcast({
+          t: S.FEED, k: 'feed.outOfCell', p: { name: p.name },
+          text: `${p.name} is out of the cell.`, tone: 'system',
+        });
       } else {
-        this.broadcast({ t: S.FEED, text: `${p.name} spends their go behind bars.`, tone: 'system' });
+        this.broadcast({
+          t: S.FEED, k: 'feed.behindBars', p: { name: p.name },
+          text: `${p.name} spends their go behind bars.`, tone: 'system',
+        });
         this.pushDuelAll();
         this.advanceTurn(now());
         return;
@@ -1992,6 +2060,7 @@ export class Room {
     this.broadcast({ t: S.CHAMBER, live, blank: rounds - live, left: this.chamber.length });
     this.broadcast({
       t: S.FEED,
+      k: 'feed.chamberLoaded', p: { live, blank: rounds - live },
       text: `The chamber is loaded: ${live} live, ${rounds - live} blank. Nobody is told the order.`,
       tone: 'system',
     });
@@ -2006,7 +2075,7 @@ export class Room {
     if (!this.duel || !p.alive) return;
     if (this.turnHolder === p.id) return;         // your own go is for shooting
     p.bracedUntil = now() + DUEL.drawTime + 0.35;
-    this.emit(p, { t: S.FEED, text: 'You shift your weight.', tone: 'system' });
+    this.emit(p, { t: S.FEED, k: 'feed.shiftWeight', text: 'You shift your weight.', tone: 'system' });
   }
 
   /**
@@ -2061,7 +2130,10 @@ export class Room {
     const live = this.nextRound();
     this.broadcast({ t: S.SOUND, sound: 'gunshot', pos: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z)] });
     if (!live) {
-      this.broadcast({ t: S.FEED, text: `${p.name} puts it to their own head. It clicks.`, tone: 'good' });
+      this.broadcast({
+        t: S.FEED, k: 'feed.selfClick', p: { name: p.name },
+        text: `${p.name} puts it to their own head. It clicks.`, tone: 'good',
+      });
       // A blank costs you a card and nothing else - and the floor is yours again.
       this.setTurn({ kind: 'turn', holder: p.id, endsAt: now() + DUEL.turn });
       p.bangsThisTurn = 0;
@@ -2069,12 +2141,16 @@ export class Room {
       return;
     }
 
-    this.broadcast({ t: S.FEED, text: `${p.name} puts it to their own head. It was not a blank.`, tone: 'bad' });
+    this.broadcast({
+      t: S.FEED, k: 'feed.selfLive', p: { name: p.name },
+      text: `${p.name} puts it to their own head. It was not a blank.`, tone: 'bad',
+    });
     const behind = this.linedUpBehind(p);
     this.applyDamage(p, p, 1, 'selfshot', null);
     if (behind) {
       this.broadcast({
         t: S.FEED,
+        k: 'feed.throughInto', p: { name: behind.name },
         text: `It goes straight through and finds ${behind.name} stood behind them.`,
         tone: 'bad',
       });

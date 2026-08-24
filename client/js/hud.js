@@ -6,7 +6,8 @@ import {
   CHARACTERS, CHARACTER_ORDER, ROLES, VOICE_LINES, WEAPONS, PHASE, CARDS, CARD_ORDER,
 } from '../../shared/constants.js';
 import { useDefs, cardUrl } from './cardart.js';
-import { placePhrase } from '../../shared/map.js';
+import { placePhrase, placeParts, ZONES } from '../../shared/map.js';
+import { line } from '../../shared/i18n.js';
 import { DUEL_CARDS, DUEL_CARD_ORDER } from '../../shared/deck.js';
 import { duelCardUrl } from './duelart.js';
 
@@ -304,7 +305,9 @@ export class HUD {
         : this.t('faction.renegade', 'NOBODY BUT YOU');
     $('roleBlurb').textContent = this.t(`role.${role}.blurb`, msg.blurb);
     $('roleObjective').textContent = objective;
-    $('roleIntel').textContent = msg.intel || this.t('role.blind', 'Nothing. You are working blind.');
+    $('roleIntel').textContent = msg.intelK
+      ? this.t(msg.intelK, msg.intel, msg.intelP)
+      : (msg.intel || this.t('role.blind', 'Nothing. You are working blind.'));
     $('roleCharacter').textContent = `${this.t(`char.${msg.character}.role`, c.role)} — ${c.name}`;
     $('roleAbility').textContent = `${this.t(`char.${msg.character}.ability`, c.ability)}: `
       + this.t(`char.${msg.character}.desc`, c.desc);
@@ -376,6 +379,25 @@ export class HUD {
   }
 
   nameOf(id) { return this.roster.get(id)?.name || '?'; }
+
+  /**
+   * A place, as it reads after a verb. English already has one of these in
+   * map.js; this is the same sentence built the other way round for a language
+   * that puts the preposition on the end - "in the Saloon", "살룬에서".
+   */
+  place(raw) {
+    const english = placePhrase(raw);
+    const parts = placeParts(raw);
+    if (!parts) return english;
+    const zone = (id) => this.t(`place.${id}`, ZONES.find((z) => z.id === id)?.name || id);
+    if (parts.kind === 'outskirts') return this.t('place.outskirts', english);
+    const here = zone(parts.ids[0]);
+    if (parts.kind === 'between') {
+      return this.t('place.between', english,
+        { a: here, b: this.t('place.flats', 'the flats') });
+    }
+    return this.t(`place.${parts.kind}`, english, { p: here });
+  }
 
   // ------------------------------------------------------------ the chamber
   /** How many rounds are left in the chamber the whole town is counting. */
@@ -758,22 +780,28 @@ export class HUD {
   killFeed(msg) {
     this.knownRoles.set(msg.victim, msg.victimRole);
     const r = ROLES[msg.victimRole];
-    const roleTag = `<span class="rle" style="color:${r.color}">${r.name}</span>`;
+    const role = `<span class="rle" style="color:${r.color}">${escapeHtml(this.t(`role.${msg.victimRole}.name`, r.name))}</span>`;
+    const killer = `<b>${escapeHtml(msg.killerName || '')}</b>`;
+    const victim = `<b>${escapeHtml(msg.victimName)}</b>`;
+    const where = this.place(msg.place);
     let line;
     if (msg.youDied) {
       line = msg.killerName
-        ? `<b>${escapeHtml(msg.killerName)}</b> put you down ${placePhrase(msg.place)}.`
-        : `You died ${placePhrase(msg.place)}.`;
+        ? this.t('kill.youDiedTo', `${killer} put you down ${where}.`, { killer, where })
+        : this.t('kill.youDied', `You died ${where}.`, { where });
     } else if (msg.youKilled) {
-      line = `You killed <b>${escapeHtml(msg.victimName)}</b> — they were the ${roleTag}.`;
+      line = this.t('kill.youKilled', `You killed ${victim} — they were the ${role}.`, { victim, role });
     } else if (msg.witnessed && msg.killerName) {
-      line = `You watch <b>${escapeHtml(msg.killerName)}</b> kill <b>${escapeHtml(msg.victimName)}</b> — the ${roleTag}.`;
+      line = this.t('kill.watched', `You watch ${killer} kill ${victim} — the ${role}.`,
+        { killer, victim, role });
     } else if (msg.cause === 'storm') {
-      line = `<b>${escapeHtml(msg.victimName)}</b> choked out in the storm — the ${roleTag}.`;
+      line = this.t('kill.storm', `${victim} choked out in the storm — the ${role}.`, { victim, role });
     } else if (msg.cause === 'left') {
-      line = `<b>${escapeHtml(msg.victimName)}</b> rode out of town — the ${roleTag}.`;
+      line = this.t('kill.left', `${victim} rode out of town — the ${role}.`, { victim, role });
     } else {
-      line = `A shot ${placePhrase(msg.place)}. <b>${escapeHtml(msg.victimName)}</b> is dead — the ${roleTag}. Nobody saw who.`;
+      line = this.t('kill.unseen',
+        `A shot ${where}. ${victim} is dead — the ${role}. Nobody saw who.`,
+        { where, victim, role });
     }
     this.addFeed(line, 'kill');
     const p = this.roster.get(msg.victim);
@@ -783,7 +811,11 @@ export class HUD {
   addChat(msg) {
     const el = document.createElement('div');
     el.className = 'chatLine' + (msg.voice ? ' voice' : '') + (msg.dead ? ' dead' : '');
-    el.innerHTML = `<b>${escapeHtml(msg.from)}${msg.dead ? ' (dead)' : ''}:</b> ${escapeHtml(msg.text)}`;
+    // A bot's line and a shout carry a key; anything a person typed does not,
+    // and is shown exactly as they typed it.
+    const said = line(this.game.settings?.get('lang') || 'en', msg);
+    const dead = msg.dead ? ` ${this.t('hud.deadTag', '(dead)')}` : '';
+    el.innerHTML = `<b>${escapeHtml(msg.from)}${dead}:</b> ${escapeHtml(said)}`;
     $('chatLog').appendChild(el);
     this.chatLines.push(el);
     while (this.chatLines.length > 9) this.chatLines.shift().remove();
@@ -862,38 +894,51 @@ export class HUD {
     const ol = $('timeline');
     ol.innerHTML = '';
     if (!events.length) {
-      ol.innerHTML = '<li><span class="muted">Nobody did anything worth recording.</span></li>';
+      ol.innerHTML = `<li><span class="muted">${escapeHtml(
+        this.t('tl.nothing', 'Nobody did anything worth recording.'))}</span></li>`;
       return;
     }
+    const tag = (role) => {
+      const r = ROLES[role];
+      if (!r) return '';
+      return ` <span class="rle" style="color:${r.color}">${escapeHtml(this.t(`role.${role}.name`, r.name))}</span>`;
+    };
     for (const e of events) {
       const li = document.createElement('li');
       const mm = Math.floor(e.at / 60);
       const ss = String(e.at % 60).padStart(2, '0');
       let body;
       if (e.type === 'death') {
-        const r = ROLES[e.victimRole];
-        const who = `<b>${escapeHtml(e.victim)}</b> <span class="rle" style="color:${r?.color}">${r?.name || ''}</span>`;
-        if (e.cause === 'storm') body = `${who} choked out in the storm`;
-        else if (e.cause === 'left') body = `${who} rode out`;
+        const who = `<b>${escapeHtml(e.victim)}</b>${tag(e.victimRole)}`;
+        const where = this.place(e.place);
+        if (e.cause === 'storm') body = this.t('tl.storm', `${who} choked out in the storm`, { who });
+        else if (e.cause === 'left') body = this.t('tl.left', `${who} rode out`, { who });
         else if (e.killer) {
-          const kr = ROLES[e.killerRole];
-          body = `<b>${escapeHtml(e.killer)}</b> <span class="rle" style="color:${kr?.color}">${kr?.name || ''}</span> killed ${who} ${placePhrase(e.place)}`;
-        } else body = `${who} died ${placePhrase(e.place)}`;
+          const killer = `<b>${escapeHtml(e.killer)}</b>${tag(e.killerRole)}`;
+          body = this.t('tl.killed', `${killer} killed ${who} ${where}`, { killer, who, where });
+        } else body = this.t('tl.died', `${who} died ${where}`, { who, where });
         li.className = 'death';
       } else if (e.type === 'card') {
         // The payoff for every silent card in the round: the aftermath screen
         // is the first and only place the town finds out what was played.
-        const name = escapeHtml(e.cardName || e.card);
+        const name = `<span class="crd">${escapeHtml(
+          this.t(`card.${e.card}.name`, e.cardName || e.card))}</span>`;
         const face = CARDS[e.card] ? `<img class="crdMini" src="${cardUrl(e.card)}" alt="">` : '';
-        body = e.target
-          ? `${face}<b>${escapeHtml(e.who)}</b> played <span class="crd">${name}</span> on <b>${escapeHtml(e.target)}</b>`
-          : `${face}<b>${escapeHtml(e.who)}</b> played <span class="crd">${name}</span>${e.secret ? ' — nobody knew' : ''}`;
+        const who = `<b>${escapeHtml(e.who)}</b>`;
+        body = face + (e.target
+          ? this.t('tl.cardOn', `${who} played ${name} on <b>${escapeHtml(e.target)}</b>`,
+            { who, card: name, target: `<b>${escapeHtml(e.target)}</b>` })
+          : this.t(e.secret ? 'tl.cardSecret' : 'tl.card',
+            `${who} played ${name}${e.secret ? ' — nobody knew' : ''}`, { who, card: name }));
         li.className = 'card';
       } else if (e.type === 'badge') {
-        body = `<b>${escapeHtml(e.who)}</b> pinned on the star`;
+        const who = `<b>${escapeHtml(e.who)}</b>`;
+        body = this.t('tl.badge', `${who} pinned on the star`, { who });
         li.className = 'badge';
       } else {
-        body = `<b>${escapeHtml(e.who)}</b> called out <b>${escapeHtml(e.target)}</b>`;
+        const who = `<b>${escapeHtml(e.who)}</b>`;
+        const target = `<b>${escapeHtml(e.target)}</b>`;
+        body = this.t('tl.accuse', `${who} called out ${target}`, { who, target });
         li.className = 'accuse';
       }
       li.innerHTML = `<time>${mm}:${ss}</time>${body}`;

@@ -9,7 +9,7 @@ import {
   PLAYER, WEAPONS, CHARACTERS, CARDS, PHASE, VISION, DUEL, clamp, stepStamina, canSprint,
 } from '../shared/constants.js';
 import { DUEL_CARDS, DISTANCE_UNIT, inReach, reachOf } from '../shared/deck.js';
-import MAP, { NAV_NODES, zoneAt } from '../shared/map.js';
+import MAP, { NAV_NODES, zoneAt, placeParts } from '../shared/map.js';
 import { moveAndCollide, lineOfSight } from '../shared/collision.js';
 
 export const BOT_NAMES = [
@@ -18,30 +18,33 @@ export const BOT_NAMES = [
   'Jed Mercer', 'Nova Sackett', 'Hollis Grange', 'Perla Ruiz', 'Amos Teague',
 ];
 
+// What a bot says out loud, and the key it says it under. These go out over
+// the chat channel like anything anybody types, so the line travels composed;
+// the key travels beside it so a client in another language can say it again.
 const CHATTER = {
   suspicious: [
-    'Somebody just took a shot at nothing. Who was that?',
-    'I do not like how quiet {name} is being.',
-    '{name} keeps circling me. Explain yourself.',
-    'That was gunfire near {place}.',
+    ['bot.sus1', 'Somebody just took a shot at nothing. Who was that?'],
+    ['bot.sus2', 'I do not like how quiet {name} is being.'],
+    ['bot.sus3', '{name} keeps circling me. Explain yourself.'],
+    ['bot.sus4', 'That was gunfire near {place}.'],
   ],
   friendly: [
-    '{name}, you and me, back to back.',
-    'Truce holds as long as your barrel stays down.',
-    'I got no quarrel with you.',
+    ['bot.fr1', '{name}, you and me, back to back.'],
+    ['bot.fr2', 'Truce holds as long as your barrel stays down.'],
+    ['bot.fr3', 'I got no quarrel with you.'],
   ],
   accuse: [
-    '{name} shot first. I saw it.',
-    'It is {name}. Has to be.',
-    'Do not turn your back on {name}.',
+    ['bot.ac1', '{name} shot first. I saw it.'],
+    ['bot.ac2', 'It is {name}. Has to be.'],
+    ['bot.ac3', 'Do not turn your back on {name}.'],
   ],
   hurt: [
-    'I am hit! {name} did it!',
-    'Somebody put lead in me over by {place}.',
+    ['bot.hu1', 'I am hit! {name} did it!'],
+    ['bot.hu2', 'Somebody put lead in me over by {place}.'],
   ],
   lawful: [
-    'I ride with the law, whatever you believe.',
-    'Put it down and nobody has to be buried today.',
+    ['bot.la1', 'I ride with the law, whatever you believe.'],
+    ['bot.la2', 'Put it down and nobody has to be buried today.'],
   ],
 };
 
@@ -446,9 +449,17 @@ export class BotBrain {
     }
   }
 
-  say(template, vars = {}) {
+  say([key, template], vars = {}) {
     const text = template.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? 'somebody');
-    this.room.broadcast({ t: 'chat', from: this.self.name, id: this.self.id, text, bot: true });
+    // A place is a place rather than a phrase, so it travels with its id and
+    // gets named again on the other side in whatever language is over there.
+    const holes = { ...vars };
+    const where = vars.place ? placeParts(vars.place) : null;
+    if (where?.ids?.length) holes.placeKey = `place.${where.ids[0]}`;
+    this.room.broadcast({
+      t: 'chat', from: this.self.name, id: this.self.id, text, bot: true,
+      k: key, p: holes,
+    });
   }
 
   // -------------------------------------------------------------------------

@@ -468,18 +468,26 @@ for (const [rx, rz, rw, rh, rd] of [
 // every place: you are IN the Saloon, ON Main Street and AT the water tower.
 // Defaults to "in", which is right for most of this town.
 // ---------------------------------------------------------------------------
+//
+// `id` is what the place is called when it is not being called anything: the
+// name on the wire is English prose and a Korean feed cannot use it, so a
+// client that needs to say the place somewhere else looks the id up instead.
 export const ZONES = [
-  { name: 'the Saloon', x0: -33, z0: -27, x1: -11, z1: -7 },
-  { name: "the Sheriff's Office", x0: -10, z0: -23, x1: 6, z1: -7 },
-  { name: 'the General Store', x0: 9, z0: -25, x1: 28, z1: -7 },
-  { name: 'the Mine', x0: 33, z0: -27, x1: 65, z1: -13 },
-  { name: 'the Stable', x0: -41, z0: 7, x1: -21, z1: 23 },
-  { name: 'the Church', x0: -9, z0: 10, x1: 9, z1: 30 },
-  { name: 'the Cemetery', x0: 13, z0: 9, x1: 37, z1: 27 },
-  { name: 'Main Street', prep: 'on', x0: -42, z0: -7, x1: 33, z1: 7 },
-  { name: 'the back alleys', x0: -36, z0: -35, x1: 30, z1: -25 },
-  { name: 'the water tower', prep: 'at', x0: -53, z0: -6, x1: -40, z1: 4 },
+  { id: 'saloon', name: 'the Saloon', x0: -33, z0: -27, x1: -11, z1: -7 },
+  { id: 'office', name: "the Sheriff's Office", x0: -10, z0: -23, x1: 6, z1: -7 },
+  { id: 'store', name: 'the General Store', x0: 9, z0: -25, x1: 28, z1: -7 },
+  { id: 'mine', name: 'the Mine', x0: 33, z0: -27, x1: 65, z1: -13 },
+  { id: 'stable', name: 'the Stable', x0: -41, z0: 7, x1: -21, z1: 23 },
+  { id: 'church', name: 'the Church', x0: -9, z0: 10, x1: 9, z1: 30 },
+  { id: 'cemetery', name: 'the Cemetery', x0: 13, z0: 9, x1: 37, z1: 27 },
+  { id: 'main', name: 'Main Street', prep: 'on', x0: -42, z0: -7, x1: 33, z1: 7 },
+  { id: 'alleys', name: 'the back alleys', x0: -36, z0: -35, x1: 30, z1: -25 },
+  { id: 'tower', name: 'the water tower', prep: 'at', x0: -53, z0: -6, x1: -40, z1: 4 },
 ];
+
+/** The flats beyond the last building, which are not a zone but are a place. */
+export const OUTSKIRTS = 'the desert outskirts';
+export const FLATS = 'the flats';
 
 export function zoneAt(x, z, y = 0) {
   let nearest = null, nearestD = Infinity;
@@ -495,8 +503,44 @@ export function zoneAt(x, z, y = 0) {
     if (d < nearestD) { nearestD = d; nearest = zn; }
   }
   if (nearest && nearestD < 16) return `just outside ${nearest.name}`;
-  if (nearest && nearestD < 34) return `the ground between ${nearest.name} and the flats`;
-  return 'the desert outskirts';
+  if (nearest && nearestD < 34) return `the ground between ${nearest.name} and ${FLATS}`;
+  return OUTSKIRTS;
+}
+
+/**
+ * Take a place back apart into what it is made of, so another language can put
+ * it together its own way. The wire carries the English phrase - it is what the
+ * playtest log wants and what a place is called - and Korean cannot use it: the
+ * preposition goes on the end there and the word order goes the other way.
+ *
+ * Returns { kind, ids } where kind is one of in / outside / roof / between /
+ * outskirts, and ids are zone ids, or null if this is not a place we know.
+ */
+export function placeParts(place) {
+  const p = String(place || '');
+  if (!p) return null;
+  if (p === OUTSKIRTS) return { kind: 'outskirts', ids: [] };
+  const idOf = (name) => ZONES.find((z) => z.name === name)?.id || null;
+  const shapes = [
+    ['just outside ', 'outside'],
+    ['the rooftops above ', 'roof'],
+  ];
+  for (const [prefix, kind] of shapes) {
+    if (p.startsWith(prefix)) {
+      const id = idOf(p.slice(prefix.length));
+      return id ? { kind, ids: [id] } : null;
+    }
+  }
+  if (p.startsWith('the ground between ')) {
+    const rest = p.slice('the ground between '.length);
+    const at = rest.lastIndexOf(' and ');
+    if (at < 0) return null;
+    const id = idOf(rest.slice(0, at));
+    const other = rest.slice(at + 5);
+    return id ? { kind: 'between', ids: [id], with: other === FLATS ? 'flats' : null } : null;
+  }
+  const id = idOf(p);
+  return id ? { kind: 'in', ids: [id] } : null;
 }
 
 /**

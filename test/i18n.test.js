@@ -10,12 +10,18 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const { t, has, keys, pickLang, LANGS, DEFAULT_LANG } = await import('../shared/i18n.js');
+const { t, has, keys, pickLang, closed, LANGS, DEFAULT_LANG } = await import('../shared/i18n.js');
 
 const HTML = await readFile(new URL('../client/index.html', import.meta.url), 'utf8');
-const SRC = await Promise.all(
-  ['js/main.js', 'js/hud.js', 'js/settings.js'].map((f) => readFile(new URL(`../client/${f}`, import.meta.url), 'utf8')),
-).then((all) => all.join('\n'));
+// The client asks for most of these; the server asks for the rest. A sentence
+// the server composed travels with its key, so room.js names keys too, and a
+// key it stopped sending is exactly as dead as one the HUD stopped sending.
+const SRC = await Promise.all([
+  ...['js/main.js', 'js/hud.js', 'js/settings.js']
+    .map((f) => readFile(new URL(`../client/${f}`, import.meta.url), 'utf8')),
+  readFile(new URL('../server/room.js', import.meta.url), 'utf8'),
+  readFile(new URL('../server/bots.js', import.meta.url), 'utf8'),
+]).then((all) => all.join('\n'));
 
 /** Every key the page asks for by attribute. */
 function htmlKeys() {
@@ -29,7 +35,7 @@ function htmlKeys() {
 // while the game was quite happily using all of them.
 const NAMESPACES = ['ui', 'rules', 'key', 'set', 'hud', 'phase', 'role', 'faction',
   'char', 'card', 'sb', 'res', 'deny', 'boot', 'voice', 'loot', 'turn',
-  'cham', 'aim', 'duel', 'man'];
+  'cham', 'aim', 'duel', 'man', 'feed', 'kill', 'place', 'intel', 'tl', 'bot'];
 const KEYISH = new RegExp(`^(?:${NAMESPACES.join('|')})\\.[\\w.]+$`);
 
 /** Every key the client asks for in code, literal or built from an id. */
@@ -88,6 +94,29 @@ test('the holes in a sentence get filled, and only the ones we have', () => {
   assert.equal(t('en', 'x', '{a} and {b}', { a: 'one' }), 'one and {b}',
     'a value nobody passed is left visible rather than printed as undefined');
   assert.equal(t('ko', 'hud.standing', '', { n: 4 }), '<b>4</b>명 생존');
+});
+
+test('a name in a Korean sentence takes the particle the name takes', () => {
+  // Korean picks half its particles on whether the word before them ends in a
+  // consonant, so a sentence with somebody's name in it cannot know its own
+  // grammar until the name arrives. This is that, and it is why the fallback
+  // English and the Korean cannot be the same string with the same holes.
+  assert.equal(t('en', 'x', '{a:이/가} 쓰러졌다', { a: '보안관' }), '보안관이 쓰러졌다');
+  assert.equal(t('en', 'x', '{a:이/가} 쓰러졌다', { a: '무법자' }), '무법자가 쓰러졌다');
+  assert.equal(t('en', 'x', '{a:은/는} 안 움직였다', { a: '별' }), '별은 안 움직였다');
+  assert.equal(t('en', 'x', '{a:을/를} 쐈다', { a: '가마' }), '가마를 쐈다');
+  // A Latin name takes the particle its Korean *reading* takes, and the reading
+  // is not in the spelling - Vane is 베인 and closes, Kessler is 케슬러 and does
+  // not, and they end in the same two letters. So there is no guess: anything
+  // that is not Hangul takes the closed form, and the Korean in this project is
+  // written so that nobody's name ever stands in front of a particle.
+  assert.equal(t('en', 'x', '{a:이/가}', { a: 'Vane' }), 'Vane이');
+  assert.equal(closed('Vane'), true);
+  assert.equal(closed('케슬러'), false, '러 is an open syllable and the arithmetic says so');
+  // And a plain hole is still a plain hole, in either language.
+  assert.equal(t('en', 'x', '{a} and {b}', { a: 'one', b: 'two' }), 'one and two');
+  assert.equal(t('en', 'x', '{a:이/가}', {}), '{a:이/가}', 'a value nobody passed stays visible');
+  assert.equal(closed(''), false, 'nothing at all ends in nothing at all');
 });
 
 test('a Korean browser gets Korean and everybody else gets English', () => {

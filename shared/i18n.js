@@ -235,6 +235,158 @@ const KO = {
   'duel.kind.weapon': '무기',
   'duel.kind.curse': '남에게 깔기',
 
+  // ------------------------------------------------------- what bots say
+  // Bots talk, and half the deduction layer is people reading what they said
+  // against what they did. A Korean player who cannot read it is playing a
+  // different game, so these are the same lines said again rather than a
+  // gloss on them. No particle stands behind a name.
+  'bot.sus1': '방금 누가 허공에다 쐈습니다. 누굽니까?',
+  'bot.sus2': '{name} — 저렇게 조용한 게 마음에 안 듭니다.',
+  'bot.sus3': '{name} — 자꾸 내 주위를 도는군요. 해명하시죠.',
+  'bot.sus4': '{place} 쪽에서 총소리가 났습니다.',
+  'bot.fr1': '{name}, 당신하고 나, 등 맞대고 갑시다.',
+  'bot.fr2': '총구만 내리고 있으면 휴전은 유지됩니다.',
+  'bot.fr3': '나는 당신하고 싸울 생각 없습니다.',
+  'bot.ac1': '{name} — 저쪽이 먼저 쐈습니다. 내가 봤습니다.',
+  'bot.ac2': '{name}입니다. 그럴 수밖에 없습니다.',
+  'bot.ac3': '{name} — 저 사람한테 등 보이지 마십시오.',
+  'bot.hu1': '맞았습니다! {name}가 했습니다!',
+  'bot.hu2': '{place} 근처에서 누가 나한테 납을 박았습니다.',
+  'bot.la1': '당신들이 뭘 믿든, 나는 법 쪽입니다.',
+  'bot.la2': '내려놓으십시오. 오늘 아무도 묻히지 않아도 됩니다.',
+  'hud.deadTag': '(사망)',
+
+  // ------------------------------------------------------ the timeline
+  // The round's public account, on the aftermath screen. Everything here has
+  // a name in front of it, so nothing here has a particle behind one.
+  'tl.nothing': '기록에 남을 만한 일은 아무도 하지 않았습니다.',
+  'tl.storm': '{who} — 모래폭풍 속에서 숨이 막힘',
+  'tl.left': '{who} — 마을을 떠남',
+  'tl.killed': '{killer} — {where} {who} 사살',
+  'tl.died': '{who} — {where} 사망',
+  'tl.card': '{who} — {card} 사용',
+  'tl.cardSecret': '{who} — {card} 사용 (아무도 몰랐음)',
+  'tl.cardOn': '{who} — {target}에게 {card} 사용',
+  'tl.badge': '{who} — 별을 달았음',
+  'tl.accuse': '{who} — {target} 지목',
+
+  // -------------------------------------------------- the thread you pull
+  // One sentence each, and it is most of what anybody has to go on all round.
+  'intel.pair': '보안관은 이 둘 중 하나입니다: {a}  또는  {b}.',
+  'intel.alone': '당신은 혼자 왔습니다. 나머지 패거리는 끝내 도착하지 못했습니다.',
+  'intel.mate': '패거리 중 얼굴 하나를 알아봅니다 — {name}.',
+  'intel.nothing': '여기 있는 누구에 대해서도 아는 것이 없습니다. 잘된 일입니다.',
+  'intel.lawman': '{name} — 별이든 아니든, 어떤 종류의 배지를 달고 있다는 것을 압니다.',
+  'intel.sheriff': '아무도 당신 얼굴을 모릅니다. 계속 그렇게 두거나, 별을 달고 덤벼보라고 하거나.',
+
+  // ------------------------------------------------------- the kill feed
+  // The one line everybody reads. Composed on the client, because who is told
+  // what depends on who saw it - so the server sends the facts and the HUD
+  // says them, in whichever language it is in.
+  'kill.youDiedTo': '{killer} — 당신을 {where} 눕혔습니다.',
+  'kill.youDied': '{where} 죽었습니다.',
+  'kill.youKilled': '{victim} 사살 — 정체 {role}.',
+  'kill.watched': '{killer} — {victim} 죽이는 장면을 당신이 봤습니다. 정체 {role}.',
+  'kill.storm': '{victim} — 모래폭풍 속에서 숨이 막혔습니다. 정체 {role}.',
+  'kill.left': '{victim} — 마을을 떠났습니다. 정체 {role}.',
+  'kill.unseen': '{where} 총성 한 발. {victim} 사망 — 정체 {role}. 누가 쐈는지는 아무도 못 봤습니다.',
+
+  // -------------------------------------------------------------- places
+  // English puts the preposition in front of the name and Korean puts it on
+  // the end, so the place and the phrase it sits in are separate keys.
+  'place.saloon': '살룬',
+  'place.office': '보안관 사무소',
+  'place.store': '잡화점',
+  'place.mine': '광산',
+  'place.stable': '마구간',
+  'place.church': '교회',
+  'place.cemetery': '공동묘지',
+  'place.main': '큰길',
+  'place.alleys': '뒷골목',
+  'place.tower': '급수탑',
+  'place.flats': '벌판',
+  'place.in': '{p}에서',
+  'place.outside': '{p} 바로 밖에서',
+  'place.roof': '{p} 위 지붕에서',
+  'place.between': '{a:과/와} {b} 사이 공터에서',
+  'place.outskirts': '마을 바깥 사막에서',
+
+  // ------------------------------------------------------------ the feed
+  // The server composes these in English and sends the key and the holes with
+  // them. Nobody's name is ever standing in front of a particle: a Latin name
+  // takes the particle its Korean reading takes and the reading is not in the
+  // spelling, so these are written round the problem rather than into it.
+  'feed.barrelSoak': '빗물통이 대신 맞았습니다. 쏜 자는 자기가 빗맞혔다고 믿고 있습니다.',
+  'feed.bought': '아무도 못 봤습니다. 돈값은 했습니다.',
+  'feed.outOfDark': '어둠 속에서 날아온 총알. 쏜 얼굴은 끝내 보지 못했습니다.',
+  'feed.ledger': '장부가 알아서 적힙니다. 방금 그건 누가 했는지 알게 되었습니다.',
+  'feed.blankMine': '공포탄. 연기와 소리뿐입니다.',
+  'feed.blankAtYou': '당신을 겨눈 한 발 — 공포탄이었습니다.',
+  'feed.tooFar': '너무 멉니다. 총알은 아무 의미 없는 곳으로 빗나갑니다.',
+  'feed.intoBarrel': '총알이 빗물통에 박혔습니다.',
+  'feed.woodNotMeat': '살이 아니라 나무였습니다.',
+  'feed.notThere': '그가 생각한 자리에 당신은 없었습니다.',
+  'feed.heWasReady': '빗나갔습니다. 상대는 준비하고 있었습니다.',
+  'feed.neverMoved': '손에 들고 있으면서 움직이지 않았습니다.',
+  'feed.patchedYou': '{name} — 당신을 치료했습니다 (+{n}).',
+  'feed.youPatched': '{name} 치료 완료.',
+  'feed.bandagedSelf': '스스로 붕대를 감았습니다 (+{n}).',
+  'feed.callsOut': '{a} — {b} 앞으로 불러냈습니다.',
+  'feed.pinsStar': '{name} — 별을 달고 법을 자처합니다. 믿을지 말지는 각자 알아서.',
+  'feed.storeOut': '{name} — 잡화점을 펼쳤습니다.',
+  'feed.noSights': '조준선 안에 이름 붙일 사람이 없습니다.',
+  'feed.swept': '뒤쪽 거리를 쓸었습니다. 남긴 발자국이 전부 사라졌고, 한동안 남지도 않습니다.',
+  'feed.glass': '유리를 눈에 댑니다. 몇 초 동안 이 마을에서 울리는 모든 총성에 얼굴이 붙습니다.',
+  'feed.poster': '{a} — 교회 문에 수배 전단을 박았습니다. 이름은 {b}.',
+  'feed.postered': '당신 이름이 방금 교회 문에 걸렸습니다. 마을 전체가 읽을 수 있습니다.',
+  'feed.rolesDealt': '역할이 배분되었습니다. 교회 종이 울릴 때까지 총은 총집에.',
+  'feed.bell': '종이 울립니다. 이제 총집에 있는 것은 없습니다.',
+  'feed.storm': '모래폭풍이 마을 광장으로 조여옵니다. 들어오거나, 숨이 막히거나.',
+  'feed.stickGoesOff': '{name} — 손에 쥔 채로 터졌습니다.',
+  'feed.fusePassed': '심지는 아직 타고 있습니다. 옆으로 넘깁니다.',
+  'feed.handedStick': '누군가 불붙은 다이너마이트를 당신 손에 쥐여줍니다.',
+  'feed.outOfCell': '{name} — 유치장에서 나왔습니다.',
+  'feed.behindBars': '{name} — 차례를 창살 안에서 보냅니다.',
+  'feed.chamberLoaded': '약실 장전 완료: 실탄 {live}, 공포탄 {blank}. 순서는 아무에게도 알려주지 않습니다.',
+  'feed.shiftWeight': '몸의 무게를 옮깁니다.',
+  'feed.selfClick': '{name} — 자기 머리에 대고 당겼습니다. 딸깍.',
+  'feed.selfLive': '{name} — 자기 머리에 대고 당겼습니다. 공포탄이 아니었습니다.',
+  'feed.throughInto': '총알은 그대로 관통해 뒤에 서 있던 {name}에게 박혔습니다.',
+
+  // ------------------------------------------------- the eighty, in play
+  'duel.say.reaction': '그건 남이 당신을 쐈을 때 쓰는 카드입니다.',
+  'duel.say.gearOut': '이미 하나 깔아두었습니다.',
+  'duel.say.noCurseTarget': '그걸 씌울 상대가 없습니다.',
+  'duel.say.notTheStar': '별을 단 자에게는 안 됩니다.',
+  'duel.say.alreadyIn': '이미 갇혀 있습니다.',
+  'duel.say.noTarget': '그 카드를 쓸 상대가 없습니다.',
+  'duel.say.notClose': '그러기엔 너무 멉니다.',
+  'duel.say.nothingToTake': '가져올 것이 없습니다.',
+  'duel.say.noPouring': '둘만 남으면 아무도 술을 따라주지 않습니다.',
+  'duel.say.notHurt': '그걸 원할 만큼 다치지 않았습니다.',
+  'duel.say.oneBack': '한 대 회복.',
+  'duel.say.moreCards': '{n}장 더.',
+  'duel.tell.weapon': '{name} — 「{card}」 탁자에 올려놓았습니다.',
+  'duel.tell.gear': '{name} — 「{card}」 앞에 깔았습니다.',
+  'duel.tell.lights': '{name} — 심지에 불을 붙여 내려놓았습니다.',
+  'duel.tell.jail': '{a} — {b} 유치장에 처넣었습니다.',
+  'duel.tell.panic': '{a} — {b}에게서 한 장 낚아챘습니다.',
+  'duel.tell.catbalou': '{a} — {b}에게 카드 한 장을 버리게 했습니다.',
+  'duel.tell.saloon': '{name} — 모두에게 한 잔씩 돌렸습니다.',
+  'duel.tell.indians': '{name} — 능선을 가리킵니다.',
+  'duel.tell.gatling': '{name} — 거리 전체를 향해 갈겼습니다.',
+
+  // ------------------------------------------- picked up, and no room for it
+  'deny.full.whiskey': '그걸 원할 만큼 다치지 않았습니다.',
+  'deny.full.ammo': '탄띠가 전부 꽉 찼습니다.',
+  'deny.full.dynamite': '한 개도 더 들 수 없습니다.',
+  'deny.full.shotgun': '산탄총도, 그에 맞는 탄도 이미 다 있습니다.',
+  'deny.full.rifle': '레버 소총도, 그에 맞는 탄도 이미 다 있습니다.',
+  'deny.full.other': '그건 당신에게 쓸모가 없습니다.',
+  'card.barrel.armed': '빗물통을 굴려다 놓았습니다. 다음에 당신을 찾아온 총알은 물을 찾게 됩니다.',
+  'card.witness.armed': '돈이 오갔습니다. 당신의 다음 살인은 일어나지 않은 일이 됩니다.',
+  'card.ledger.armed': '장부가 펼쳐졌습니다. 이 마을에서 다음으로 죽는 자가 당신 대신 이름을 적습니다.',
+
   'phase.lobby': '로비',
   'phase.prep': '준비',
   'phase.combat': '교전',
@@ -383,11 +535,70 @@ const KO = {
 const TABLE = { ko: KO };
 
 /** Fill {name} holes. Missing values are left alone rather than printed as undefined. */
+/**
+ * Does this word end in a closing consonant? Korean picks half its particles on
+ * the answer - 이 or 가, 은 or 는, 을 or 를 - so a sentence cannot know its own
+ * grammar until the word arrives.
+ *
+ * For Hangul the question is arithmetic: a syllable block is
+ * 0xAC00 + (initial * 588) + (vowel * 28) + final, so a remainder of zero means
+ * no final consonant, and this is exact.
+ *
+ * For anything else it is not answerable. A Latin name takes the particle its
+ * *Korean reading* takes, and the reading is not in the spelling: Vane is 베인
+ * and closes, Kessler is 케슬러 and does not, and the two of them end in the
+ * same letters. So there is no heuristic here - non-Hangul takes the closed
+ * form and the strings in this file are written so that no player's name is
+ * ever standing in front of a particle. Use this for words we chose ourselves.
+ */
+export function closed(word) {
+  const s = String(word ?? '').trim();
+  if (!s) return false;
+  const code = s.charCodeAt(s.length - 1);
+  if (code >= 0xac00 && code <= 0xd7a3) return (code - 0xac00) % 28 !== 0;
+  return true;
+}
+
+/**
+ * Fill the holes. `{name}` is the value; `{name:이/가}` is the value followed by
+ * whichever of those two the value takes, which is the whole of why Korean
+ * cannot be done with the same string table as English.
+ */
 function fill(text, params) {
   if (!params) return text;
-  return String(text).replace(/\{(\w+)\}/g, (whole, key) => (
-    Object.prototype.hasOwnProperty.call(params, key) ? String(params[key]) : whole
-  ));
+  const value = (key) => (Object.prototype.hasOwnProperty.call(params, key) ? params[key] : undefined);
+  return String(text).replace(/\{(\w+)(?::([^{}/]+)\/([^{}]+))?\}/g, (whole, key, a, b) => {
+    const v = value(key);
+    if (v === undefined) return whole;
+    const word = String(v);
+    return a ? word + (closed(word) ? a : b) : word;
+  });
+}
+
+/**
+ * A hole whose value is itself a word that gets translated.
+ *
+ * The server puts a card name in a sentence and can only send the English of
+ * it, so it sends the key beside it: { card: 'Barrel', cardKey: 'duel.barrel.name' }
+ * becomes { card: '빗물통' } before the sentence is filled in. The English
+ * already in the hole is the fallback, which is the rule everywhere else here.
+ */
+export function resolve(lang, params) {
+  if (!params) return params;
+  const out = { ...params };
+  for (const [key, v] of Object.entries(params)) {
+    if (!key.endsWith('Key') || typeof v !== 'string') continue;
+    const base = key.slice(0, -3);
+    out[base] = t(lang, v, out[base] ?? '');
+    delete out[key];
+  }
+  return out;
+}
+
+/** A line the server composed, said in this language. Key, English, holes. */
+export function line(lang, msg) {
+  if (!msg || !msg.k) return msg?.text ?? '';
+  return t(lang, msg.k, msg.text, resolve(lang, msg.p));
 }
 
 /**

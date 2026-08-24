@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 177 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 181 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 ```
@@ -493,6 +493,43 @@ wide one uncomfortable.
 
 ---
 
+## Language
+
+The whole game is in **English and Korean**, switched in the settings panel, and
+a browser that asks for Korean gets Korean without being asked twice.
+
+It is an **overlay rather than a second copy**. There is only ever one English
+copy of any string — the one in the HTML, the one in `constants.js`, or the
+sentence the server actually composed — and `shared/i18n.js` is keyed to it. So
+there is no pair of English strings anywhere that can drift apart, and an
+untranslated key falls through to the English it was handed rather than to a
+hole. `npm test` fails on a key the page asks for that nobody translated, and on
+a translation for a key that no longer exists.
+
+Sentences the **server** composes travel as three things: the English line, the
+key, and the holes as data. Korean puts the verb at the end and the preposition
+on the back of the noun, so it cannot reuse English word order — "a shot in the
+Saloon" is "살룬에서 총성 한 발", and the place, the count and the card name have
+to be free to move. Two things fall out of that:
+
+- **Places are ids on the wire, not prose.** `zoneAt` still returns "just outside
+  the Church" because that is what a place is called and what the playtest log
+  wants; `placeParts` takes it back apart so another language can put it
+  together its own way.
+- **Korean picks half its particles on the word in front of them** — 이 or 가, 은
+  or 는, 을 or 를 — so a sentence with somebody's name in it does not know its own
+  grammar until the name arrives. For Hangul that is arithmetic and `{card:을/를}`
+  does it. For a Latin name it is not answerable: Vane is 베인 and closes,
+  Kessler is 케슬러 and does not, and they end in the same two letters. So no
+  player's name is ever standing in front of a particle — the Korean is written
+  round the problem rather than into it.
+
+What is deliberately **not** translated: the characters' personal names, and the
+printed card faces, which are 1880s letterpress and are the same object in any
+language.
+
+---
+
 ## Controls
 
 | | |
@@ -567,7 +604,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 177 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 181 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -688,14 +725,27 @@ They are grouped by what they protect:
   to have seen it coming, and that when it is pointed at them they take that
   warning often enough to be worth giving — but not so often that they cannot
   be shot.
+- **`test/feedlines.test.js`** — every line the town says, said in Korean. The
+  strings are checked next door: that they exist, that nothing is orphaned, that
+  no Korean entry is secretly English. What that cannot catch is a sentence
+  whose holes do not match the holes the server filled — the key says `{a}` and
+  the server sent `{name}`, so a Korean player reads the word "{a}". So this
+  plays a whole round of each mode, catches every keyed line on its way out, and
+  says all of them in both languages; then it reaches by hand for the dozen a
+  round of bots never gets to, which is most of the refusals. It found two on
+  the way in.
 - **`test/i18n.test.js`** — the Korean overlay. There is only ever one English
   copy of any string — the one in the HTML, in `constants.js`, or in the
   sentence the server built — and Korean is keyed to it, so two English copies
   cannot drift apart. What can happen instead is a key the page asks for that
   nobody translated, or a translation for a key that no longer exists, and both
-  of those fail here. Plus: an untranslated key falls through to the English it
-  was handed rather than to a hole, a Korean browser gets Korean without being
-  asked, and no Korean entry is secretly still in English.
+  of those fail here — the client and the server both name keys, so a key either
+  of them stopped sending is exactly as dead as the other's. Plus: an
+  untranslated key falls through to the English it was handed rather than to a
+  hole, a Korean browser gets Korean without being asked, no Korean entry is
+  secretly still in English, and a name in a Korean sentence takes the particle
+  that name takes — which for Hangul is arithmetic and for a Latin name is not
+  answerable at all, so the strings are written round it rather than into it.
 - **`test/fuzz.test.js`** — every shape of message a socket can send that a real
   client never would: numbers where objects go, `NaN` and `Infinity` where
   coordinates go, five-thousand-character strings, `__proto__` as a card name.

@@ -25,7 +25,7 @@ import { HUD } from './hud.js';
 import { initCharacterModels } from './charmodels.js';
 import { cardUrl } from './cardart.js';
 import { Settings, LIMITS, motionScale } from './settings.js';
-import { t, pickLang } from '../../shared/i18n.js';
+import { t, line, pickLang } from '../../shared/i18n.js';
 import { DUEL_CARDS } from '../../shared/deck.js';
 
 const $ = (id) => document.getElementById(id);
@@ -589,7 +589,10 @@ class Game {
         break;
 
       case S.FEED:
-        this.hud.addFeed(escapeHtml(msg.text), msg.tone);
+        // The server composed the line in English and, where it could, sent the
+        // key and the holes as well. Both travel: a key nobody has translated
+        // still has to say something, and the English is where it says it.
+        this.hud.addFeed(escapeHtml(line(this.settings?.get('lang') || 'en', msg)), msg.tone);
         if (msg.deny) this.audio.deny();
         break;
       case S.CHAT:
