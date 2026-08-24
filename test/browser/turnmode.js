@@ -18,6 +18,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { DUEL } from '../../shared/constants.js';
 import { DUEL_CARDS } from '../../shared/deck.js';
+import { TABLE } from '../../shared/map.js';
 
 let chromium;
 try {
@@ -154,16 +155,17 @@ try {
   // the mark you keep, all round, and heads are the only thing that moves.
   await A.click('#gameCanvas').catch(() => {});
   await A.waitForFunction(() => window.game?.turn?.kind, null, { timeout: 60000 });
+  await A.evaluate(([x, z]) => { window.__tableX = x; window.__tableZ = z; }, [TABLE.x, TABLE.z]);
   const seated = await A.evaluate(() => {
     const g = window.game;
     return {
       rooted: g.rooted(),
       seat: g.self?.seat,
-      atTable: Math.hypot(g.self.pos.x - (-4), g.self.pos.z - 0),
+      atTable: Math.hypot(g.self.pos.x - window.__tableX, g.self.pos.z - window.__tableZ),
     };
   });
   check(seated.rooted, 'the client knows the feet are nailed down');
-  check(seated.atTable > 4 && seated.atTable < 8,
+  check(Math.abs(seated.atTable - TABLE.standing) < 0.6,
     `and it put you at the table (${seated.atTable.toFixed(1)}m from the middle of it)`);
 
   for (const kind of ['turn', 'reposition']) {
@@ -185,28 +187,37 @@ try {
   await A.screenshot({ path: `${SHOTS}/d2-the-table.png` });
 
   // A card, played with the number printed on it, and the table seeing it.
-  await myGo(A);
-  const play = await A.evaluate(async () => {
-    const g = window.game;
-    // Something that can be played at nobody: gear, a weapon, or more cards.
-    const want = ['barrel', 'scope', 'mustang', 'volcanic', 'schofield', 'remington',
-      'carabine', 'winchester', 'stagecoach', 'wells', 'store'];
-    const at = g.duel.hand.findIndex((id) => want.includes(id));
-    if (at < 0) return { skipped: true };
-    const card = g.duel.hand[at];
-    const before = g.duel.hand.filter((c) => c === card).length;
-    g.playDuelCard(at);
-    await new Promise((r) => setTimeout(r, 900));
-    return {
-      card,
-      left: g.duel.hand.filter((c) => c === card).length,
-      before,
-      gear: [...(g.duel.gear || [])],
-      weapon: g.duel.weapon,
-      reach: g.duel.reach,
-      table: g.duel.table?.length || 0,
-    };
-  });
+  // Two attempts, because a go is six seconds and the card in hand this lap may
+  // be one the room is right to refuse - a second Scope on a man who has one.
+  let play = { skipped: true };
+  for (let attempt = 0; attempt < 2 && play.skipped; attempt += 1) {
+    await myGo(A);
+    // eslint-disable-next-line no-await-in-loop
+    play = await A.evaluate(async () => {
+      const g = window.game;
+      // Something playable at nobody that this man has not already got out:
+      // gear he is not wearing, a longer gun than the one in front of him, or
+      // simply more cards.
+      const gear = new Set(g.duel.gear || []);
+      const want = ['stagecoach', 'wells', 'store', 'barrel', 'scope', 'mustang',
+        'winchester', 'carabine', 'remington', 'schofield', 'volcanic'];
+      const at = g.duel.hand.findIndex((id) => want.includes(id) && !gear.has(id) && g.duel.weapon !== id);
+      if (at < 0) return { skipped: true };
+      const card = g.duel.hand[at];
+      const before = g.duel.hand.filter((c) => c === card).length;
+      g.playDuelCard(at);
+      await new Promise((r) => setTimeout(r, 900));
+      return {
+        card,
+        left: g.duel.hand.filter((c) => c === card).length,
+        before,
+        gear: [...(g.duel.gear || [])],
+        weapon: g.duel.weapon,
+        reach: g.duel.reach,
+        table: g.duel.table?.length || 0,
+      };
+    });
+  }
   if (play.skipped) {
     check(true, 'no card in hand this go could be played at nobody (skipped)');
   } else {

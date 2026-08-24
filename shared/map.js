@@ -490,9 +490,12 @@ for (const [rx, rz, rw, rh, rd] of [
 // ---------------------------------------------------------------------------
 export const TABLE = {
   x: -4, z: 0,             // the middle of Main Street, outside the Sheriff's office
-  radius: 3.6,             // the table itself
-  standing: 5.6,           // how far out the marks are
-  height: 1.02,
+  // A table, and table-sized. The first cut of this was seven metres across and
+  // read as a stage with people standing on the rim of it rather than as
+  // something anybody could deal a hand on.
+  radius: 1.7,
+  standing: 3.6,           // how far out the marks are
+  height: 0.95,
 };
 
 /** Where the nth of `count` men stands, and which way he is facing. */
@@ -518,13 +521,15 @@ export function seatsApart(a, b, count) {
 }
 
 // The table itself, and the ring of ground round it people stand on.
-box([TABLE.x - TABLE.radius, 0.92, TABLE.z - TABLE.radius],
-  [TABLE.x + TABLE.radius, TABLE.height, TABLE.z + TABLE.radius], 'wood');
-for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-  box([TABLE.x + dx * (TABLE.radius - 0.7) - 0.14, 0, TABLE.z + dz * (TABLE.radius - 0.7) - 0.14],
-    [TABLE.x + dx * (TABLE.radius - 0.7) + 0.14, 0.92, TABLE.z + dz * (TABLE.radius - 0.7) + 0.14], 'wood');
-}
-props.push({ type: 'table', x: TABLE.x, z: TABLE.z, r: TABLE.radius, y: TABLE.height });
+// The collision shape only: a bullet and a boot meet a box, and the eye meets
+// the round board the prop draws. Marked unseen so it is not drawn twice.
+box([TABLE.x - TABLE.radius * 0.86, TABLE.height - 0.1, TABLE.z - TABLE.radius * 0.86],
+  [TABLE.x + TABLE.radius * 0.86, TABLE.height, TABLE.z + TABLE.radius * 0.86],
+  'wood', { unseen: true });
+props.push({
+  type: 'table', x: TABLE.x, z: TABLE.z, r: TABLE.radius, y: TABLE.height,
+  standing: TABLE.standing,
+});
 
 export const ZONES = [
   { id: 'saloon', name: 'the Saloon', x0: -33, z0: -27, x1: -11, z1: -7 },

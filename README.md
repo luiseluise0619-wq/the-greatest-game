@@ -24,7 +24,7 @@ Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
 npm test               # 199 checks: map, collision, match rules, information rules, cards, anti-cheat
-npm run test:browser   # optional: real Chromium, needs playwright installed
+npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
 ```
@@ -84,10 +84,18 @@ by default**; the free-for-all everything above describes is still here and stil
 tested, and `HNH_MODE=free npm start` runs it.
 
 The turn mode is the card game this project has always been shaped like, played
-from inside a first-person town. A card game rations who may act by going round
-a table. There is no table in a first-person game and eight people are moving at
-once, so what gets rationed is **the trigger**, not the feet — and a round
-alternates between everybody walking at once and nobody walking at all.
+from inside a first-person town — **standing at a table**, in the middle of Main
+Street. You are dealt a mark on the ground and that is where you stay: nobody
+walks, all round. What gets rationed is **the trigger**, and one man at a time
+has it.
+
+The seating is not decoration. It is the brake the whole thing runs on: a
+starting gun reaches the man next to you, so most of the gang physically cannot
+shoot the Sheriff for several turns, and **where you were put is as much the
+hand you were dealt as the cards are**. The first version of this mode had
+everybody walking a hundred-and-thirty-metre town between goes and took that
+brake clean off — the gang won eight rounds in ten, and only 29% of anybody's
+go ended in a shot. At the table it is 59%.
 
 Everything in the manual is on screen too: **HOW THIS IS PLAYED** in the lobby,
 **F1** once the round has started, in English or Korean.
@@ -112,8 +120,8 @@ decision and buys real armour.
 
 | | Length | What happens |
 |---|---|---|
-| **The walk** | 15s | Nobody can shoot. Everybody picks their ground. The chamber is loaded and announced |
-| **A go** | 6s each | One man at a time, in an order the whole town was shown. Nobody walks — you can still look about |
+| **A go** | 6s each | One man at a time, in an order the whole table was shown. You can turn your head; that is all |
+| **The beat between** | 4s | The chamber is loaded in the open and everybody counts what went into it |
 
 ### What it takes to fire
 
@@ -123,9 +131,11 @@ Three things at once, and every one of them is a decision somebody else can see:
   does nothing at all and does not even cost ammunition.
 - **You have to be holding a `Bang!`** — one a turn, spent whether or not it
   hits. Ammunition is cards.
-- **He has to be inside what your gun reaches**, and that is the card lying in
-  front of you rather than the sights. The belt gun everyone starts with reaches
-  22 metres; a Winchester reaches five times that.
+- **He has to be inside what your gun reaches**, counted in **seats** the way the
+  original counts them. The belt gun everyone starts with reaches the man beside
+  you and nothing further; a Winchester reaches five seats, which at most tables
+  is everybody. A man who goes down leaves the circle, so the two either side of
+  him become neighbours and the round gets sharper as it thins.
 
 Then the barrel has to **stay on him for most of a second** before it will go
 off. That is the draw, and it is the only warning he gets — which is what makes
@@ -144,8 +154,9 @@ card.
 
 On your own go you may put the barrel against your own head with **Q**. A blank
 buys you another go on the spot. A live round costs you a hit and **carries on
-out of your back** into whoever chose to stand in line behind you. Which is why
-where everybody stood during the walk is worth looking at.
+out of your back** into whoever is standing in line behind you — which at a round
+table is the man on your other side. Turn to face your left-hand neighbour and it
+is your right-hand one who catches it.
 
 ### The sixteen
 
@@ -188,10 +199,10 @@ window, same two-colour drift, same trimmed corners. No image file has ever been
 in this repository. `/proof/?deck=duel` prints the sheet while the server is
 running, which is how the blocks were cut.
 
-Distances are the one thing that had to be reinvented rather than copied. The
-original seats everybody round a table and counts chairs; here there are no
-chairs, so a "distance" is 22 metres of actual ground, and whether you are inside
-it is decided by where you chose to stand during the walk.
+Distance is the original's, unchanged: seats round the table, counted the short
+way. It was 22 metres of open ground for a while, in the version of this mode
+where everybody walked, and that turned out to be the one thing that could not be
+reinvented — see the table above.
 
 ---
 
@@ -825,11 +836,21 @@ as artifacts. A third job prints the bot balance and is allowed to fail — it i
 there to be read when a bot change lands, not to gate anything, because win
 shares under fifty rounds say whatever they like.
 
-`npm run test:browser` drives a real Chromium through a whole round with two
-players — lobby, room codes, the manual, both decks printed face up, the role card,
-the hand dealt and a card played, and on to the aftermath screen where the
-round's cards are finally named — seventy-two checks, watching for console errors and
-server noise the whole way.
+`npm run test:browser` drives a real Chromium through a whole round of **each
+game**, with two players.
+
+`playthrough.js` is the free-for-all — lobby, room codes, the manual, both decks
+printed face up, the role card, the hand dealt and a card played, and on to the
+aftermath screen where the round's cards are finally named — seventy-two checks,
+watching for console errors and server noise the whole way.
+
+`turnmode.js` is the mode a town plays by default, which until it existed had no
+browser coverage at all: that the lobby offers the right game, that a gunhand is
+dealt with the role and printed on the card, that the chamber is counted in the
+open, that the feet really are nailed to the mark you were dealt for the whole
+round, that a number key spends the card printed on it and the table sees where
+it went, that a refresh mid-lap hands the whole game back, and that nobody is
+ever reading HE HAS YOU under the words YOUR GO. Thirty-two more.
 It also measures the HUD rather than trusting it: nothing may run off the edge
 of the window, no word may be written over the town without a shadow under it
 or something opaque behind it, and no two tiles of the shout wheel may sit on
@@ -867,28 +888,39 @@ won by information. The knobs that control that balance, if you want to move it:
 
 ### The turn mode, over 60 rounds a setting
 
-The mode has one arithmetic problem and one number that fixes it. The gang wins
-by killing one man they can see; the law wins by killing whoever is left and has
-no idea who that is. In the card game the brake on that is the seating — a
-starting gun reaches the man next to you, so most of the gang physically cannot
-shoot the Sheriff for several turns. There are no seats here, and fifteen seconds
-of walk crosses this whole town, so the brake is gone.
+The mode has one arithmetic problem. The gang wins by killing one man they can
+see; the law wins by killing whoever is left and has no idea who that is. In the
+card game the brake on that is the seating, and the first version of this mode
+had no seats — everybody walked a hundred-and-thirty-metre town between goes, so
+anybody who wanted to be inside twenty-two metres of the star at the bell could
+be. It cost a Sheriff worth seven hits instead of five to hold that together, and
+it was still not a good game: only **29% of anybody's go ended in a shot**.
+
+Putting the table in fixed it as a game before it fixed it as a balance:
+
+| | goes ending in a shot | shots finding somebody |
+|---|---|---|
+| walking a town | 29% | 45% |
+| **at the table** | **59%** | 45% |
+
+The star's hits, swept again at the table (`HNH_SHERIFFHEALTH`):
 
 | Star's hits | The Law | Outlaws | Renegade |
 |---|---|---|---|
-| 5 (the card game's) | 27% | **68%** | 5% |
-| **7** | **45%** | 40% | 15% |
-| 9 | **67%** | 27% | 7% |
+| 5 (the card game's) | 15% | **80%** | 5% |
+| 6 | 42% | **55%** | 3% |
+| **7** | 37% | **57%** | 7% |
+| 8 | **60%** | 33% | 7% |
 
-So seven, and two more independent runs of sixty at that setting came out 48/45/7
-and 47/47/7. It is a deviation from the original and it is the price of taking
-the seats away.
+So seven, and the confirming run of sixty came out **50 / 43 / 7**. It is the one
+deviation from the original left in the mode, and it is there because the star is
+the only man at the table anybody can identify while the law has nothing like
+that to aim back with.
 
-The other numbers from those runs, which are the ones to watch if the bots ever
-change: about **52 goes a round**, **29% of them ending in a shot**, **45% of
-shots finding somebody** — the rest split between a blank out of the shared
-chamber, a man out of range, and a man who saw it coming and spent the card. And
-between four and five men a round put the gun to their own head.
+The other numbers to watch if the bots ever change: about **42 goes a round**,
+**45% of shots finding somebody** — the rest split between a blank out of the
+shared chamber, a man out of range, and a man who saw it coming and spent the
+card — and about **one man a round** putting the gun to his own head.
 
 Balance over **120 headless bot-only rounds** (`npm run balance -- 120`) sits at:
 

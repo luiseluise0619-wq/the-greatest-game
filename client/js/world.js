@@ -215,6 +215,10 @@ export function buildWorld(scene) {
   const byMat = new Map();
   for (const b of MAP.solids) {
     if (b.mat === 'cliff') continue;                 // drawn separately, no shadows
+    // Some solids are the collision shape for something drawn by hand - the
+    // table is a box to a bullet and a round board to look at - so they say so
+    // rather than being drawn twice.
+    if (b.unseen) continue;
     if (!byMat.has(b.mat)) byMat.set(b.mat, []);
     byMat.get(b.mat).push(b);
   }
@@ -298,10 +302,10 @@ export function buildWorld(scene) {
       // Planks across the top, so it reads as boards rather than a disc.
       for (let i = -3; i <= 3; i++) {
         const line = new THREE.Mesh(
-          new THREE.BoxGeometry(p.r * 1.9, 0.01, 0.05),
+          new THREE.BoxGeometry(p.r * 1.9, 0.01, 0.035),
           new THREE.MeshLambertMaterial({ color: 0x4a3320 }),
         );
-        line.position.set(p.x, p.y + 0.005, p.z + i * (p.r / 3.4));
+        line.position.set(p.x, p.y + 0.005, p.z + i * (p.r / 3.6));
         group.add(line);
       }
       const legMat = new THREE.MeshLambertMaterial({ color: 0x4a3320 });
@@ -314,9 +318,9 @@ export function buildWorld(scene) {
       const markMat = new THREE.MeshBasicMaterial({ color: 0x3a2a1c, transparent: true, opacity: 0.5 });
       for (let i = 0; i < 8; i++) {
         const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
-        const mark = new THREE.Mesh(new THREE.RingGeometry(0.44, 0.58, 18), markMat);
+        const mark = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.52, 18), markMat);
         mark.rotation.x = -Math.PI / 2;
-        mark.position.set(p.x + Math.cos(a) * 5.6, 0.02, p.z + Math.sin(a) * 5.6);
+        mark.position.set(p.x + Math.cos(a) * p.standing, 0.02, p.z + Math.sin(a) * p.standing);
         group.add(mark);
       }
     } else if (p.type === 'windmill') {
