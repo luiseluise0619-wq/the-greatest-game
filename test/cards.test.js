@@ -10,6 +10,7 @@ import {
   PHASE, TIMING, CARDS, CARD_ORDER, CARD_DEAL, SOCIAL, CHARACTERS, WEAPONS,
   BUFF_VALUES, GAMBLER_BOONS, PLAYER, MODES,
 } from '../shared/constants.js';
+import { DUEL_CARDS } from '../shared/deck.js';
 
 const { Room } = await import('../server/room.js');
 const { BotBrain } = await import('../server/bots.js');
@@ -807,4 +808,17 @@ test('every buff the client predicts is worth what the server granted', () => {
     assert.equal(runner.stamina, PLAYER.staminaMax,
       'walking with the boon on was read as a sprint and charged for');
   } finally { clock.restore(); }
+});
+
+test('every one of the eighty has a block cut for it', async () => {
+  // Same rule as the six: add a card to the deck and forget to cut a block and
+  // the game ships a blank face. Nothing here draws - the press needs a canvas
+  // and this is plain Node - so it checks the tables, which is what goes wrong.
+  const art = await import('../client/js/duelart.js');
+  const deck = Object.keys(DUEL_CARDS);
+  const missing = deck.filter((id) => !art.PRINTABLE.includes(id));
+  assert.deepEqual(missing, [], `in the deck, never cut:\n  ${missing.join('\n  ')}`);
+  const extra = art.PRINTABLE.filter((id) => !deck.includes(id));
+  assert.deepEqual(extra, [], `cut, but no such card:\n  ${extra.join('\n  ')}`);
+  assert.equal(art.PRINTABLE.length, 22);
 });

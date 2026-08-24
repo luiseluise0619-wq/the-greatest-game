@@ -140,6 +140,24 @@ try {
     'and F1 brings it back');
   await A.click('#manClose');
 
+  // Two decks share the id "barrel", and the strip is built once at boot and
+  // again when the server says which game this town plays. The first build's
+  // idle queue used to carry on dropping faces into the second build's strip,
+  // so the turn mode's lobby printed the free-for-all's Rain Barrel.
+  const freeBarrel = await A.evaluate(() =>
+    document.querySelector('#deckStrip .deckCard[data-id="barrel"] img')?.src.length || 0);
+  await A.evaluate(() => { window.game.duelMode = true; window.game.hud.buildDeckStrip(); });
+  const eighty = await A.waitForFunction(() => document.querySelectorAll('#deckStrip img').length === 22,
+    null, { timeout: 60000 }).then(() => 22).catch(() => -1);
+  check(eighty === 22, `the other deck prints all of itself too (${eighty} faces)`);
+  const swapped = await A.evaluate(() =>
+    document.querySelector('#deckStrip .deckCard[data-id="barrel"] img')?.src.length || 0);
+  check(swapped > 0 && swapped !== freeBarrel,
+    'and the card both decks have is the right one of the two');
+  await A.evaluate(() => { window.game.duelMode = false; window.game.hud.buildDeckStrip(); });
+  await A.waitForFunction(() => document.querySelectorAll('#deckStrip .deckCard').length === 6,
+    null, { timeout: 20000 });
+
   // Settings: a change has to reach the running game and survive a reload.
   await A.click('#openSettings');
   const settingsOpen = await A.evaluate(() => !document.getElementById('settings').classList.contains('hidden'));

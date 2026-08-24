@@ -192,7 +192,7 @@ function press(target, drawInk, R) {
 // Engraving helpers
 // ---------------------------------------------------------------------------
 /** Fill a shape with parallel rules - the whole vocabulary of a wood cut. */
-function hatch(g, shape, angle, gap, lw = 1.6, alpha = 1) {
+export function hatch(g, shape, angle, gap, lw = 1.6, alpha = 1) {
   g.save();
   g.beginPath(); shape(g); g.clip();
   g.globalAlpha = alpha;
@@ -866,7 +866,18 @@ const PIP = {
 // ---------------------------------------------------------------------------
 // The press run
 // ---------------------------------------------------------------------------
-function printFace(id, def) {
+/**
+ * One card, whichever deck it came out of. The six information cards and the
+ * eighty of the turn mode are different games, but they came off the same press
+ * in the same year in the same town, so they are the same object: same paper,
+ * same window, same two-colour drift, same trimmed corners.
+ *
+ * `spec` is { id, name, rules, flavour, cut, pip, fit } - everything the plate
+ * cannot work out for itself.
+ */
+export function plate(spec) {
+  const id = spec.id;
+  const def = spec;
   const R = rng(seedOf(id));
   const c = mk(W, H);
   const g = c.getContext('2d');
@@ -892,30 +903,38 @@ function printFace(id, def) {
     k.lineTo(W / 2, 178); k.closePath(); k.fill();
 
     // The cut, dropped into the card's picture window.
-    const f = FIT[id];
+    const f = spec.fit || { s: 1, x: 0, y: 0 };
     k.save();
     k.beginPath(); k.rect(WIN.x, WIN.y, WIN.w, WIN.h); k.clip();
-    k.translate(300 + f.x, 400 + f.y);
-    k.scale(f.s, f.s);
+    k.translate(300 + (f.x || 0), 400 + (f.y || 0));
+    k.scale(f.s || 1, f.s || 1);
     k.translate(-300, -400);
-    CUT[id](k, R);
+    if (spec.cut) spec.cut(k, R);
     k.restore();
 
     // Rules text, in the small print at the foot of the card.
     k.beginPath(); k.moveTo(96, 622); k.lineTo(W - 96, 622); k.stroke();
-    const n = wrap(k, def.rules, W / 2, 658, 424, 28, 21);
-    k.save();
-    k.globalAlpha = 0.72;
-    wrap(k, def.flavour, W / 2, 668 + n * 27, 400, 22, 17, 'italic');
-    k.restore();
+    const n = wrap(k, def.rules || '', W / 2, 658, 424, 28, 21);
+    if (def.flavour) {
+      k.save();
+      k.globalAlpha = 0.72;
+      wrap(k, def.flavour, W / 2, 668 + n * 27, 400, 22, 17, 'italic');
+      k.restore();
+    }
 
     // Corner marks, one upright and one turned, like a real index.
-    for (const [x, y, rot] of [[62, 62, 0], [W - 62, H - 62, Math.PI]]) {
-      k.save(); k.translate(x, y); k.rotate(rot); PIP[id](k); k.restore();
+    if (spec.pip) {
+      for (const [x, y, rot] of [[62, 62, 0], [W - 62, H - 62, Math.PI]]) {
+        k.save(); k.translate(x, y); k.rotate(rot); spec.pip(k); k.restore();
+      }
     }
   }, R);
 
   return trim(c, R);
+}
+
+function printFace(id, def) {
+  return plate({ ...def, id, cut: CUT[id], pip: PIP[id], fit: FIT[id] });
 }
 
 function printBack() {
@@ -1008,6 +1027,23 @@ export function cardUrl(id) {
   cache.set(key, url);
   // The plate has been run; from here the card only ever exists as an image.
   cache.delete(id);
+  c.width = c.height = 0;
+  return url;
+}
+
+/**
+ * Print something once and keep only the image, the same way the six do. Any
+ * other deck in this client hands its own plate spec in here and gets the same
+ * paper, the same WebP economy and the same one-run-per-session guarantee.
+ */
+export function plateUrl(key, build) {
+  const k = `url:${key}`;
+  if (cache.has(k)) return cache.get(k);
+  const c = build();
+  let url = '';
+  try { url = c.toDataURL('image/webp', 0.92); } catch { url = ''; }
+  if (!url.startsWith('data:image/webp')) url = c.toDataURL('image/png');
+  cache.set(k, url);
   c.width = c.height = 0;
   return url;
 }

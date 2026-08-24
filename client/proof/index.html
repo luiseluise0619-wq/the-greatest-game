@@ -8,6 +8,9 @@
   The press proof. Open /proof/ while the server is running to see every card
   face at full size; this is how the deck in client/js/cardart.js was tuned, and
   it is the fastest way to check a change to it. /proof/?c=witness prints one.
+
+  /proof/?deck=duel is the other deck - the eighty of the turn mode, out of
+  client/js/duelart.js, on the same press.
 -->
 <style>
   body { margin: 0; background: #17120e; color: #b8a586; font: 12px "Courier New", monospace; padding: 16px; }
@@ -18,16 +21,31 @@
 </style>
 </head>
 <body>
-<h1>THE DECK — PROOF SHEET</h1>
+<h1 id="head">THE DECK — PROOF SHEET</h1>
 <div id="sheet"></div>
 <script type="module">
   import { CARDS, CARD_ORDER } from '../../shared/constants.js';
-  import { useDefs, cardCanvas } from '../js/cardart.js';
+  import { DUEL_CARDS, DUEL_CARD_ORDER } from '../../shared/deck.js';
+  import { useDefs, cardCanvas, plate } from '../js/cardart.js';
+  import { CUT, PIP, FIT } from '../js/duelart.js';
   useDefs(CARDS);
-  const only = new URLSearchParams(location.search).get('c');
+  const q = new URLSearchParams(location.search);
+  const only = q.get('c');
+  const duel = q.get('deck') === 'duel';
   if (only) document.body.classList.add('one');
-  const ids = only ? [only] : [...CARD_ORDER, 'back'];
-  for (const id of ids) document.getElementById('sheet').appendChild(cardCanvas(id));
+  const sheet = document.getElementById('sheet');
+  if (duel) {
+    document.getElementById('head').textContent = 'THE EIGHTY — PROOF SHEET';
+    for (const id of (only ? [only] : DUEL_CARD_ORDER)) {
+      const d = DUEL_CARDS[id];
+      sheet.appendChild(plate({
+        id: `duel:${id}`, name: d.name, rules: d.rules, flavour: d.flavour,
+        cut: CUT[id], pip: PIP[id], fit: FIT[id],
+      }));
+    }
+  } else {
+    for (const id of (only ? [only] : [...CARD_ORDER, 'back'])) sheet.appendChild(cardCanvas(id));
+  }
   window.__ready = true;
 </script>
 </body>

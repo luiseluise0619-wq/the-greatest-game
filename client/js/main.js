@@ -501,7 +501,11 @@ class Game {
         // Which of the two games this town plays. Known before the deal, which
         // is when it is worth knowing: the manual is read in the lobby.
         if (msg.mode) {
+          // The strip is built before the first packet arrives, so it is built
+          // out of the wrong deck until this lands. Once is enough.
+          const was = this.duelMode;
           this.duelMode = msg.mode === 'duel';
+          if (was !== this.duelMode) this.hud.buildDeckStrip();
           const lob = $('lobbyRules');
           if (lob) {
             lob.classList.toggle('duel', this.duelMode);

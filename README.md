@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 176 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 177 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 ```
@@ -142,8 +142,11 @@ crosshair.
 
 Every effect is the original's, because a game system is not anybody's property.
 Not one sentence of the rules text is: everything on those cards was written for
-this project, and the faces are printed at runtime by `cardart.js` like
-everything else here. No artwork has ever been in this repository.
+this project, and all twenty-two faces are cut in `client/js/duelart.js` and
+printed at runtime on the same press as the other six — same paper, same picture
+window, same two-colour drift, same trimmed corners. No image file has ever been
+in this repository. `/proof/?deck=duel` prints the sheet while the server is
+running, which is how the blocks were cut.
 
 Distances are the one thing that had to be reinvented rather than copied. The
 original seats everybody round a table and counts chairs; here there are no
@@ -297,7 +300,8 @@ is ours.
 
 ### The cards are printed, not drawn
 
-There are no image files here either. `client/js/cardart.js` is a small printing
+There are no image files here either — twenty-eight card faces and not one of
+them is a file. `client/js/cardart.js` is a small printing
 press: it lays down rag paper (pulp blotches, fibres, foxing, a glass ring,
 handled edges), engraves a wood cut for each card in the hatching vocabulary an
 1880s job printer had, sets the type, and then presses the whole ink layer onto
@@ -311,11 +315,20 @@ the paper. Three details do most of the work:
 - every card is **seeded from its own id**, so a given card is always the same
   physical object and never shimmers between redraws.
 
+`client/js/duelart.js` cuts the other twenty-two blocks — the turn mode's deck —
+and runs them off on that same press, so the two decks are the same object: same
+paper, same picture window, same drift, same trimmed corners. Nothing in either
+is anybody's artwork. What is drawn is what the card *does*, worked out from
+scratch: the one that makes a man throw something away is a card torn in half,
+which is not a design anybody owns, it is what the words say. Six of the
+twenty-two are the same gun with a different barrel on it, and are one function.
+
 Each face is about 30ms of canvas work and is printed once, in idle time while
 you are still in the lobby, then kept as a WebP data URL (~120KB, against 1.4MB
 for the same face as a PNG). Open **`/proof/`** while the server is running to
-see the whole sheet at full size — that page is how the deck was tuned, and
-`/proof/?c=witness` prints a single card.
+see the whole sheet at full size — that page is how both decks were cut.
+`/proof/?c=witness` prints a single card and `/proof/?deck=duel` prints the
+eighty.
 
 ---
 
@@ -510,8 +523,9 @@ client/     js/main.js    networking, local movement, input, render loop
             js/audio.js   every sound synthesised in WebAudio, no files
             js/hud.js     HUD, feed, role card, your hand, scoreboard, results
             js/cardart.js the printing press: every card face drawn onto a canvas
+            js/duelart.js the blocks for the eighty, run off on the same press
             js/settings.js local preferences, guarded against blocked storage
-            proof/        /proof/ - the deck at full size, for tuning cardart.js
+            proof/        /proof/ - either deck at full size, for cutting blocks
 tools/      balance.mjs   headless bot rounds -> win split, pace, crossfire share
 ```
 
@@ -553,7 +567,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 176 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 177 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -707,9 +721,9 @@ there to be read when a bot change lands, not to gate anything, because win
 shares under fifty rounds say whatever they like.
 
 `npm run test:browser` drives a real Chromium through a whole round with two
-players — lobby, room codes, the manual, the deck printed face up, the role card,
+players — lobby, room codes, the manual, both decks printed face up, the role card,
 the hand dealt and a card played, and on to the aftermath screen where the
-round's cards are finally named — seventy checks, watching for console errors and
+round's cards are finally named — seventy-two checks, watching for console errors and
 server noise the whole way.
 It also measures the HUD rather than trusting it: nothing may run off the edge
 of the window, no word may be written over the town without a shadow under it

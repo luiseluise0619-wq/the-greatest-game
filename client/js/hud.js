@@ -7,7 +7,8 @@ import {
 } from '../../shared/constants.js';
 import { useDefs, cardUrl } from './cardart.js';
 import { placePhrase } from '../../shared/map.js';
-import { DUEL_CARDS } from '../../shared/deck.js';
+import { DUEL_CARDS, DUEL_CARD_ORDER } from '../../shared/deck.js';
+import { duelCardUrl } from './duelart.js';
 
 useDefs(CARDS);
 
@@ -139,22 +140,46 @@ export class HUD {
   buildDeckStrip() {
     const strip = $('deckStrip');
     if (!strip) return;
-    strip.innerHTML = CARD_ORDER.map((id) => {
-      const c = CARDS[id];
-      return `<figure class="deckCard" data-id="${id}" title="${escapeHtml(this.t(`card.${id}.desc`, c.desc))}">
+    // Whichever deck this town is playing with. Twenty-two plates is a lot of
+    // press work, so it is still one card per idle slice - the strip fills in
+    // while somebody is picking a gunhand, which is what the lobby is for.
+    const duel = !!this.game.duelMode;
+    const order = duel ? DUEL_CARD_ORDER : CARD_ORDER;
+    const defs = duel ? DUEL_CARDS : CARDS;
+    const url = duel ? duelCardUrl : cardUrl;
+    // Four whole literal keys rather than two built out of parts, so the suite
+    // can still see which keys this file asks for. It reads worse and catches
+    // a rename, which is the trade every key in this project makes.
+    const name = (id, english) => (duel
+      ? this.t(`duel.${id}.name`, english) : this.t(`card.${id}.name`, english));
+    const rulesOf = (id, english) => (duel
+      ? this.t(`duel.${id}.rules`, english) : this.t(`card.${id}.rules`, english));
+    strip.classList.toggle('eighty', duel);
+    strip.innerHTML = order.map((id) => {
+      const c = defs[id];
+      const rules = rulesOf(id, c.rules || c.desc);
+      return `<figure class="deckCard" data-id="${id}" title="${escapeHtml(rules)}">
         <span class="deckSlot"></span>
-        <figcaption>${escapeHtml(this.t(`card.${id}.name`, c.name))}
-          <em>${escapeHtml(this.t(`card.${id}.rules`, c.rules))}</em></figcaption></figure>`;
+        <figcaption>${escapeHtml(name(id, c.name))}
+          <em>${escapeHtml(rules)}</em></figcaption></figure>`;
     }).join('');
-    const queue = [...CARD_ORDER];
+    // A run of the press, so the one before it stops. The strip is built once
+    // at boot out of whichever deck the client guessed and again when the
+    // server says which town this is - and the old run's idle queue was still
+    // dropping faces into the new strip, which the two decks sharing the id
+    // "barrel" made visible: the turn mode's lobby printed a Rain Barrel.
+    this.deckRun = (this.deckRun || 0) + 1;
+    const run = this.deckRun;
+    const queue = [...order];
     const next = () => {
+      if (run !== this.deckRun) return;
       const id = queue.shift();
       if (!id) return;
       const slot = strip.querySelector(`.deckCard[data-id="${id}"] .deckSlot`);
       if (slot) {
         const img = document.createElement('img');
-        img.src = cardUrl(id);
-        img.alt = CARDS[id].name;
+        img.src = url(id);
+        img.alt = defs[id].name;
         slot.replaceWith(img);
       }
       if (typeof requestIdleCallback === 'function') requestIdleCallback(next, { timeout: 900 });
@@ -618,7 +643,11 @@ export class HUD {
       box.innerHTML = this.duel.hand.map((id, i) => {
         const c = DUEL_CARDS[id];
         if (!c) return '';
-        return `<div class="handCard noFace">
+        // The role card is the one quiet moment there is time to look at a
+        // face, so this is where the plate goes rather than the HUD, where a
+        // hundred-pixel card is a smudge and the words are the whole point.
+        return `<div class="handCard duelHandCard">
+          <img src="${duelCardUrl(id)}" alt="${escapeHtml(c.name)}">
           <div class="handText">
             <h5><span>${escapeHtml(this.t(`duel.${id}.name`, c.name))}</span><em>${i + 1}</em></h5>
             <div class="handKind">${escapeHtml(this.t(`duel.kind.${c.kind}`, c.kind.toUpperCase()))}</div>

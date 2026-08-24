@@ -375,7 +375,10 @@ button.big { width: 100%; padding: 14px; font-size: 15px; letter-spacing: .22em;
 .deckLead { font-size: 12px; line-height: 1.6; color: rgba(232,217,189,.68); margin: 0 0 10px; }
 .deckLead b { background: rgba(200,180,140,.18); border: 1px solid rgba(200,180,140,.28); padding: 0 5px; color: var(--sand); }
 #deckStrip { display: grid; grid-template-columns: repeat(6, 1fr); gap: 9px; margin: 0 0 18px; }
-.deckCard { margin: 0; }
+/* min-width:0 or a nowrap caption inside a 1fr track pushes the track wider
+   than the grid, which is how twenty-two cards came out four thousand pixels
+   across. A grid track's floor is its content unless it is told otherwise. */
+.deckCard { margin: 0; min-width: 0; }
 .deckCard img, .deckCard .deckSlot {
   display: block; width: 100%; aspect-ratio: 5 / 7; border-radius: 4px;
   background: rgba(200,180,140,.07); border: 1px solid rgba(200,180,140,.14);
@@ -387,7 +390,17 @@ button.big { width: 100%; padding: 14px; font-size: 15px; letter-spacing: .22em;
   margin-top: 5px; font-size: 8.5px; letter-spacing: .07em; line-height: 1.3;
   color: rgba(232,217,189,.5); text-align: center;
 }
-@media (max-width: 900px) { #deckStrip { grid-template-columns: repeat(3, 1fr); } }
+/* Twenty-two of them rather than six, so they go smaller and the rules text
+   under each becomes a line of it - the whole card is on the manual page. */
+#deckStrip.eighty { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 7px; }
+#deckStrip.eighty figcaption { font-size: 8.5px; }
+#deckStrip.eighty figcaption em {
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+@media (max-width: 900px) {
+  #deckStrip { grid-template-columns: repeat(3, 1fr); }
+  #deckStrip.eighty { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 
 /* ------------------------------------------------------------- THE MANUAL
    Two columns on anything wide enough for two, one on a phone, and the
@@ -542,9 +555,10 @@ button.big { width: 100%; padding: 14px; font-size: 15px; letter-spacing: .22em;
   box-shadow: 0 4px 12px rgba(50, 32, 14, .38);
 }
 .handCard.live img { filter: saturate(.6) brightness(.92); box-shadow: 0 0 0 2px rgba(150,100,30,.55); }
-/* The eighty are not printed yet, so their entry on the role card is the
-   rules text with a rule down the side where the face would be. */
-.handCard.noFace { border-left: 2px solid rgba(60,42,26,.3); padding-left: 9px; }
+/* Five of the eighty at once is a taller list than two of the six, so their
+   faces are printed smaller - it is a reading aid on that card, not the
+   showcase, which is the strip in the lobby. */
+#manual .handCard img, .duelHandCard img { width: 62px; }
 .handCard h5 {
   margin: 1px 0 4px; font-size: 12px; letter-spacing: .06em; color: #3c2a1a;
   display: flex; justify-content: space-between; align-items: baseline; gap: 6px;
