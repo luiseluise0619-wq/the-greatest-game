@@ -183,6 +183,7 @@
 
         <button id="startBtn" class="primary big" data-i18n="ui.deal">DEAL THE ROLES</button>
         <div id="menuStatus" class="muted" data-i18n="ui.connecting">connecting…</div>
+        <button id="openManual" class="ghost wide" data-i18n="ui.howToPlay">HOW THIS IS PLAYED</button>
         <button id="openSettings" class="ghost wide" data-i18n="ui.settings">SETTINGS</button>
       </section>
 
@@ -190,7 +191,7 @@
         <label class="fieldLabel" data-i18n="ui.pickGunhand">PICK YOUR GUNHAND</label>
         <div id="charGrid"></div>
 
-        <div class="rules">
+        <div class="rules" id="lobbyRules">
           <h3 data-i18n="ui.howItGoes">HOW A ROUND GOES</h3>
           <ul>
             <li data-i18n-html="rules.secret"><b>Roles are secret.</b> Sheriff, Deputies, Outlaws, one Renegade. Nobody is told who anybody is.</li>
@@ -198,15 +199,23 @@
             <li data-i18n-html="rules.kills"><b>Kills only name the killer if somebody watched it happen.</b> Everything else is a rumour and a location.</li>
             <li data-i18n-html="rules.dead"><b>The dead reveal their role.</b> Every body is evidence — for whoever is still standing.</li>
             <li data-i18n-html="rules.star"><b>The Sheriff may pin on the star</b> for real armour and a permanent target. Or stay a stranger.</li>
+            <li class="duelOnly" data-i18n-html="rules.turns"><b>You take it in turns.</b> Everybody walks at once, then one man
+            at a time gets six seconds with the only live gun in town — and nobody walks while he has it.</li>
+            <li class="duelOnly" data-i18n-html="rules.ammo"><b>Ammunition is cards.</b> You cannot fire without a Bang! in your
+            hand, your gun reaches exactly as far as the card in front of you says, and the chamber the
+            whole town is drawing from has blanks in it.</li>
           </ul>
-          <h3 data-i18n="ui.theDeck">THE DECK</h3>
-          <p class="deckLead" data-i18n-html="ui.deckLead">Two of these six are dealt to you every round, and nobody is ever told
+          <p class="duelOnly manLead" data-i18n-html="ui.manLead">All of it is written out properly under
+          <b>HOW THIS IS PLAYED</b>, and <b>F1</b> opens it again once the round has started.</p>
+
+          <h3 class="freeOnly" data-i18n="ui.theDeck">THE DECK</h3>
+          <p class="deckLead freeOnly" data-i18n-html="ui.deckLead">Two of these six are dealt to you every round, and nobody is ever told
           what anybody else is holding. None of them shoot — they edit what the town is allowed to
           know. Play one with <b>Z</b> or <b>X</b>.</p>
-          <div id="deckStrip"></div>
+          <div id="deckStrip" class="freeOnly"></div>
 
-          <h3 data-i18n="ui.controls">CONTROLS</h3>
-          <div class="keys">
+          <h3 class="freeOnly" data-i18n="ui.controls">CONTROLS</h3>
+          <div class="keys freeOnly">
             <span data-i18n-html="key.move"><b>WASD</b> move</span><span data-i18n-html="key.sprint"><b>Shift</b> sprint</span><span data-i18n-html="key.crouch"><b>Ctrl</b> crouch</span>
             <span data-i18n-html="key.jump"><b>Space</b> jump</span><span data-i18n-html="key.fire"><b>LMB</b> fire</span><span data-i18n-html="key.aim"><b>RMB</b> aim (rifle)</span>
             <span data-i18n-html="key.reload"><b>R</b> reload</span><span data-i18n-html="key.guns"><b>1 2 3</b> guns</span><span data-i18n-html="key.dynamite"><b>G</b> dynamite</span>
@@ -230,6 +239,91 @@
 </div>
 
 <!-- ===================== SETTINGS ===================== -->
+<!-- ===================== THE MANUAL =====================
+     Everything a man needs to know before the bell, in the order he needs it.
+     Two games are in this repository and they have almost nothing in common,
+     so the sections are marked and only the ones for tonight's game are up. -->
+<div id="manual" class="overlay hidden">
+  <div class="panel wide" id="manualPanel">
+    <h2 data-i18n="man.title">HOW THIS IS PLAYED</h2>
+    <p class="muted small" data-i18n="man.sub">Read it now. Nobody stops for questions once the bell has rung.</p>
+
+    <div class="manGrid">
+      <section class="manCol">
+        <h3 data-i18n="man.pointTitle">WHAT YOU ARE TRYING TO DO</h3>
+        <p data-i18n-html="man.point"><b>Roles are secret and they decide everything.</b> The <b>Sheriff</b> wants
+        the town clean. His <b>Deputies</b> want him alive, and he does not know who they are.
+        The <b>Outlaws</b> want the Sheriff dead. The <b>Renegade</b> wants to be the last man
+        standing, which means he needs the Outlaws gone <i>and</i> the Sheriff dead — last.</p>
+        <p data-i18n-html="man.thread"><b>Everybody gets one thread to pull.</b> A Deputy learns two names,
+        one of which is the Sheriff. An Outlaw recognises a single accomplice. The Sheriff
+        knows nothing at all. Everything else you work out by watching who shoots whom.</p>
+        <p data-i18n-html="man.witness"><b>A killing only names the killer if somebody watched it happen.</b>
+        Otherwise the town gets a shot, a direction and a rumour. The dead turn their role
+        face up, which makes every body a piece of evidence for whoever is still standing.</p>
+
+        <h3 class="duelOnly" data-i18n="man.lapTitle">A LAP</h3>
+        <p class="duelOnly" data-i18n-html="man.lap">A round is laps, and a lap is two things. First
+        <b>everybody walks at once</b> and nobody can shoot: fifteen seconds to pick your
+        ground. Then <b>one man at a time gets his go</b>, six seconds each, in an order the
+        whole town was shown at the start — and while anybody has a go, <b>nobody walks</b>.
+        You can still look around. That is most of what you do on somebody else's go.</p>
+
+        <h3 class="duelOnly" data-i18n="man.fireTitle">WHAT IT TAKES TO FIRE</h3>
+        <p class="duelOnly" data-i18n-html="man.fire">Three things, all at once. It has to be
+        <b>your go</b>. You have to be holding a <b>Bang!</b> — one a turn, and it is spent whether
+        or not you hit anything. And the man has to be <b>inside what your gun reaches</b>,
+        which is the card lying in front of you, not the sights.</p>
+        <p class="duelOnly" data-i18n-html="man.draw">Then you have to <b>hold the barrel on him</b> for
+        most of a second before it will go off. That is the draw, and it is the only warning
+        he gets. Anybody watching you can see who you have picked.</p>
+      </section>
+
+      <section class="manCol">
+        <h3 class="duelOnly" data-i18n="man.chamberTitle">THE CHAMBER</h3>
+        <p class="duelOnly" data-i18n-html="man.chamber">There is <b>one chamber for the whole town</b>. It is
+        loaded at the start of every lap and announced out loud — so many live, so many
+        blank, never the order — and <b>every shot anybody fires draws the next round</b>.
+        Six people spend the lap counting the same six rounds. A blank is smoke and noise,
+        and it still costs the card.</p>
+
+        <h3 class="duelOnly" data-i18n="man.aimedTitle">WHEN IT STOPS ON YOU</h3>
+        <p class="duelOnly" data-i18n-html="man.aimed">The screen tells you a barrel has settled on you and
+        you have the length of his draw. Press <b>Space</b> and you are not standing where he
+        thought — but it spends a <b>Missed!</b> out of your hand, and only works if you had one.
+        Nobody spends it for you. It is the only move anybody makes on somebody else's go.</p>
+
+        <h3 class="duelOnly" data-i18n="man.selfTitle">THE BARREL TURNED ROUND</h3>
+        <p class="duelOnly" data-i18n-html="man.self">On your own go you may put it against your own head
+        with <b>Q</b>. A blank buys you another go on the spot. A live round costs you a hit and
+        <b>carries on out of your back</b> into whoever chose to stand in line behind you. Which
+        is why where everybody stood during the walk is worth looking at.</p>
+
+        <h3 class="duelOnly" data-i18n="man.cardsTitle">THE EIGHTY</h3>
+        <p class="duelOnly" data-i18n-html="man.cards">Your hand is the size of your health, and you draw
+        two at the start of every go — so the closer you are to dying, the less you can do
+        about it. Play one with the <b>number key printed on it</b>. Some need somebody in your
+        crosshair first. <b>Bang!</b> and <b>Missed!</b> are not played with a key: one is fired and
+        one is spent for you when you move.</p>
+
+        <h3 class="freeOnly" data-i18n="man.deckTitle">THE DECK</h3>
+        <p class="freeOnly" data-i18n-html="man.deck">Two of six cards are dealt to you every round and
+        nobody is ever told what anybody else holds. None of them shoot — they edit what the
+        town is allowed to know. Play one with <b>Z</b> or <b>X</b>.</p>
+
+        <h3 data-i18n="man.starTitle">THE STAR</h3>
+        <p data-i18n-html="man.star">The Sheriff may pin it on at any time with <b>B</b>. It is real armour
+        and a permanent target, and it cannot be taken off again. Staying a stranger is the
+        other half of the job.</p>
+      </section>
+    </div>
+
+    <h3 data-i18n="ui.controls">CONTROLS</h3>
+    <div class="keys" id="manKeys"></div>
+    <button id="manClose" class="primary wide" data-i18n="man.close">BACK</button>
+  </div>
+</div>
+
 <div id="settings" class="overlay hidden">
   <div class="panel">
     <h2 data-i18n="set.title">SETTINGS</h2>

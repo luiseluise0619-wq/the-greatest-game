@@ -1787,6 +1787,9 @@ export class Room {
     this.broadcast({
       t: S.LOBBY, players: list, botTarget: this.botFillTarget,
       min: MIN_PLAYERS, max: MAX_PLAYERS, phase: this.phase,
+      // Which game this town is playing. The two have different rules, and a
+      // manual that describes the wrong one is worse than no manual.
+      mode: this.mode,
       startsIn: this.lobbyStartAt ? Math.max(0, Math.ceil(this.lobbyStartAt - now())) : 0,
     });
   }

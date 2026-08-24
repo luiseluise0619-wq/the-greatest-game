@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 175 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 176 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 ```
@@ -73,6 +73,82 @@ standing**, updated every tick, flashing when it drops.
 
 The Sheriff dying ends the round immediately — the gang wins, unless the Renegade
 is the only one left, in which case the Renegade takes it.
+
+---
+
+## The turn mode
+
+There are two games in this repository. **The turn mode is the one a town plays
+by default**; the free-for-all everything above describes is still here and still
+tested, and `HNH_MODE=free npm start` runs it.
+
+The turn mode is the card game this project has always been shaped like, played
+from inside a first-person town. A card game rations who may act by going round
+a table. There is no table in a first-person game and eight people are moving at
+once, so what gets rationed is **the trigger**, not the feet — and a round
+alternates between everybody walking at once and nobody walking at all.
+
+Everything in the manual is on screen too: **HOW THIS IS PLAYED** in the lobby,
+**F1** once the round has started, in English or Korean.
+
+### A lap
+
+| | Length | What happens |
+|---|---|---|
+| **The walk** | 15s | Nobody can shoot. Everybody picks their ground. The chamber is loaded and announced |
+| **A go** | 6s each | One man at a time, in an order the whole town was shown. Nobody walks — you can still look about |
+
+### What it takes to fire
+
+Three things at once, and every one of them is a decision somebody else can see:
+
+- **It has to be your go.** One gun is live at a time. A shot fired out of turn
+  does nothing at all and does not even cost ammunition.
+- **You have to be holding a `Bang!`** — one a turn, spent whether or not it
+  hits. Ammunition is cards.
+- **He has to be inside what your gun reaches**, and that is the card lying in
+  front of you rather than the sights. The belt gun everyone starts with reaches
+  22 metres; a Winchester reaches five times that.
+
+Then the barrel has to **stay on him for most of a second** before it will go
+off. That is the draw, and it is the only warning he gets — which is what makes
+the card in his hand a decision rather than a deduction. It only saves him if he
+saw it coming and pressed **Space**, and it spends a `Missed!` out of his hand to
+do it. Nobody spends it for him. It is the only move anybody makes on somebody
+else's go.
+
+### The chamber
+
+There is **one chamber for the whole town**. It is loaded at the start of every
+lap and announced in the open — so many live, so many blank, never the order —
+and **every shot anybody fires draws the next round**. Six people spend the lap
+counting the same six rounds. A blank is smoke and noise and it still costs the
+card.
+
+On your own go you may put the barrel against your own head with **Q**. A blank
+buys you another go on the spot. A live round costs you a hit and **carries on
+out of your back** into whoever chose to stand in line behind you. Which is why
+where everybody stood during the walk is worth looking at.
+
+### The eighty
+
+The deck is `shared/deck.js`: eighty cards in the same proportions the game this
+is modelled on prints them in — twenty-five `Bang!`, twelve `Missed!`, six
+`Beer`, one `Gatling`, and so on down to the single `Dynamite`. Your hand is the
+size of your health and you draw two at the start of every go, so **the closer
+you are to dying the less you can do about it**. Play one with the number key
+printed on it; the ones that need somebody in mind take whoever is in your
+crosshair.
+
+Every effect is the original's, because a game system is not anybody's property.
+Not one sentence of the rules text is: everything on those cards was written for
+this project, and the faces are printed at runtime by `cardart.js` like
+everything else here. No artwork has ever been in this repository.
+
+Distances are the one thing that had to be reinvented rather than copied. The
+original seats everybody round a table and counts chairs; here there are no
+chairs, so a "distance" is 22 metres of actual ground, and whether you are inside
+it is decided by where you chose to stand during the walk.
 
 ---
 
@@ -477,7 +553,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 175 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 176 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -576,7 +652,11 @@ They are grouped by what they protect:
   to have seen it, that the card in his hand only saves him if he saw it and
   moved, and that pointing it at your own head buys another go on a click and
   costs two men a hit on a live round — you, and whoever chose to stand in the
-  line behind you.
+  line behind you. Two of these were passing against a game that was not
+  applying them: nothing that comes out of a gun says "shot" — it says
+  "revolver" — so the chamber, the range, the barrel and the card in his hand
+  applied to the tests and to nothing else; and a coach gun's nine pellets took
+  nine hits off one man for the single Bang! that paid for them.
 - **`test/deck.test.js`** — the eighty cards: that the deck is printed in the
   right proportions, that a hand is dealt the size of your health and shrinks
   with it, that ammunition is cards and one of them is a turn, that a gun
@@ -627,9 +707,10 @@ there to be read when a bot change lands, not to gate anything, because win
 shares under fifty rounds say whatever they like.
 
 `npm run test:browser` drives a real Chromium through a whole round with two
-players — lobby, room codes, the deck printed face up, the role card, the hand
-dealt and a card played, and on to the aftermath screen where the round's cards
-are finally named — checking for console errors and server noise the whole way.
+players — lobby, room codes, the manual, the deck printed face up, the role card,
+the hand dealt and a card played, and on to the aftermath screen where the
+round's cards are finally named — seventy checks, watching for console errors and
+server noise the whole way.
 It also measures the HUD rather than trusting it: nothing may run off the edge
 of the window, no word may be written over the town without a shadow under it
 or something opaque behind it, and no two tiles of the shout wheel may sit on

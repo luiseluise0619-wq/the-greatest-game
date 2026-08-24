@@ -105,6 +105,41 @@ try {
     null, { timeout: 40000 }).then(() => 6).catch(() => -1);
   check(deck === 6, `the deck is on show in the lobby (${deck} faces)`);
 
+  // The manual. It carries both games and has to show exactly one of them -
+  // this suite runs the free-for-all, so the turn-mode half must be down.
+  await A.click('#openManual');
+  const man = await A.evaluate(() => {
+    const el = document.getElementById('manual');
+    const panel = document.getElementById('manualPanel');
+    const up = (sel) => [...document.querySelectorAll(sel)].filter((n) => n.offsetParent !== null).length;
+    return {
+      open: !el.classList.contains('hidden'),
+      free: up('#manual .freeOnly'), duel: up('#manual .duelOnly'),
+      keys: [...document.querySelectorAll('#manKeys span')].map((n) => n.textContent),
+      fits: panel.scrollHeight <= panel.clientHeight + 2,
+      words: (document.querySelector('.manGrid')?.textContent || '').trim().split(/\s+/).length,
+    };
+  });
+  check(man.open, 'the manual opens from the lobby');
+  check(man.free > 0 && man.duel === 0,
+    `and only carries the game being played (${man.free} for it, ${man.duel} against)`);
+  check(man.words > 150, `and there is something in it to read (${man.words} words)`);
+  check(man.keys.some((k) => k.startsWith('Z X')) && !man.keys.some((k) => k.startsWith('1…9')),
+    'the keys listed are this mode\'s keys');
+  check(man.fits, 'the whole manual is on one screen at this size');
+  await A.screenshot({ path: `${SHOTS}/01c-manual.png` });
+  await A.keyboard.press('Escape');
+  const manShut = await A.evaluate(() => ({
+    manual: document.getElementById('manual').classList.contains('hidden'),
+    settings: !document.getElementById('settings').classList.contains('hidden'),
+  }));
+  check(manShut.manual && !manShut.settings,
+    'Escape closes it without opening the settings underneath');
+  await A.keyboard.press('F1');
+  check(await A.evaluate(() => !document.getElementById('manual').classList.contains('hidden')),
+    'and F1 brings it back');
+  await A.click('#manClose');
+
   // Settings: a change has to reach the running game and survive a reload.
   await A.click('#openSettings');
   const settingsOpen = await A.evaluate(() => !document.getElementById('settings').classList.contains('hidden'));

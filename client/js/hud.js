@@ -57,7 +57,57 @@ export class HUD {
     if (this.selfRole) this.setRole(this.selfRole);
     if (this.duel) { this.renderRoleCards(); this.setDuel(this.duel); }
     if (this.turn) this.setTurn(this.turn);
+    this.buildManualKeys(this.game.duelMode);
     if (this.chamberLeft != null) this.setChamber({ left: this.chamberLeft, ...(this.chamberMix || {}) });
+  }
+
+  /**
+   * The keys, for the game being played. The two modes disagree about what
+   * half the number row does and about whether you can walk, so printing one
+   * list for both would be printing a wrong one for each.
+   */
+  buildManualKeys(duel) {
+    const box = $('manKeys');
+    if (!box) return;
+    const common = [
+      ['key.move', 'WASD', 'move'],
+      ['key.pickup', 'E', 'pick up'],
+      ['key.callout', 'F', 'call out'],
+      ['key.shout', 'V', 'shout'],
+      ['key.chat', 'T', 'chat'],
+      ['key.table', 'Tab', 'table'],
+      ['key.hand', 'H', 'your hand'],
+      ['key.star', 'B', 'pin the star'],
+      ['key.manual', 'F1', 'this page'],
+      ['key.settings', 'Esc', 'settings'],
+    ];
+    // Q is the ability in one game and the barrel turned round in the other,
+    // and Space is a jump in one and getting out of the way in the other.
+    const duelKeys = [
+      ['man.key.fire', 'LMB', 'fire — once the barrel has been on him a moment'],
+      ['man.key.cards', '1…9', 'play a card'],
+      ['man.key.brace', 'Space', 'get out of the way'],
+      ['man.key.self', 'Q', 'turn it on yourself'],
+    ];
+    const freeKeys = [
+      ['key.ability', 'Q', 'ability'],
+      ['key.sprint', 'Shift', 'sprint'],
+      ['key.crouch', 'Ctrl', 'crouch'],
+      ['key.jump', 'Space', 'jump'],
+      ['key.fire', 'LMB', 'fire'],
+      ['key.aim', 'RMB', 'aim (rifle)'],
+      ['key.reload', 'R', 'reload'],
+      ['key.guns', '1 2 3', 'guns'],
+      ['key.dynamite', 'G', 'dynamite'],
+      ['key.card', 'Z X', 'play a card'],
+    ];
+    const rows = duel ? [...duelKeys, ...common] : [...freeKeys, ...common];
+    box.innerHTML = rows.map(([key, cap, what]) => {
+      // The cap is a key on a keyboard and does not translate; the word beside
+      // it is the whole of what a manual is for and does.
+      const said = this.t(key, `<b>${cap}</b> ${what}`);
+      return `<span>${said}</span>`;
+    }).join('');
   }
 
   buildCharacterGrid() {

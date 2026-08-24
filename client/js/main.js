@@ -40,6 +40,8 @@ class Game {
     this.turn = null;
     this.turnDeadline = 0;
     this.duel = null;
+    this.duelMode = false;
+    this.manualOpen = false;
     this.aimedOn = false;
     this.inGame = false;
     this.views = new Map();
@@ -286,6 +288,27 @@ class Game {
     $('setClose').onclick = () => this.showSettings(false);
     $('setReset').onclick = () => { this.settings.reset(); this.syncSettingsPanel(); };
     $('openSettings').onclick = () => this.showSettings(true);
+    $('openManual').onclick = () => this.showManual(true);
+    $('manClose').onclick = () => this.showManual(false);
+  }
+
+  /**
+   * The manual. Two games live in this client and they share almost nothing,
+   * so it carries both and puts up the one this town is playing - a manual
+   * describing the wrong game is worse than no manual at all.
+   */
+  showManual(show) {
+    this.manualOpen = show;
+    const el = $('manual');
+    if (show) {
+      el.classList.toggle('duel', !!this.duelMode);
+      el.classList.toggle('free', !this.duelMode);
+      this.hud.buildManualKeys(!!this.duelMode);
+      el.scrollTop = 0;
+      const panel = $('manualPanel');
+      if (panel) panel.scrollTop = 0;
+    }
+    el.classList.toggle('hidden', !show);
   }
 
   /** Push the stored values back into the controls, after a reset. */
@@ -474,7 +497,19 @@ class Game {
         if (msg.token) writeToken(msg.token);
         this.setRoom(msg);
         break;
-      case S.LOBBY: this.hud.setLobby(msg); break;
+      case S.LOBBY:
+        // Which of the two games this town plays. Known before the deal, which
+        // is when it is worth knowing: the manual is read in the lobby.
+        if (msg.mode) {
+          this.duelMode = msg.mode === 'duel';
+          const lob = $('lobbyRules');
+          if (lob) {
+            lob.classList.toggle('duel', this.duelMode);
+            lob.classList.toggle('free', !this.duelMode);
+          }
+        }
+        this.hud.setLobby(msg);
+        break;
 
       case S.ROLE:
         this.selfRole = msg;
@@ -900,6 +935,14 @@ class Game {
       const k = e.code;
       if (this.keys.has(k)) return;
       this.keys.add(k);
+
+      // The manual is on top of everything, so it closes before anything else
+      // gets to read the key - including the settings panel underneath it.
+      if (this.manualOpen) {
+        if (k === 'Escape' || k === 'F1' || k === 'Slash') { e.preventDefault(); this.showManual(false); }
+        return;
+      }
+      if (k === 'F1') { e.preventDefault(); this.showManual(true); return; }
 
       // Escape works everywhere, including the menu. In game the browser eats
       // the first press to release the pointer lock, so this is the second one.

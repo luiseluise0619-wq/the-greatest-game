@@ -178,6 +178,36 @@ test('and a live one goes through you into whoever stood behind', () => {
   } finally { clock.restore(); }
 });
 
+test('the man on the end of it is told, and told when it moves off', () => {
+  // The warning is the whole reason the draw is slow. It travels on one packet
+  // to one player, so it is the one part of this that no amount of watching
+  // the room can prove - only what actually left the socket.
+  const { room, clock, all, stub } = town();
+  try {
+    const me = all.find((p) => !p.bot);
+    const gunman = all.find((p) => p.bot);
+    room.turn = { kind: 'turn', holder: gunman.id, endsAt: 1e12 };
+    gunman.pos = { x: 0, y: 0, z: 0 };
+    gunman.yaw = Math.PI; gunman.pitch = 0;      // looking down +z
+    me.pos = { x: 0, y: 0, z: 10 };
+    for (const p of all) if (p !== me && p !== gunman) p.pos = { x: 900, y: 0, z: 900 };
+    stub.reset();
+
+    room.stepAim(Date.now() / 1000);
+    const told = stub.last('aimed');
+    assert.ok(told, 'a barrel settled on him and nobody told him');
+    assert.equal(told.on, true);
+    assert.equal(told.by, gunman.id, 'and he was not told who');
+
+    // And when it comes off him he is told that too, or the warning never ends.
+    stub.reset();
+    gunman.yaw = 0;
+    room.stepAim(Date.now() / 1000 + 0.1);
+    const cleared = stub.last('aimed');
+    assert.ok(cleared && cleared.on === false, 'the gun moved off him and the warning stayed up');
+  } finally { clock.restore(); }
+});
+
 test('the rules apply to a fired gun, not only to the word for one', () => {
   // Every rule in this file hangs off one branch, and that branch was reading
   // the word "shot". Nothing that ever comes out of a gun says "shot": it says

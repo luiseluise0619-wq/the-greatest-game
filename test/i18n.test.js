@@ -29,7 +29,7 @@ function htmlKeys() {
 // while the game was quite happily using all of them.
 const NAMESPACES = ['ui', 'rules', 'key', 'set', 'hud', 'phase', 'role', 'faction',
   'char', 'card', 'sb', 'res', 'deny', 'boot', 'voice', 'loot', 'turn',
-  'cham', 'aim', 'duel'];
+  'cham', 'aim', 'duel', 'man'];
 const KEYISH = new RegExp(`^(?:${NAMESPACES.join('|')})\\.[\\w.]+$`);
 
 /** Every key the client asks for in code, literal or built from an id. */
