@@ -26,6 +26,7 @@ Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 npm test               # 193 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, needs playwright installed
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
+HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
 ```
 
 ## Playing with other people
@@ -90,6 +91,22 @@ alternates between everybody walking at once and nobody walking at all.
 
 Everything in the manual is on screen too: **HOW THIS IS PLAYED** in the lobby,
 **F1** once the round has started, in English or Korean.
+
+### The star is face up
+
+The one place the turn mode does **not** hide a role. The card game deals the
+Sheriff's card face up in front of him and everybody else's face down, and that
+is not a detail — it is the balance. The gang wins by killing one named man; the
+law wins by killing whoever is left. A gang that cannot see its target is
+shooting at random, and the law wins by attrition instead. Sixty rounds of the
+harness with the star hidden came out **law 67%, gang 28%**, and making the gang
+better at guessing pushed it to **75/23**, because the extra shooting killed more
+of them than of the law.
+
+So the star goes on at the deal, the Sheriff takes the first go of the round, and
+the other three roles stay exactly as hidden as they are everywhere else in this
+project. The free-for-all keeps its own version, where pinning it on is a
+decision and buys real armour.
 
 ### A lap
 
@@ -837,6 +854,37 @@ won by information. The knobs that control that balance, if you want to move it:
 - `TIMING` — phase lengths, including the public-lobby auto-start countdown
   (or the `HNH_*` env overrides: `HNH_PREP`, `HNH_COMBAT`, `HNH_ENDGAME`,
   `HNH_RESULTS`, `HNH_LOBBYCOUNTDOWN`).
+- `DUEL` in `shared/constants.js` — the turn mode's own numbers: the walk, the
+  length of a go, how many hits everybody has and how many the star has, how much
+  of the chamber is live, and how long a barrel must be steady before it fires.
+  `HNH_MODE=duel npm run balance -- 60` sweeps them, and every one of them is
+  overridable there (`HNH_REPOSITION`, `HNH_TURN`, `HNH_HEALTH`,
+  `HNH_SHERIFFHEALTH`, `HNH_LIVESHARE`, `HNH_DRAWTIME`).
+
+### The turn mode, over 60 rounds a setting
+
+The mode has one arithmetic problem and one number that fixes it. The gang wins
+by killing one man they can see; the law wins by killing whoever is left and has
+no idea who that is. In the card game the brake on that is the seating — a
+starting gun reaches the man next to you, so most of the gang physically cannot
+shoot the Sheriff for several turns. There are no seats here, and fifteen seconds
+of walk crosses this whole town, so the brake is gone.
+
+| Star's hits | The Law | Outlaws | Renegade |
+|---|---|---|---|
+| 5 (the card game's) | 27% | **68%** | 5% |
+| **7** | **45%** | 40% | 15% |
+| 9 | **67%** | 27% | 7% |
+
+So seven, and two more independent runs of sixty at that setting came out 48/45/7
+and 47/47/7. It is a deviation from the original and it is the price of taking
+the seats away.
+
+The other numbers from those runs, which are the ones to watch if the bots ever
+change: about **52 goes a round**, **29% of them ending in a shot**, **45% of
+shots finding somebody** — the rest split between a blank out of the shared
+chamber, a man out of range, and a man who saw it coming and spent the card. And
+between four and five men a round put the gun to their own head.
 
 Balance over **120 headless bot-only rounds** (`npm run balance -- 120`) sits at:
 

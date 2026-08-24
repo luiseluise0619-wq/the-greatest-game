@@ -65,7 +65,8 @@ test('all sixteen are dealt, and no two men get the same one', () => {
     assert.ok(hands.every((h) => GUNHANDS[h]), `somebody was dealt ${hands.find((h) => !GUNHANDS[h])}`);
     assert.equal(new Set(hands).size, hands.length, 'two men got the same gunhand');
     for (const p of fresh.players.values()) {
-      assert.equal(p.maxHealth, healthOf(p.gunhand, DUEL.health) + (p.role === 'sheriff' ? 1 : 0),
+      const star = p.role === 'sheriff' ? DUEL.sheriffHealth - DUEL.health : 0;
+      assert.equal(p.maxHealth, healthOf(p.gunhand, DUEL.health) + star,
         `${p.gunhand} started on the wrong number of hits`);
       assert.equal(p.duelHand.length, p.maxHealth, 'and was dealt the wrong number of cards');
     }

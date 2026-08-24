@@ -202,7 +202,8 @@
             <li data-i18n-html="rules.thread"><b>You get one thread to pull.</b> A Deputy learns two names, one of which is the Sheriff. An Outlaw recognises a single accomplice.</li>
             <li data-i18n-html="rules.kills"><b>Kills only name the killer if somebody watched it happen.</b> Everything else is a rumour and a location.</li>
             <li data-i18n-html="rules.dead"><b>The dead reveal their role.</b> Every body is evidence — for whoever is still standing.</li>
-            <li data-i18n-html="rules.star"><b>The Sheriff may pin on the star</b> for real armour and a permanent target. Or stay a stranger.</li>
+            <li class="freeOnly" data-i18n-html="rules.star"><b>The Sheriff may pin on the star</b> for real armour and a permanent target. Or stay a stranger.</li>
+            <li class="duelOnly" data-i18n-html="rules.starDuel"><b>The Sheriff wears the star from the bell.</b> He is the one man everybody can find, and the only role in this mode that is not a secret.</li>
             <li class="duelOnly" data-i18n-html="rules.turns"><b>You take it in turns.</b> Everybody walks at once, then one man
             at a time gets six seconds with the only live gun in town — and nobody walks while he has it.</li>
             <li class="duelOnly" data-i18n-html="rules.ammo"><b>Ammunition is cards.</b> You cannot fire without a Bang! in your
@@ -326,10 +327,17 @@
         nobody is ever told what anybody else holds. None of them shoot — they edit what the
         town is allowed to know. Play one with <b>Z</b> or <b>X</b>.</p>
 
-        <h3 data-i18n="man.starTitle">THE STAR</h3>
-        <p data-i18n-html="man.star">The Sheriff may pin it on at any time with <b>B</b>. It is real armour
+        <h3 class="freeOnly" data-i18n="man.starTitle">THE STAR</h3>
+        <p class="freeOnly" data-i18n-html="man.star">The Sheriff may pin it on at any time with <b>B</b>. It is real armour
         and a permanent target, and it cannot be taken off again. Staying a stranger is the
         other half of the job.</p>
+
+        <h3 class="duelOnly" data-i18n="man.starTitle">THE STAR</h3>
+        <p class="duelOnly" data-i18n-html="man.starDuel">The Sheriff wears it from the first bell —
+        the one role in this mode that is <b>not</b> a secret, and the one man everybody can find. He
+        takes the first go of the round and he has more hits in him than anybody else, and he needs
+        both: the gang knows exactly who to shoot and the law has no idea who to shoot back at.
+        Everybody else is as hidden as they are anywhere else.</p>
       </section>
     </div>
 

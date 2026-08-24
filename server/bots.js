@@ -8,7 +8,7 @@
 import {
   PLAYER, WEAPONS, CHARACTERS, CARDS, PHASE, VISION, DUEL, clamp, stepStamina, canSprint,
 } from '../shared/constants.js';
-import { DUEL_CARDS, DISTANCE_UNIT, inReach, reachOf } from '../shared/deck.js';
+import { DUEL_CARDS, DISTANCE_UNIT, inReach, reachOf, coverOf } from '../shared/deck.js';
 import MAP, { NAV_NODES, zoneAt, placeParts } from '../shared/map.js';
 import { moveAndCollide, lineOfSight } from '../shared/collision.js';
 
@@ -207,6 +207,8 @@ export class BotBrain {
     this.protecteeThreat = null;    // deputies remember who went for their man
     this.nextProbeAt = 0;
     this.nextDuelActAt = 0;
+    this.duelTurnKey = null;
+    this.gambled = false;
     this.braceRolled = false;
     this.braceAt = 0;
     // Nobody levels a gun for exactly as long as anybody else, so the moment
@@ -361,6 +363,13 @@ export class BotBrain {
           }
         } else if (data.attacker && data.attacker !== me && this.canSee(data.attacker)) {
           this.suspect(data.attacker.id, 0.3 * this.paranoia);
+          // Shooting the man with the star on is loud, and in the turn mode it
+          // is also public: one gun is live at a time and the other six are
+          // standing still watching it. It is a lead rather than a verdict,
+          // though - the law jumping on the first man it saw fire at the star
+          // put the gang's win share UP, because a sixth of all shooting is
+          // friendly fire and the law spent the round shooting each other.
+          if (data.victim?.badge) this.suspect(data.attacker.id, me.faction === 'law' ? 0.3 : 0.15);
           if (data.victim && this.allies.has(data.victim.id)) {
             this.suspect(data.attacker.id, 0.35);
             this.target = data.attacker.id;
@@ -640,6 +649,12 @@ export class BotBrain {
 
     // Only one man in town is pointing a gun at anybody. Everybody else is
     // watching him do it, which is also how they see it coming.
+    // think() is where an outlaw decides who he is going to lean on, and this
+    // fork does not call think(). So in the turn mode no outlaw had ever picked
+    // anybody out, and the law won two rounds in three because the gang spent
+    // every one of them shooting at whoever happened to be in front of them.
+    if (me.role === 'outlaw' && !this.sheriffCertain && t >= this.nextProbeAt) this.pickPrimeSuspect(t);
+
     const holder = room.turnHolder ? room.players.get(room.turnHolder) : null;
     this.aim(t, dt, mine ? quarry : (holder && holder !== me ? holder : visibleTarget), mine);
 
@@ -658,28 +673,83 @@ export class BotBrain {
     if (mine) this.duelTurn(t, quarry);
     else this.duelWatch(t);
     this.social(t, dt);
+
+    // Pinning the star is the map's biggest event in either mode, and this
+    // fork used to be above the line that does it - so in the turn mode no
+    // Sheriff had ever pinned one on. Forty rounds of the harness and the
+    // number sat at 0.00 the whole time.
+    if (me.role === 'sheriff' && !me.badge && room.phase === PHASE.COMBAT) {
+      this.badgeTimer = (this.badgeTimer || 0) + dt;
+      if (this.badgeTimer > this.wantBadgeAt) room.onBadge(me);
+    }
   }
 
   /**
    * Where to stand, which in the turn mode is the only thing anybody decides
-   * with their feet - and so is most of the game. Close enough that your gun
-   * reaches the man you want; no closer, because his reaches back.
+   * with their feet - and so is most of the game.
+   *
+   * The first version of this walked straight at whoever the bot wanted dead,
+   * which is half a decision. Standing somewhere is two questions: can I reach
+   * him, and who can reach me? A Sheriff with the star on and nobody he trusts
+   * nearby has no answer to the first and only the second matters; a gang that
+   * has found him has both. So this scores a handful of real spots and takes
+   * the best one, which is what a person does with fifteen seconds.
    */
   duelGround() {
     const me = this.self;
-    if (this.room.phase === PHASE.ENDGAME) {
+    const room = this.room;
+    if (room.phase === PHASE.ENDGAME) {
       const d = Math.hypot(me.pos.x, me.pos.z);
-      if (d > (this.room.ringRadius || 60) - 8) return { x: rnd(-8, 8), z: rnd(-8, 8) };
+      if (d > (room.ringRadius || 60) - 8) return { x: rnd(-8, 8), z: rnd(-8, 8) };
     }
     const mark = this.duelMark();
-    if (!mark) return this.wanderGoal();
-    const want = reachOf(me) * rnd(0.5, 0.85);
-    let dx = me.pos.x - mark.pos.x, dz = me.pos.z - mark.pos.z;
-    const len = Math.hypot(dx, dz) || 1;
-    return {
-      x: clamp(mark.pos.x + (dx / len) * want + rnd(-5, 5), -66, 66),
-      z: clamp(mark.pos.z + (dz / len) * want + rnd(-5, 5), -66, 66),
-    };
+    const others = [...room.players.values()].filter((o) => o.alive && o.id !== me.id);
+    const reach = reachOf(me);
+
+    // Candidates: a ring round the mark at the edge of my own reach, plus a few
+    // places I already know how to get to. Cheap, and it only runs every few
+    // seconds during a walk.
+    const spots = [];
+    if (mark) {
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + rnd(0, 1);
+        const r = reach * rnd(0.55, 0.9) - coverOf(mark) * 0.5;
+        spots.push({ x: clamp(mark.pos.x + Math.cos(a) * r, -66, 66), z: clamp(mark.pos.z + Math.sin(a) * r, -66, 66) });
+      }
+    }
+    for (let i = 0; i < 4; i++) spots.push(this.wanderGoal());
+    spots.push({ x: me.pos.x, z: me.pos.z });
+
+    let best = null, bestScore = -Infinity;
+    for (const spot of spots) {
+      let score = 0;
+      // Can I reach him from here? That is the whole of what a go is for.
+      if (mark) {
+        const d = Math.hypot(mark.pos.x - spot.x, mark.pos.z - spot.z);
+        score += inReach(me, mark, d) ? 3 : -2;
+        score -= d / 200;                                  // and nearer is better
+      }
+      // Who can reach me from here, and how much do I mind? A man who has no
+      // reason to shoot me is not a reason to stand anywhere else.
+      for (const o of others) {
+        if (o === mark) continue;
+        const d = Math.hypot(o.pos.x - spot.x, o.pos.z - spot.z);
+        if (!inReach(o, me, d)) continue;
+        const trust = this.knownFriends.has(o.id) || o.id === this.protectee ? -0.6 : 0;
+        score -= (0.5 + this.susOf(o.id) * 1.6 + this.paranoia * 0.5 + trust);
+      }
+      // A deputy stands where his man is, which is the job.
+      if (this.protectee) {
+        const prot = room.players.get(this.protectee);
+        if (prot && prot.alive) {
+          const d = Math.hypot(prot.pos.x - spot.x, prot.pos.z - spot.z);
+          score += d < 20 ? 1.2 : -0.4;
+        }
+      }
+      score += rnd(0, 0.6);                                // nobody is a calculator
+      if (score > bestScore) { bestScore = score; best = spot; }
+    }
+    return best || this.wanderGoal();
   }
 
   /** Whoever this bot would most like to see face down, at any distance. */
@@ -712,9 +782,54 @@ export class BotBrain {
 
   /** Your go: a card on the table, then the gun. In that order, and once each. */
   duelTurn(t, quarry) {
+    // A go is a go, and some of what happens in one happens once. This runs
+    // every tick of it, so without a mark for which go this is, "once" means
+    // "once and then never again for the rest of the round" - which is what a
+    // gamble that parked nextDuelActAt a million seconds out actually did.
+    const key = this.room.turn?.endsAt;
+    if (key !== this.duelTurnKey) {
+      this.duelTurnKey = key;
+      this.gambled = false;
+      this.nextDuelActAt = 0;
+    }
     if (t < this.nextDuelActAt) return;
     if (this.duelPlayCard(t, quarry)) { this.nextDuelActAt = t + rnd(0.3, 0.9); return; }
+    if (!quarry && !this.gambled) {
+      this.gambled = true;
+      if (this.duelGamble(t)) { this.nextDuelActAt = t + 0.8; return; }
+    }
     this.duelShoot(t, quarry);
+  }
+
+  /**
+   * The barrel turned round. A go with nobody in reach is a go worth nothing,
+   * and the gamble is the one thing that can still be done with it: a click
+   * buys another, and a live round costs a hit but does not stop at you.
+   *
+   * So the sum is a real one. Take it when the go is dead anyway, when the
+   * chamber has been counted down to mostly blanks, and when whoever chose to
+   * stand in the line behind you is somebody you would not mind finding.
+   */
+  duelGamble(t) {
+    const me = this.self;
+    const room = this.room;
+    if (!room.canBang(me)) return false;
+    const left = (room.chamber || []).length;
+    if (!left) return false;
+    // What is left in it, from what the town was told and has been counting.
+    const blanks = room.chamber.filter((live) => !live).length;
+    const odds = blanks / left;
+    const behind = room.linedUpBehind(me);
+    // A man behind you is a reason to do it or a reason not to, and which one
+    // is the whole of what standing in that line means.
+    const wants = behind ? this.wantsDead(behind) : 0;
+    if (behind && wants <= 0) return false;
+    let want = odds * (0.35 + this.aggression * 0.5);
+    if (behind && wants > 1) want += 0.45;
+    if (me.health <= 1 && !behind) want *= 0.15;      // one hit left and no upside
+    if (Math.random() > want) return false;
+    room.onSelfShot(me);
+    return true;
   }
 
   /**

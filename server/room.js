@@ -702,8 +702,11 @@ export class Room {
     }
 
     let dmg = amount;
-    if (victim.badge) dmg *= SOCIAL.badgeDamageResist;
-    if (victim.buffs.resist) dmg *= victim.buffs.resist;
+    // The star is armour in the free-for-all, where wearing it is a decision
+    // and a target. In the turn mode it is neither - it was dealt face up -
+    // and a hit there is worth exactly a hit whoever is wearing what.
+    if (victim.badge && !this.duel) dmg *= SOCIAL.badgeDamageResist;
+    if (victim.buffs.resist && !this.duel) dmg *= victim.buffs.resist;
 
     if (victim.armour > 0) {
       const soaked = Math.min(victim.armour, dmg * 0.6);
@@ -1257,8 +1260,13 @@ export class Room {
     if (!p.alive || p.role !== 'sheriff' || p.badge) return;
     p.badge = true;
     telemetry.social(this, 'badge');
-    p.maxHealth = PLAYER.maxHealth + (ROLES.sheriff.bonusHealth || 0) + SOCIAL.badgeHealthBonus;
-    p.health = p.maxHealth;
+    // In the turn mode the star is not armour, because it is not a decision:
+    // it was already on him at the deal, and the health it would buy is
+    // already in DUEL.sheriffHealth.
+    if (!this.duel) {
+      p.maxHealth = PLAYER.maxHealth + (ROLES.sheriff.bonusHealth || 0) + SOCIAL.badgeHealthBonus;
+      p.health = p.maxHealth;
+    }
     this.timeline.push({ at: Math.max(0, Math.round(now() - (this.stats?.started || now()))), type: 'badge', who: p.name });
     this.broadcast({ t: S.BADGE, id: p.id, name: p.name });
     this.broadcast({
@@ -1688,6 +1696,23 @@ export class Room {
       if (p.bot) p.brain.reset();
     });
 
+    // The star, in the mode that deals it face up.
+    //
+    // The card game this mode is modelled on puts the Sheriff's role card face
+    // up in front of him from the first turn, and everybody else's face down.
+    // That is not a detail: it is the balance. The gang wins by killing one
+    // named man while the law wins by killing whoever is left, so a gang that
+    // cannot see its target is shooting at random and the law wins by
+    // attrition. Sixty rounds of the harness with the star hidden came out at
+    // law 67%, gang 28% - and it was 75/23 after the gang were made better at
+    // guessing, because the extra shooting killed more of them than of the law.
+    //
+    // Hiding it is the free-for-all's game, and the free-for-all keeps it.
+    if (this.duel) {
+      const star = all.find((p) => p.role === 'sheriff');
+      if (star) this.onBadge(star);
+    }
+
     // Partial intel: the engine of the whole deduction layer.
     for (const p of all) {
       p.intel = this.buildIntel(p, all);
@@ -1696,8 +1721,18 @@ export class Room {
     }
 
     // The order the town takes its turns in, fixed for the round and shown to
-    // everybody. Shuffled rather than seating order, because there are no seats.
+    // everybody. Shuffled rather than seating order, because there are no seats
+    // - but the star goes first, the way the card game deals it. That is not
+    // decoration either: he is the one man everybody else can see, and the
+    // first go of the round is the only one he takes before they have all had
+    // a walk to get near him.
     this.turnOrder = this.duel ? shuffle(all.map((p) => p.id)) : [];
+    if (this.duel) {
+      const star = all.find((p) => p.role === 'sheriff');
+      if (star) {
+        this.turnOrder = [star.id, ...this.turnOrder.filter((id) => id !== star.id)];
+      }
+    }
     this.turnPtr = -1;
     this.turn = null;
 

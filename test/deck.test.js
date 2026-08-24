@@ -36,9 +36,10 @@ function table({ bots = 5 } = {}) {
   // further, one stands a step out, one is behind a barrel he never found.
   // Every test below is measuring the rule rather than the men who bend it,
   // except the one that counts what was dealt.
-  for (const p of all) if (p.role !== 'sheriff') p.gunhand = null;
+  const dealt = new Map(all.map((p) => [p.id, p.gunhand]));
+  for (const p of all) p.gunhand = null;
   return {
-    room, clock, all,
+    room, clock, all, dealt,
     give: (p, ...cards) => { p.duelHand = cards.slice(); },
     turn: (p) => { room.turn = { kind: 'turn', holder: p.id, endsAt: 1e12 }; p.bangsThisTurn = 0; },
     apart: (p, q, m) => { p.pos = { x: 0, y: 0, z: 0 }; q.pos = { x: 0, y: 0, z: m }; },
@@ -70,7 +71,7 @@ test('the pile deals, discards and comes back round again', () => {
 });
 
 test('you are dealt a hand the size of your health', () => {
-  const { room, clock, all } = table();
+  const { room, clock, all, dealt } = table();
   try {
     for (const p of all) {
       assert.equal(p.duelHand.length, p.maxHealth, `${p.role} was dealt ${p.duelHand.length}`);
@@ -79,7 +80,7 @@ test('you are dealt a hand the size of your health', () => {
     // which is not a fixed number any more, because two of the sixteen only
     // have three hits in them to start with.
     const sheriff = all.find((p) => p.role === 'sheriff');
-    const bare = healthOf(sheriff.gunhand, DUEL.health);
+    const bare = healthOf(dealt.get(sheriff.id), DUEL.health);
     assert.equal(sheriff.duelHand.length, bare + (DUEL.sheriffHealth - DUEL.health),
       'the star is one card as well as one hit better off');
     assert.equal(room.pile.remaining, 80 - all.reduce((n, p) => n + p.maxHealth, 0));

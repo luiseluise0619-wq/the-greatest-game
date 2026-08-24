@@ -437,7 +437,25 @@ export const DUEL = {
   reposition: 15,          // seconds the whole town moves at once
   turn: 6,                 // seconds each player's trigger is live
   health: 4,               // hits, not hit points
-  sheriffHealth: 5,        // the star is worth one more, and a public target
+  // The card game gives the star one hit more than everybody else and deals it
+  // face up, and those two go together: the gang knows exactly who to shoot,
+  // and cannot all reach him, because everyone is sitting in a fixed seat and
+  // a starting gun reaches the man next to you.
+  //
+  // There are no seats here. A walk is fifteen seconds and this town is a
+  // hundred and thirty metres across, so anybody who wants to be inside
+  // twenty-two metres of the star at the bell can be. That takes the whole of
+  // the original's brake off, and the arithmetic is brutal: three men with one
+  // shot each a lap, all aimed at one known man, against a law that has three
+  // shots a lap and no idea where to put them.
+  //
+  // Sixty rounds a setting, the harness, HNH_SHERIFFHEALTH:
+  //     5 hits  gang 68%  law 27%  renegade  5%
+  //     7 hits  law  45%  gang 40%  renegade 15%
+  //     9 hits  law  67%  gang 27%  renegade  7%
+  // So: seven. It is a deviation from the original and it is the price of
+  // taking the seats away. Sweep it again if the bots ever learn to shoot.
+  sheriffHealth: 7,
   draw: 2,                 // cards at the start of your turn
   // A hit is a hit. Where you put it decides whether it lands, not what it is
   // worth - which is the rule the card game runs on.
