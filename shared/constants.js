@@ -476,8 +476,13 @@ export const DUEL = {
   liveShare: 0.65,
   // Pointing it at yourself. A blank buys you another go; a live round costs
   // you a hit and does not stop there - it carries on through and takes
-  // whoever was standing in line behind you, which is why where you stand
-  // during the walk is about more than how far your gun reaches.
+  // whoever is standing in line behind you. Nobody walks any more, so the man
+  // who catches it is the one you turned your back on: which way you face is
+  // the whole of the decision, and the manual says so.
+  //
+  // It is still a bullet once it is out of you. A barrel behind you stops it
+  // and so does a man who was already moving - see Room.throughStopped, and
+  // the round it used to be that no card in the eighty could stop.
   selfShot: {
     corridor: 2.2,      // metres either side of the line out of your back
     reach: 30,          // how far the round carries once it is through you

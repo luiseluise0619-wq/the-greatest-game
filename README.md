@@ -917,8 +917,8 @@ won by information. The knobs that control that balance, if you want to move it:
 - `TIMING` — phase lengths, including the public-lobby auto-start countdown
   (or the `HNH_*` env overrides: `HNH_PREP`, `HNH_COMBAT`, `HNH_ENDGAME`,
   `HNH_RESULTS`, `HNH_LOBBYCOUNTDOWN`).
-- `DUEL` in `shared/constants.js` — the turn mode's own numbers: the walk, the
-  length of a go, how many hits everybody has and how many the star has, how much
+- `DUEL` in `shared/constants.js` — the turn mode's own numbers: the beat
+  between laps while the chamber is loaded, the length of a go, how many hits everybody has and how many the star has, how much
   of the chamber is live, and how long a barrel must be steady before it fires.
   `HNH_MODE=duel npm run balance -- 60` sweeps them, and every one of them is
   overridable there (`HNH_REPOSITION`, `HNH_TURN`, `HNH_HEALTH`,
@@ -940,7 +940,8 @@ Putting the table in fixed it as a game before it fixed it as a balance:
 |---|---|---|
 | walking a town | 29% | 45% |
 | at the table | 59% | 45% |
-| **and with the deck not printing itself** | **64%** | 48% |
+| and with the deck not printing itself | 64% | 48% |
+| **and the deputies watching the right man** | **66%** | 46% |
 
 The third row is not a tuning change. The deck was quietly growing: every
 weapon, every piece of gear and the cell went onto the discard pile *and* face
@@ -951,21 +952,33 @@ that matters more — the share of the Sheriff's killers who had actually picked
 him out went from **62%** to **79%** over eighty rounds. A correct deck means he
 dies to somebody deciding rather than to crossfire.
 
-The star's hits, swept again at the table (`HNH_SHERIFFHEALTH`):
+The star's hits, swept again at the table (`HNH_SHERIFFHEALTH`), and again
+after the bot deputies stopped guarding the wrong man:
 
 | Star's hits | The Law | Outlaws | Renegade |
 |---|---|---|---|
-| 5 (the card game's) | 15% | **80%** | 5% |
-| 6 | 42% | **55%** | 3% |
-| **7** | 37% | **57%** | 7% |
-| 8 | **60%** | 33% | 7% |
+| 5 (the card game's) | 30% | **68%** | 2% |
+| 6 | 35% | **58%** | 7% |
+| **7** | 47% | 50% | 3% |
 
-So seven, and the confirming run of sixty came out **50 / 43 / 7**. It is the one
-deviation from the original left in the mode, and it is there because the star is
-the only man at the table anybody can identify while the law has nothing like
-that to aim back with. Eighty rounds on the fixed deck read **50 / 34 / 16**, and
-two runs of sixty beside it **50 / 35 / 15** and **53 / 37 / 10** — the same
-answer three times, which is more than the noise floor below usually allows.
+The middle column used to read 80 / 55 / 57 across those same three settings,
+which was not a tuning problem but a bug: seeding a bot's starting knowledge
+happens on the first update *after* the deal, so in this mode it overwrote the
+badge event — which had already named the Sheriff, because the star goes on at
+the bell — with a coin flip between him and a decoy. Roughly half the deputies
+at every table spent the round defending a stranger. Fixing that is worth
+seventeen points to the law on its own, and it is the reason the sweep now
+comes out even at seven rather than merely least-bad.
+
+So still seven, and it is still the one deviation from the original left in the
+mode — the star is the only man at the table anybody can identify, and the law
+has nothing like that to aim back with. But it is no longer papering over
+anything: two runs of sixty on the fixed build read **law 55 / outlaw 42** and
+**law 47 / outlaw 50**, which is the closest to even this mode has measured.
+
+The Renegade is the number left to watch. He has come out anywhere between 2%
+and 16% across these runs, and at one player in seven a 60-round sample gives
+him one or two wins either way — so nothing here says anything about him yet.
 
 The other numbers to watch if the bots ever change: about **40 goes a round**,
 **46% of shots finding somebody** — the rest split between a blank out of the
