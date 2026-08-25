@@ -72,6 +72,28 @@ test('every string the client asks for by name has been translated', () => {
   assert.deepEqual(missing, [], `asked for in code, missing in Korean:\n  ${missing.join('\n  ')}`);
 });
 
+test('no Korean sentence puts a particle after a name the client wraps in a tag', () => {
+  // Particle choice reads the last character of whatever went into the hole.
+  // The server sends plain names, so a particle after one of those is right.
+  // The client builds some of its own lines and wraps the names in <b> first -
+  // and "<b>베인</b>" ends in ">", which is not Hangul, so `closed()` falls
+  // through to "treat it as closed" and the sentence takes the same wrong
+  // particle for every name in the game.
+  //
+  // The lines the client composes are the kill feed and the round's account.
+  // They are written without a particle after the name, and this is what makes
+  // that a rule instead of a habit somebody breaks next time.
+  const clientComposed = (k) => /^(kill|tl)\./.test(k) || k === 'feed.watchPatch';
+  const bad = [];
+  for (const key of keys('ko')) {
+    if (!clientComposed(key)) continue;
+    for (const m of String(t('ko', key, '')).matchAll(/\{(\w+):([^{}/]+)\/([^{}]+)\}/g)) {
+      bad.push(`${key}: {${m[1]}} takes a particle, and the client fills it with a tag`);
+    }
+  }
+  assert.deepEqual(bad, [], bad.join('\n  '));
+});
+
 test('nothing in the Korean table is talking to itself', () => {
   // A key nobody asks for any more is either a rename that only got done on one
   // side, or a screen that was deleted. Both are worth knowing about.

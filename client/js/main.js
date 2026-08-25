@@ -646,13 +646,18 @@ class Game {
 
       case S.FOOTPRINTS:
         this.effects.showFootprints(msg.prints, msg.duration);
-        this.hud.addFeed('You read the dust. Fresh prints, no names on them.', 'good');
+        this.hud.addFeed(escapeHtml(this.tr('feed.readDust',
+          'You read the dust. Fresh prints, no names on them.')), 'good');
         break;
 
       case S.CARDS: this.hud.setHand(msg); break;
 
       case S.BADGE:
-        this.hud.addFeed(`<b>${escapeHtml(msg.name)}</b> pins on the star.`, 'badge');
+        // No line here. The server already said it - "pins on the star and
+        // claims the law" in one mode, "wears the star, and the whole town
+        // knows it" in the other - keyed, so a Korean town reads it in Korean.
+        // Saying it again from the client said it twice, and the second time
+        // in English.
         this.audio.blip(700, 0.4, 'triangle', 0.16, 1200);
         break;
 
@@ -771,16 +776,26 @@ class Game {
   onAbilityEvent(msg) {
     if (msg.id === this.selfId) {
       this.audio.ability();
-      if (msg.label) this.hud.addFeed(escapeHtml(msg.label), 'good');
+      // The boon the deck turned up. The label is the server's English; the
+      // key is the id beside it, so a Korean player reads a Korean one.
+      if (msg.label) {
+        this.hud.addFeed(escapeHtml(msg.boon
+          ? this.tr(`boon.${msg.boon}`, msg.label) : msg.label), 'good');
+      }
     }
     const v = this.views.get(msg.id);
     if (msg.kind === 'medic' && msg.target) {
-      // Somebody just publicly patched somebody up. Loudest tell in the game.
+      // Somebody just publicly patched somebody up. Loudest tell in the game,
+      // and the reason a bystander is told at all: the two men involved get
+      // their own keyed lines from the server, so this one is only for
+      // everybody else watching it happen.
       const a = this.views.get(msg.id), b = this.views.get(msg.target);
-      const nameA = a ? a.name : 'Someone';
-      const nameB = msg.target === this.selfId ? 'you' : (b ? b.name : 'someone');
-      if (a || msg.target === this.selfId) {
-        this.hud.addFeed(`<b>${escapeHtml(nameA)}</b> patches up <b>${escapeHtml(nameB)}</b>.`, 'good');
+      const mine = msg.id === this.selfId || msg.target === this.selfId;
+      if (a && b && !mine) {
+        const nameA = `<b>${escapeHtml(a.name)}</b>`;
+        const nameB = `<b>${escapeHtml(b.name)}</b>`;
+        this.hud.addFeed(this.tr('feed.watchPatch', `${nameA} patches up ${nameB}.`,
+          { a: nameA, b: nameB }), 'good');
       }
     }
   }

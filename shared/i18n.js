@@ -372,6 +372,8 @@ const KO = {
   'feed.rideAgain': '{name} — 한 판 더 할 준비가 됐습니다 ({n}/{of}).',
   'feed.posterStar': '벽보가 답합니다 — {name:이/가} 별을 달고 있습니다.',
   'feed.posterNoStar': '벽보가 답합니다 — {name:은/는} 별을 달고 있지 않습니다.',
+  'feed.readDust': '먼지를 읽습니다. 갓 찍힌 발자국, 이름은 없습니다.',
+  'feed.watchPatch': '{a} — {b} 치료해 주는 장면을 봤습니다.',
   'feed.postered': '당신 이름이 방금 교회 문에 걸렸습니다. 마을 전체가 읽을 수 있습니다.',
   'feed.backAlive': '돌아왔습니다. 몸은 거리에서 한 발짝도 움직이지 않았습니다 — 그 조용한 틈을 아무도 쓰지 않았기를.',
   'feed.backDead': '돌아왔습니다. 그리고 여전히 죽어 있습니다.',
