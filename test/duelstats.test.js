@@ -193,10 +193,24 @@ test('a bot only knows the wounds it put in itself', () => {
   try {
     const all = [...room.players.values()].filter((x) => x.alive);
     const [a, b, c] = all;
+    b.health = Math.max(3, b.health);
     // Nothing anywhere puts another man's health in a snapshot, so a bot that
     // reads it is reading a number the human across the table is never sent.
     // What it may know is what it fired and saw land.
     assert.ok(!a.dealtTo || a.dealtTo.size === 0, 'somebody started the round already knowing');
+    // A shot that actually lands: a live round, next to each other, nothing in
+    // front of him to stop it and nothing in his hand to answer with. Without
+    // this the room is right to throw it out and there is nothing to remember.
+    a.roundIsLive = true;
+    a.gunhand = null; b.gunhand = null;
+    b.gear = []; b.duelHand = []; b.bracedUntil = 0;
+    a.pos = { x: 40, y: 0, z: 0 };
+    b.pos = { x: 40, y: 0, z: 1 };
+    for (const o of all) o.seat = null;
+    a.seat = 0; b.seat = 1;
+    let seat = 2;
+    for (const o of all) { if (o === a || o === b) continue; o.seat = seat++; }
+    a.shotSerial = (a.shotSerial || 0) + 1; a.shotSpent = null;
     room.applyDamage(b, a, 1, 'revolver', null);
     assert.equal(a.dealtTo.get(b.id), 1, 'the shooter did not remember what he landed');
     assert.ok(!(a.dealtTo.get(c.id) > 0), 'the shooter remembers hitting a man he never fired at');
@@ -271,7 +285,11 @@ test('the pile is eighty cards and stays eighty cards', () => {
     assert.ok(count() >= 70, `the deck started at ${count()}`);
 
     const all = [...room.players.values()].filter((p) => p.alive);
-    const [a, b] = all;
+    // Not the man wearing the star: the cell is the one card in the eighty
+    // that will not go on him, so picking him here would be testing a refusal.
+    const a = all.find((p) => p.role !== 'sheriff');
+    const b = all.find((p) => p !== a && p.role !== 'sheriff');
+    assert.ok(a && b, 'the table is all Sheriff');
     // Lock him up, then take the cell off him. The cell is the one thing in
     // front of a man that is not his card, and taking it used to leave the
     // flag set - so the top of his go put a SECOND one back on the pile.
@@ -315,7 +333,11 @@ test('no card in the eighty prints itself a second copy when it is played', () =
       return n;
     };
     const all = [...room.players.values()].filter((p) => p.alive);
-    const [a, b] = all;
+    // Same reason as above: the cell does not go on the man with the star, and
+    // a refusal changes nothing and so proves nothing.
+    const a = all.find((p) => p.role !== 'sheriff');
+    const b = all.find((p) => p !== a && p.role !== 'sheriff');
+    assert.ok(a && b, 'the table is all Sheriff');
     const bad = [];
     for (const id of Object.keys(DUEL_CARDS)) {
       const card = DUEL_CARDS[id];

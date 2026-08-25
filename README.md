@@ -934,7 +934,17 @@ Putting the table in fixed it as a game before it fixed it as a balance:
 | | goes ending in a shot | shots finding somebody |
 |---|---|---|
 | walking a town | 29% | 45% |
-| **at the table** | **59%** | 45% |
+| at the table | 59% | 45% |
+| **and with the deck not printing itself** | **65%** | 46% |
+
+The third row is not a tuning change. The deck was quietly growing: every
+weapon, every piece of gear and the cell went onto the discard pile *and* face
+up in front of a player, so ten of the twenty-two existed twice the moment they
+were played and the pile thickened with guns and barrels all round. Fixing it
+put six points on the share of goes that end in a shot, and it moved the number
+that matters more — the share of the Sheriff's killers who had actually picked
+him out went from **62%** to **82% and 89%** across two runs of sixty. A correct
+deck means he dies to somebody deciding rather than to crossfire.
 
 The star's hits, swept again at the table (`HNH_SHERIFFHEALTH`):
 
@@ -948,10 +958,11 @@ The star's hits, swept again at the table (`HNH_SHERIFFHEALTH`):
 So seven, and the confirming run of sixty came out **50 / 43 / 7**. It is the one
 deviation from the original left in the mode, and it is there because the star is
 the only man at the table anybody can identify while the law has nothing like
-that to aim back with.
+that to aim back with. Two runs of sixty on the fixed deck read **50 / 35 / 15**
+and **53 / 37 / 10**, which is the same answer inside the noise floor below.
 
-The other numbers to watch if the bots ever change: about **42 goes a round**,
-**45% of shots finding somebody** — the rest split between a blank out of the
+The other numbers to watch if the bots ever change: about **40 goes a round**,
+**46% of shots finding somebody** — the rest split between a blank out of the
 shared chamber, a man out of range, and a man who saw it coming and spent the
 card — and about **one man a round** putting the gun to his own head.
 
