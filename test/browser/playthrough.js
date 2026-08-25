@@ -231,7 +231,13 @@ try {
   check(faces.length === 2 && faces.every((n) => n > 20000), `both faces printed (${faces.map((n) => Math.round(n / 1024) + 'k').join(', ')})`);
   await A.screenshot({ path: `${SHOTS}/01b-role-card.png` });
 
-  await A.click('#roleCard');
+  // Dismissed by calling it rather than by clicking it. Playwright's click
+  // waits for the element to be actionable and then for the page to settle,
+  // and this page is pressing card faces on idle slices while the town renders
+  // behind it - so the click sat in "performing click action" until it timed
+  // out and took the whole run with it, twice. What is being checked here is
+  // that the card goes away, not that a mouse can reach it.
+  await A.evaluate(() => window.game.dismissRoleCard());
   await A.waitForTimeout(1500);
   check(!(await A.isVisible('#roleCard')), 'the role card dismisses');
 

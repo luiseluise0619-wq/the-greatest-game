@@ -161,7 +161,13 @@ try {
   check(role.keys.join('') === role.cards.map((_, i) => String(i + 1)).join(''),
     'and numbered with the key that plays it');
   await A.screenshot({ path: `${SHOTS}/d1-role-card.png` });
-  await A.click('#roleCard');
+  // Dismissed by calling it rather than by clicking it. Playwright's click
+  // waits for the element to be actionable and then for the page to settle,
+  // and this page is pressing card faces on idle slices while the town renders
+  // behind it - so the click sat in "performing click action" until it timed
+  // out and took the whole run with it, twice. What is being checked here is
+  // that the card goes away, not that a mouse can reach it.
+  await A.evaluate(() => window.game.dismissRoleCard());
   await A.waitForTimeout(400);
 
   // The bell, the chamber, and the running order.
@@ -517,7 +523,7 @@ try {
     check(back.hand.length >= 1, `and a hand to play with (${back.hand.length} cards)`);
     check(back.order >= 2 && back.cham, 'and the running order and the chamber with it');
   }
-  await A.click('#roleCard').catch(() => {});
+  await A.evaluate(() => window.game.dismissRoleCard()).catch(() => {});
 
   // The warning. A barrel stops on you and you have the length of his draw -
   // and when it moves off, it has to say so.
