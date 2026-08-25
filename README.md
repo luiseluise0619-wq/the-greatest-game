@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 204 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 206 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -655,7 +655,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 204 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 206 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -806,7 +806,10 @@ They are grouped by what they protect:
   as zero for every round anybody was playing. These lock in the figures worth
   watching at a table: goes taken, the share of them that ended in a shot, the
   share where a man could do nothing at all with his six seconds, and which
-  gunhand went out and was still standing at the end.
+  gunhand went out and was still standing at the end. Plus the account of the
+  round itself, which named the lobby character nobody in this mode ever chose
+  and printed a dash where the cards should be — because nothing on the server
+  had ever put a duel card on the list the results screen reads from.
 - **`test/i18n.test.js`** — the Korean overlay. There is only ever one English
   copy of any string — the one in the HTML, in `constants.js`, or in the
   sentence the server built — and Korean is keyed to it, so two English copies

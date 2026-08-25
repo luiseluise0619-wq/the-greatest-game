@@ -116,3 +116,73 @@ test('the whole point: the numbers are non-zero for a mode being played', () => 
     assert.equal(DUEL.draw, 2);
   } finally { clock.restore(); }
 });
+
+test('the account of the round names the gunhand and prints the cards', () => {
+  const { room, clock } = seatedRoom('STA5');
+  try {
+    const p = [...room.players.values()].find((x) => x.alive);
+    p.duelHand = ['bang', 'beer'];
+    room.turn = { kind: 'turn', holder: p.id, endsAt: Date.now() / 1000 + 1e6 };
+    p.cardsThisTurn = 0;
+    // Beer is refused on a man who is not hurt, and again when only two are
+    // left standing. Neither is what this test is about.
+    p.health = Math.max(1, p.maxHealth - 1);
+    const before = (p.cardsPlayed || []).length;
+    room.onDuelCard(p, { card: 'beer' });
+    assert.equal(p.cardsPlayed.length, before + 1,
+      'the card was played and the account of the round never heard about it');
+    assert.ok(p.cardsPlayed.includes('beer'), 'and it was not the card that was played');
+
+    // A Bang! is fired rather than pressed, and it still left the hand.
+    room.spendBang(p);
+    assert.ok(p.cardsPlayed.includes('bang'), 'a fired Bang! is not on the account');
+
+    // And the row the results screen is built from carries the gunhand rather
+    // than the lobby character nobody in this mode ever chose.
+    let payload = null;
+    const real = room.broadcast.bind(room);
+    room.broadcast = (m) => { if (m.rows) payload = m; return real(m); };
+    room.endMatch('law', 'over', 'end.sundown');
+    room.broadcast = real;
+    assert.ok(payload, 'the round ended and nobody was sent an account of it');
+    const mine = payload.rows.find((r) => r.id === p.id);
+    assert.ok(mine, 'the account left somebody off it');
+    assert.equal(mine.duel, true, 'the account does not say which game it was');
+    assert.ok(mine.gunhand && GUNHANDS[mine.gunhand],
+      `the account says the gunhand was ${mine.gunhand}`);
+    assert.equal(mine.gunhandName, GUNHANDS[mine.gunhand].ability,
+      'the gunhand has no name on it');
+    assert.ok(mine.cards.includes('beer') && mine.cards.includes('bang'),
+      `the cards played are missing from the account (${mine.cards.join(',')})`);
+  } finally { clock.restore(); }
+});
+
+test('getting out of the way counts as a card spent', () => {
+  const { room, clock } = seatedRoom('STA6');
+  try {
+    const all = [...room.players.values()].filter((x) => x.alive);
+    const [shooter, victim] = all;
+    victim.duelHand = ['missed'];
+    victim.cardsPlayed = [];
+    victim.bracedUntil = Date.now() / 1000 + 5;
+    shooter.gunhand = null;
+    victim.gunhand = null;
+    victim.gear = [];
+    // Live round, and near enough to reach: this test is about the card, not
+    // about the chamber or the seating.
+    shooter.roundIsLive = true;
+    shooter.pos = { x: 40, y: 0, z: 0 };
+    victim.pos = { x: 40, y: 0, z: 1 };
+    for (const o of all) o.seat = null;
+    shooter.seat = 0; victim.seat = 1;
+    let at = 2;
+    for (const o of all) { if (o === shooter || o === victim) continue; o.seat = at++; }
+    const landed = room.duelShotLands(victim, shooter, 'revolver');
+    // Whichever way the room names it, the card left her hand and the round's
+    // account has to know: half of what anybody does with a hand here is this.
+    assert.equal(victim.duelHand.length, 0, 'the Missed! was never spent');
+    assert.ok(victim.cardsPlayed.includes('missed'),
+      'she got out of the way and the account of the round never heard about it');
+    assert.equal(landed, false, 'the shot landed anyway');
+  } finally { clock.restore(); }
+});

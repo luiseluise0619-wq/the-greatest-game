@@ -168,24 +168,10 @@ try {
   check(Math.abs(seated.atTable - TABLE.standing) < 0.6,
     `and it put you at the table (${seated.atTable.toFixed(1)}m from the middle of it)`);
 
-  for (const kind of ['turn', 'reposition']) {
-    await A.waitForFunction(
-      (k) => window.game?.turn?.kind === k, kind, { timeout: 90000 },
-    ).catch(() => {});
-    const was = await A.evaluate(() => {
-      window.game.keys.add('KeyW');
-      return { x: window.game.self.pos.x, z: window.game.self.pos.z };
-    });
-    await A.waitForTimeout(1100);
-    const now = await A.evaluate(() => {
-      window.game.keys.delete('KeyW');
-      return { x: window.game.self.pos.x, z: window.game.self.pos.z };
-    });
-    const walked = Math.hypot(now.x - was.x, now.z - was.z);
-    check(walked < 0.6, `holding W for a second during a ${kind} moved ${walked.toFixed(1)}m`);
-  }
-  await A.screenshot({ path: `${SHOTS}/d2-the-table.png` });
-
+  // The feet come after the cards on purpose. This player is one man sitting
+  // at a table with five who shoot at him, and everything below needs him
+  // alive: spending two laps proving he cannot walk before trying to play a
+  // card meant the card checks were regularly reached by a corpse.
   // A card, played with the number printed on it, and the table seeing it.
   // Two attempts, because a go is six seconds and the card in hand this lap may
   // be one the room is right to refuse - a second Scope on a man who has one.
@@ -200,12 +186,29 @@ try {
   // whichever comes first, and only judge the ones that got played.
   let play = { skipped: true };
   for (let attempt = 0; attempt < 4 && play.skipped; attempt += 1) {
+    if (attempt > 0) {
+      // Wait for this go to pass before asking for the next one, or myGo()
+      // resolves on the same go it just refused and the attempts burn down in
+      // a tight loop without ever waiting for a fresh one.
+      // eslint-disable-next-line no-await-in-loop
+      await A.waitForFunction(() => window.game?.turn?.holder !== window.game?.selfId,
+        null, { timeout: 60000 }).catch(() => {});
+    }
     await myGo(A);
+    // eslint-disable-next-line no-await-in-loop
+    if (!await A.evaluate(() => window.game.self?.alive !== false)) break;
     // eslint-disable-next-line no-await-in-loop
     play = await A.evaluate(async () => {
       const g = window.game;
       const mine = () => g.turn?.kind === 'turn' && g.turn.holder === g.selfId;
       if (!mine()) return { skipped: true };
+      // Enough of the go left to send a card and see it come back. myGo()
+      // resolves the moment the turn packet lands, but the walk checks above
+      // spend part of a go of their own, so it can resolve on one that is
+      // nearly over - and the server is then right to refuse what arrives
+      // after the bell.
+      const left = (g.turnDeadline || 0) - performance.now() / 1000;
+      if (left < 2.5) return { skipped: true };
       // Something playable at nobody that this man has not already got out:
       // gear he is not wearing, a longer gun than the one in front of him, or
       // simply more cards.
@@ -251,6 +254,9 @@ try {
   // nobody. So is the hand limit, which is what you lose cards to at the end
   // of your own go.
   const board = await A.evaluate(() => {
+    // A dead man holds nothing and may keep nothing, and every number below
+    // reads zero honestly. Say which it is rather than calling it a failure.
+    if (window.game.self?.alive === false) return { dead: true };
     const rows = [...document.querySelectorAll('#turnOrder li')];
     const count = document.getElementById('duelCount');
     return {
@@ -264,6 +270,9 @@ try {
       limit: window.game.duel.limit,
     };
   });
+  if (board.dead) {
+    check(true, 'the table readouts were not reached (this man is already down)');
+  } else {
   check(board.rows >= 4, `the running order lists the table (${board.rows} men)`);
   check(board.withCount === board.rows,
     `and how many cards each of them is holding (${board.counts.join('/')})`);
@@ -271,8 +280,64 @@ try {
   check(board.limitShown, `and what you may keep at the end of your go (${board.limitText})`);
   check(board.limitText.includes(String(board.hand)) && board.limitText.includes(String(board.limit)),
     `the count is your hand against your limit (${board.hand} of ${board.limit})`);
+  }
+
+  // The scoreboard's last column. It said "Kills" and printed a dash for the
+  // living and an empty cell for the dead, because nothing on the client ever
+  // counted anything - a header promising a number over a column that never
+  // had one. It counts the killings this player was actually told the killer
+  // of now, which is the only tally a hidden-role round entitles anybody to.
+  const sb = await A.evaluate(() => {
+    const hud = window.game.hud;
+    const ids = [...hud.roster.keys()];
+    const before = ids.map((id) => hud.seenKills.get(id) || 0);
+    // Two killings said to have been watched, both by the same man, plus one
+    // nobody saw - which must not be counted against anybody.
+    if (ids.length >= 2) {
+      hud.killFeed({ victim: ids[1], victimName: 'x', victimRole: 'outlaw',
+        killer: ids[0], killerName: 'y', witnessed: true, place: 'the street' });
+      hud.killFeed({ victim: ids[1], victimName: 'x', victimRole: 'outlaw',
+        killer: ids[0], killerName: 'y', witnessed: true, place: 'the street' });
+      hud.killFeed({ victim: ids[1], victimName: 'x', victimRole: 'outlaw',
+        killer: null, killerName: null, witnessed: false, place: 'the street' });
+    }
+    hud.toggleScoreboard(true);
+    const rows = [...document.querySelectorAll('#sbTable tbody tr')]
+      .map((tr) => [...tr.children].map((td) => td.textContent.trim()));
+    hud.toggleScoreboard(false);
+    return {
+      head: [...document.querySelectorAll('#sbTable thead th')].map((t) => t.textContent.trim()),
+      last: rows.map((r) => r[r.length - 1]),
+      counted: hud.seenKills.get(ids[0]) - (before[0] || 0),
+      unseen: [...hud.seenKills.values()].reduce((a, b) => a + b, 0),
+      rows: rows.length,
+    };
+  });
+  check(sb.counted === 2, `a killing you watched is counted against the man who did it (${sb.counted})`);
+  check(sb.unseen === 2, `and one nobody watched is counted against nobody (${sb.unseen} in all)`);
+  check(sb.last.some((c) => c === '2'), `and the scoreboard prints it (${sb.last.join('/')})`);
+  check(sb.head[sb.head.length - 1].length > 0, `under a header that says what it is (${sb.head[sb.head.length - 1]})`);
 
   await A.screenshot({ path: `${SHOTS}/d3-your-go.png` });
+
+  for (const kind of ['turn', 'reposition']) {
+    await A.waitForFunction(
+      (k) => window.game?.turn?.kind === k, kind, { timeout: 90000 },
+    ).catch(() => {});
+    const was = await A.evaluate(() => {
+      window.game.keys.add('KeyW');
+      return { x: window.game.self.pos.x, z: window.game.self.pos.z };
+    });
+    await A.waitForTimeout(1100);
+    const now = await A.evaluate(() => {
+      window.game.keys.delete('KeyW');
+      return { x: window.game.self.pos.x, z: window.game.self.pos.z };
+    });
+    const walked = Math.hypot(now.x - was.x, now.z - was.z);
+    check(walked < 0.6, `holding W for a second during a ${kind} moved ${walked.toFixed(1)}m`);
+  }
+  await A.screenshot({ path: `${SHOTS}/d2-the-table.png` });
+
 
   // A refresh in the middle of a lap. The hand IS the ammunition, so coming
   // back without it is coming back to a game you cannot play.

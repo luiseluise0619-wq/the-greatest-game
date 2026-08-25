@@ -28,6 +28,7 @@ export class HUD {
   constructor(game) {
     this.game = game;
     this.knownRoles = new Map();     // id -> role, learned only from bodies
+    this.seenKills = new Map();      // id -> killings you were told he did
     this.roster = new Map();         // id -> {name, bot, alive, kills}
     this.selfRole = null;
     this.matchNumber = null;
@@ -900,6 +901,15 @@ export class HUD {
    */
   killFeed(msg) {
     this.knownRoles.set(msg.victim, msg.victimRole);
+    // A tally of the killings this player has been told the killer of - one he
+    // watched, one he did, or the one that was done to him. The scoreboard's
+    // last column promised a number and printed a dash for the living and
+    // nothing at all for the dead, because nothing on the client ever counted
+    // anything. This is the honest version of that column: not how many a man
+    // has killed, which nobody in a hidden-role round is entitled to know, but
+    // how many you can put your hand up and say you saw him kill.
+    const learned = msg.killer || (msg.youKilled ? this.game.selfId : null);
+    if (learned) this.seenKills.set(learned, (this.seenKills.get(learned) || 0) + 1);
     const r = ROLES[msg.victimRole];
     const role = `<span class="rle" style="color:${r.color}">${escapeHtml(this.t(`role.${msg.victimRole}.name`, r.name))}</span>`;
     const killer = `<b>${escapeHtml(msg.killerName || '')}</b>`;
@@ -976,7 +986,7 @@ export class HUD {
           ? `<td class="role" style="color:${role.color}">${escapeHtml(this.t(`role.${known}.name`, role.name))}`
             + `${isSelf ? ` ${this.t('sb.yours', '(yours)')}` : ''}</td>`
           : `<td class="unknown">${this.t('sb.unknown', 'unknown')}</td>`}
-        <td>${p.alive ? '—' : ''}</td>`;
+        <td>${this.seenKills.get(id) || (p.alive ? '—' : '0')}</td>`;
       tb.appendChild(tr);
     }
   }
@@ -995,11 +1005,11 @@ export class HUD {
       tr.innerHTML = `
         <td>${escapeHtml(r.name)}${r.bot ? ` <span class="muted">${this.t('sb.bot', 'bot')}</span>` : ''}</td>
         <td class="role" style="color:${r.color}">${escapeHtml(this.t(`role.${r.role}.name`, r.roleName))}</td>
-        <td>${escapeHtml(this.t(`char.${r.character}.role`, r.characterName || ''))}</td>
+        <td>${escapeHtml(r.gunhand
+          ? this.t(`gun.${r.gunhand}.ability`, r.gunhandName || r.gunhand)
+          : this.t(`char.${r.character}.role`, r.characterName || ''))}</td>
         <td>${r.kills}</td>
-        <td class="cardCol">${(r.cards || []).map((c) => (CARDS[c]
-          ? `<img class="crdMini" src="${cardUrl(c)}" title="${escapeHtml(this.t(`card.${c}.name`, CARDS[c].name))}" alt="${escapeHtml(this.t(`card.${c}.name`, CARDS[c].name))}">`
-          : '')).join('') || '<span class="muted">—</span>'}</td>
+        <td class="cardCol">${this.resultCards(r)}</td>
         <td>${r.damage}</td>
         <td>${r.won ? `<span class="wonTag">${this.t('res.won', 'WON')}</span>`
           : `<span class="lostTag">${this.t('res.lost', 'lost')}</span>`}</td>`;
@@ -1009,6 +1019,25 @@ export class HUD {
     this.resetReady();
     $('hud').classList.add('resultsUp');
     $('results').classList.remove('hidden');
+  }
+
+  /**
+   * Every card that left a man's hand, printed. Two decks and two presses, and
+   * for a long time this only knew the free-for-all's six: in the turn mode -
+   * the one that is entirely about cards - the column read a dash for every
+   * player, because nothing on the server had ever put a duel card on the list
+   * it reads from.
+   */
+  resultCards(r) {
+    const faces = (r.cards || []).map((c) => {
+      const duel = r.duel && DUEL_CARDS[c];
+      const def = duel || CARDS[c];
+      if (!def) return '';
+      const name = duel ? this.t(`duel.${c}.name`, def.name) : this.t(`card.${c}.name`, def.name);
+      const url = duel ? duelCardUrl(c) : cardUrl(c);
+      return `<img class="crdMini" src="${url}" title="${escapeHtml(name)}" alt="${escapeHtml(name)}">`;
+    }).join('');
+    return faces || `<span class="muted">—</span>`;
   }
 
   /** The round's public account - the bit worth screenshotting. */
@@ -1076,6 +1105,7 @@ export class HUD {
   /** New hand dealt: forget everything we learned about the last round. */
   newMatch() {
     this.knownRoles.clear();
+    this.seenKills.clear();
     this.roster.clear();
     this.hand = []; this.armed = [];
     this.pendingDeal = false;

@@ -567,6 +567,9 @@ export class Room {
     p.duelHand.splice(at, 1);
     this.pile.put(card);
     p.bangsThisTurn = (p.bangsThisTurn || 0) + 1;
+    // A Bang! is fired rather than played, but it is still a card that left
+    // this man's hand, so it belongs on the account of the round with the rest.
+    p.cardsPlayed.push(card);
     this.checkEmptyHand(p);
     this.pushDuel(p);
     return true;
@@ -916,7 +919,14 @@ export class Room {
       victim.bracedUntil = 0;
       for (let i = 0; i < need; i++) {
         const idx = victim.duelHand.indexOf(answers[i]);
-        if (idx >= 0) { victim.duelHand.splice(idx, 1); this.pile.put(answers[i]); }
+        if (idx >= 0) {
+          victim.duelHand.splice(idx, 1);
+          this.pile.put(answers[i]);
+          // Spent on somebody else's go, but spent - and getting out of the
+          // way is half of what anybody does with a hand in this mode, so the
+          // account of the round is wrong without it.
+          victim.cardsPlayed.push(answers[i]);
+        }
       }
       this.emit(victim, { t: S.FEED, k: 'feed.notThere', text: 'You were not standing where he thought.', tone: 'good' });
       this.emit(attacker, { t: S.FEED, k: 'feed.heWasReady', text: 'Missed. He was ready for it.', tone: 'bad' });
@@ -1344,6 +1354,10 @@ export class Room {
       p.duelHand.splice(at, 1);
       this.pile.put(id);
       p.cardsThisTurn = (p.cardsThisTurn || 0) + 1;
+      // The aftermath prints every card a man played, and for a long time it
+      // printed nothing at all in the mode that is entirely about cards: this
+      // list was only ever appended to by the free-for-all's six-card deck.
+      p.cardsPlayed.push(id);
     };
     // Key, English, holes. The English is the line; the key is how the same
     // line gets said in Korean, where the card names decline and the verb is
@@ -1946,8 +1960,15 @@ export class Room {
       roleName: ROLES[p.role]?.name, color: ROLES[p.role]?.color,
       faction: p.faction, character: p.character,
       characterName: CHARACTERS[p.character]?.role,
+      // The turn mode deals a gunhand instead of letting anybody pick a
+      // character, so the character column was printing a lobby default
+      // nobody chose and nobody used. What a man was dealt is the thing that
+      // decided how he played the round, and it is worth reading afterwards.
+      gunhand: p.gunhand || null,
+      gunhandName: p.gunhand ? GUNHANDS[p.gunhand]?.ability : null,
       alive: p.alive, kills: p.kills, damage: Math.round(p.damageDealt),
       cards: (p.cardsPlayed || []).slice(),
+      duel: this.duel,
       won: p.faction === winner,
     })).sort((a, b) => (b.won - a.won) || (b.kills - a.kills) || (b.damage - a.damage));
 

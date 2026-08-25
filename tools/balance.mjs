@@ -167,9 +167,12 @@ console.log('  friendly fire  ', `${stat.friendly} (${pct(stat.friendly, stat.sh
 console.log('  the Sheriff    ', `died in ${stat.sheriffDeaths}/${ROUNDS} rounds`,
   `· ${stat.sheriffByOutlaw} to an outlaw`,
   `· ${pct(stat.sheriffTargeted, stat.sheriffDeaths)} of those killers had picked them out`);
+// The six-card deck is the free-for-all's. In the turn mode it is never dealt,
+// so printing "0.0 cards played" beside the line that says fifty-five of them
+// were is just a wrong number in a readout somebody is reading for numbers.
 console.log('  per round      ', `${(stat.accusations / ROUNDS).toFixed(1)} accusations`,
   `· ${(stat.badges / ROUNDS).toFixed(2)} stars pinned on`,
-  `· ${(stat.cards / ROUNDS).toFixed(1)} cards played`);
+  ...(MODE === MODES.DUEL ? [] : [`· ${(stat.cards / ROUNDS).toFixed(1)} cards played`]));
 
 if (MODE === MODES.DUEL) {
   // The one number the whole mode turns on: what share of the goes anybody
