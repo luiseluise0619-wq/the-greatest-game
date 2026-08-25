@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick } from './helpers.js';
 import { TIMING, MODES, DUEL } from '../shared/constants.js';
 import { GUNHANDS } from '../shared/gunhands.js';
+import { DUEL_CARDS } from '../shared/deck.js';
 
 const { Room } = await import('../server/room.js');
 const { telemetry } = await import('../server/telemetry.js');
@@ -251,5 +252,90 @@ test('a man who turns up late gets the hand as well as the body', () => {
     assert.ok(turn && turn.kind, 'and no idea whose go it is');
     assert.ok(Array.isArray(turn.order) && turn.order.length >= 2, 'and no running order');
     assert.ok(cham && Number.isFinite(cham.left), 'and no count of the chamber everybody is sharing');
+  } finally { clock.restore(); }
+});
+
+test('the pile is eighty cards and stays eighty cards', () => {
+  const { room, clock } = seatedRoom('STAA');
+  try {
+    const count = () => {
+      let n = room.pile.draw.length + room.pile.discard.length;
+      for (const p of room.players.values()) {
+        n += (p.duelHand || []).length;
+        n += (p.gear || []).length;
+        if (p.weaponCard) n += 1;
+        if (p.hasDynamite) n += 1;
+      }
+      return n;
+    };
+    assert.ok(count() >= 70, `the deck started at ${count()}`);
+
+    const all = [...room.players.values()].filter((p) => p.alive);
+    const [a, b] = all;
+    // Lock him up, then take the cell off him. The cell is the one thing in
+    // front of a man that is not his card, and taking it used to leave the
+    // flag set - so the top of his go put a SECOND one back on the pile.
+    a.duelHand = ['jail', 'panic'];
+    a.gear = [];
+    b.gear = [];
+    b.jailed = false;
+    // Counted after the hands are set by hand, so the fixture's own dealing
+    // is not what this measures.
+    const start = count();
+    room.turn = { kind: 'turn', holder: a.id, endsAt: Date.now() / 1000 + 1e6 };
+    a.cardsThisTurn = 0;
+    room.onDuelCard(a, { card: 'jail', target: b.id });
+    assert.ok(b.jailed, 'he was never locked up');
+    assert.ok((b.gear || []).includes('jail'), 'and there is no cell in front of him');
+    assert.equal(count(), start, 'locking him up lost or gained a card');
+
+    const taken = room.stripCard(b);
+    assert.equal(taken, 'jail', 'the cell was not the thing taken');
+    assert.equal(b.jailed, false, 'the door came off and he is still in the cell');
+    room.pile.put(taken);
+    assert.equal(count(), start, 'taking the cell lost or gained a card');
+
+    // And the top of his go must not print a second one.
+    room.onTurnStart(b);
+    assert.equal(count(), start, `the top of his go printed a card (${count()} vs ${start})`);
+  } finally { clock.restore(); }
+});
+
+test('no card in the eighty prints itself a second copy when it is played', () => {
+  const { room, clock } = seatedRoom('STAB');
+  try {
+    const count = () => {
+      let n = room.pile.draw.length + room.pile.discard.length;
+      for (const p of room.players.values()) {
+        n += (p.duelHand || []).length;
+        n += (p.gear || []).length;
+        if (p.weaponCard) n += 1;
+        if (p.hasDynamite) n += 1;
+      }
+      return n;
+    };
+    const all = [...room.players.values()].filter((p) => p.alive);
+    const [a, b] = all;
+    const bad = [];
+    for (const id of Object.keys(DUEL_CARDS)) {
+      const card = DUEL_CARDS[id];
+      // Bang! is fired and Missed! is spent for you; neither is played here.
+      if (card.kind === 'shot' || card.kind === 'reaction') continue;
+      // A clean table each time, so one card's leftovers are not the next
+      // card's refusal.
+      for (const p of all) {
+        p.gear = []; p.weaponCard = null; p.hasDynamite = false;
+        p.jailed = false; p.duelHand = []; p.health = Math.max(1, p.maxHealth - 1);
+      }
+      a.duelHand = [id];
+      a.cardsThisTurn = 0;
+      room.turn = { kind: 'turn', holder: a.id, endsAt: Date.now() / 1000 + 1e6 };
+      const before = count();
+      room.onDuelCard(a, { card: id, target: b.id });
+      const after = count();
+      if (after !== before) bad.push(`${id}: ${before} -> ${after}`);
+    }
+    assert.deepEqual(bad, [],
+      `these cards changed how many cards are in the game when played: ${bad.join(', ')}`);
   } finally { clock.restore(); }
 });

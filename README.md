@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 209 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 211 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -655,7 +655,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 209 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 211 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -819,7 +819,12 @@ They are grouped by what they protect:
   bot, and that path sent him the body and the free-for-all's six-card deck but
   never the hand, the running order or the chamber. The refresh path was fixed
   for exactly this and this one was not, because it only happens to somebody
-  who arrives after the bell.
+  who arrives after the bell. And two on the pile: that it is eighty cards and
+  stays eighty, and that no card in the deck changes how many cards are in the
+  game by being played. The second one found ten that did — every weapon, every
+  piece of gear and the cell went onto the discard pile *and* face up in front
+  of a player, so the deck grew a copy of itself every time anybody laid a gun
+  down, and the odds of drawing gear climbed all round.
 - **`test/i18n.test.js`** — the Korean overlay. There is only ever one English
   copy of any string — the one in the HTML, in `constants.js`, or in the
   sentence the server built — and Korean is keyed to it, so two English copies
@@ -870,7 +875,11 @@ dealt with the role and printed on the card, that the chamber is counted in the
 open, that the feet really are nailed to the mark you were dealt for the whole
 round, that a number key spends the card printed on it and the table sees where
 it went, that a refresh mid-lap hands the whole game back, and that nobody is
-ever reading HE HAS YOU under the words YOUR GO. Thirty-two more.
+ever reading HE HAS YOU under the words YOUR GO. It also reads back what the
+running order is now showing — how many cards each man is holding and what he
+has face up in front of him, all of it public and all of it drawn from a packet
+the HUD used to throw away — and what you may keep at the end of your own go.
+Forty-one more.
 It also measures the HUD rather than trusting it: nothing may run off the edge
 of the window, no word may be written over the town without a shadow under it
 or something opaque behind it, and no two tiles of the shout wheel may sit on

@@ -1365,9 +1365,19 @@ export class Room {
     if (at < 0) return;
 
     const target = msg.target != null ? this.players.get(msg.target) : null;
-    const spend = () => {
+    /**
+     * The card leaves the hand. Where it goes next depends on the card: most
+     * are done with and go on the discard pile, but a gun, a barrel, a scope,
+     * a horse and a cell all STAY - face up, in front of somebody, still in
+     * the game. Those must not also be put on the pile, and for a long time
+     * they were: `spend()` discarded unconditionally and the branch below then
+     * laid the same id down in front of a player, so every gear card ever
+     * played printed itself a second copy. Eighty cards that quietly became
+     * more than eighty, and the draw odds with them.
+     */
+    const spend = (keep = false) => {
       p.duelHand.splice(at, 1);
-      this.pile.put(id);
+      if (!keep) this.pile.put(id);
       p.cardsThisTurn = (p.cardsThisTurn || 0) + 1;
       // The aftermath prints every card a man played, and for a long time it
       // printed nothing at all in the mode that is entirely about cards: this
@@ -1394,8 +1404,8 @@ export class Room {
         return;
 
       case KIND.WEAPON: {
-        spend();
-        if (p.weaponCard) this.pile.put(p.weaponCard);
+        spend(true);                             // it goes on the table, not on the pile
+        if (p.weaponCard) this.pile.put(p.weaponCard);   // the one it replaces does
         p.weaponCard = id;
         tell('duel.tell.weapon', `${p.name} lays a ${card.name} on the table.`, 'system',
           { name: p.name, card: card.name, cardKey: cardName(id) });
@@ -1404,7 +1414,7 @@ export class Room {
 
       case KIND.GEAR: {
         if ((p.gear || []).includes(id)) { say('duel.say.gearOut', 'You already have one of those out.', 'bad'); return; }
-        spend();
+        spend(true);                             // face up in front of him, still in play
         if (id === 'dynamite') {
           p.hasDynamite = true;
           tell('duel.tell.lights', `${p.name} lights a stick and sets it down.`, 'bad', { name: p.name });
@@ -1420,7 +1430,7 @@ export class Room {
         if (!target || !target.alive || target.id === p.id) { say('duel.say.noCurseTarget', 'Nobody to put that on.', 'bad'); return; }
         if (card.notOn && target.role === card.notOn) { say('duel.say.notTheStar', 'Not the man wearing the star.', 'bad'); return; }
         if ((target.gear || []).includes(id)) { say('duel.say.alreadyIn', 'They are already in one.', 'bad'); return; }
-        spend();
+        spend(true);                             // the cell goes in front of him, not away
         target.gear.push(id);
         target.jailed = true;
         tell('duel.tell.jail', `${p.name} locks ${target.name} up.`, 'bad', { a: p.name, b: target.name });
@@ -1512,7 +1522,16 @@ export class Room {
 
   /** Take one card off somebody: from the table in front of them, or the hand. */
   stripCard(target) {
-    if ((target.gear || []).length) return target.gear.pop();
+    if ((target.gear || []).length) {
+      const taken = target.gear.pop();
+      // The cell is the one thing in front of a man that is not his. Taking it
+      // opens the door, the way it does in the original - and it has to clear
+      // the flag as well as the card, or the man stays locked in a cell that
+      // is no longer there and the top of his go puts a second one back on the
+      // pile. Eighty cards, and one of them printed twice.
+      if (taken === 'jail') target.jailed = false;
+      return taken;
+    }
     if (target.weaponCard) { const w = target.weaponCard; target.weaponCard = null; return w; }
     if ((target.duelHand || []).length) {
       const at = Math.floor(Math.random() * target.duelHand.length);
@@ -2231,8 +2250,11 @@ export class Room {
     // 2. A cell costs you the whole go, unless you talk your way out of it.
     if (p.jailed) {
       p.jailed = false;
+      const had = (p.gear || []).includes('jail');
       p.gear = (p.gear || []).filter((g) => g !== 'jail');
-      this.pile.put('jail');
+      // Only put back a card that was actually there. Somebody may have taken
+      // it off him in the meantime, and the pile is eighty cards exactly.
+      if (had) this.pile.put('jail');
       if (this.drawFor(p, 'jail')) {
         this.broadcast({
           t: S.FEED, k: 'feed.outOfCell', p: { name: p.name },
