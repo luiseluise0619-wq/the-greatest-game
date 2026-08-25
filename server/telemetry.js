@@ -172,9 +172,16 @@ class Telemetry {
   cardsDealt(n) { this.agg.cardsDealt += n; }
 
   // ------------------------------------------------------------- turn mode
-  /** A round of the turn mode began, with everyone's dealt gunhand. */
+  /**
+   * A round of the turn mode was dealt. Only the gunhands are counted here:
+   * they are a record of what went out, and a hand that was dealt went out
+   * whether or not the round ever finished.
+   *
+   * The round itself is counted at the end, in duelEnd - because `matches` is,
+   * and goesPerDuel would otherwise divide goes taken in finished rounds by a
+   * count that includes the one still being played.
+   */
   duelStart(room, players) {
-    this.agg.duelMatches += 1;
     for (const p of players) {
       if (!p.gunhand) continue;
       this.agg.byGunhand[p.gunhand] = (this.agg.byGunhand[p.gunhand] || 0) + 1;
@@ -195,6 +202,7 @@ class Telemetry {
 
   /** Who was still standing at the end, so a gunhand's record can be read. */
   duelEnd(room, survivors) {
+    this.agg.duelMatches += 1;
     for (const p of survivors) {
       if (!p.gunhand) continue;
       this.agg.gunhandWins[p.gunhand] = (this.agg.gunhandWins[p.gunhand] || 0) + 1;

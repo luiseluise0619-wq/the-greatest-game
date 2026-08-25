@@ -35,8 +35,14 @@ test('dealing the table records every gunhand that went out', () => {
   const beforeMatches = telemetry.agg.duelMatches;
   const { room, clock } = seatedRoom('STA1');
   try {
+    // The round is counted when it ENDS, the same as `matches` is - otherwise
+    // goesPerDuel divides goes taken in finished rounds by a count that
+    // includes the one still being played.
+    assert.equal(telemetry.agg.duelMatches, beforeMatches,
+      'a round was counted before anybody had finished it');
+    room.endMatch('law', 'over', 'end.sundown');
     assert.equal(telemetry.agg.duelMatches, beforeMatches + 1,
-      'the round was not counted as a turn-mode round');
+      'the round finished and was not counted as a turn-mode round');
     const dealt = [...room.players.values()].map((p) => p.gunhand).filter(Boolean);
     assert.ok(dealt.length >= 4, 'nobody was dealt a gunhand');
     for (const id of dealt) {
