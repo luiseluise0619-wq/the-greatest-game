@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, seatThem } from './helpers.js';
 import { TIMING, MODES, DUEL, rolesForPlayerCount } from '../shared/constants.js';
-import { GUNHANDS } from '../shared/gunhands.js';
+import { GUNHANDS, healthOf } from '../shared/gunhands.js';
 import { DUEL_CARDS } from '../shared/deck.js';
 
 const { Room } = await import('../server/room.js');
@@ -814,4 +814,40 @@ test('the biggest table is a contest in both games, not only in one', () => {
   // a different quantity from one who gets six seconds and reaches one seat.
   assert.equal(count(free, 'deputy'), 3, 'the free-for-all lost a deputy it needs');
   assert.equal(count(free, 'outlaw'), 3, 'and gained an outlaw it does not');
+});
+
+test('the star is a bonus on the gunhand, not a number that replaces it', () => {
+  // The code reads
+  //     maxHealth = healthOf(gunhand) + (sheriff ? sheriffHealth - health : 0)
+  // so the star adds three hits to whatever the man was dealt. That is the
+  // original's rule - one bullet more than that character's own life total -
+  // and it means a Sheriff dealt one of the two three-hit gunhands has six
+  // rather than seven. Pinned here because DUEL.sheriffHealth reads like an
+  // absolute and every balance sweep in the README quotes it as one: turning
+  // it into an absolute would make a three-hit gunhand strictly better than a
+  // four-hit one for exactly one man at the table.
+  const bonus = DUEL.sheriffHealth - DUEL.health;
+  assert.ok(bonus > 0, 'the star is worth nothing');
+
+  const thin = Object.values(GUNHANDS).filter((g) => g.health < DUEL.health);
+  assert.ok(thin.length >= 1, 'no gunhand is worth fewer hits than the default any more');
+
+  const seen = new Map();
+  for (let i = 0; i < 24; i += 1) {
+    const { room, clock } = seatedRoom(`STAR${i}`);
+    try {
+      for (const p of room.players.values()) {
+        if (!p.gunhand) continue;
+        const want = healthOf(p.gunhand, DUEL.health) + (p.role === 'sheriff' ? bonus : 0);
+        assert.equal(p.maxHealth, want,
+          `${p.role} with ${p.gunhand} has ${p.maxHealth} hits, not ${want}`);
+        if (p.role === 'sheriff') seen.set(p.gunhand, p.maxHealth);
+      }
+    } finally { clock.restore(); }
+  }
+  assert.ok(seen.size > 0, 'no Sheriff was ever dealt a gunhand');
+  for (const [hand, hits] of seen) {
+    assert.equal(hits, healthOf(hand, DUEL.health) + bonus,
+      `a Sheriff holding ${hand} came out on ${hits}`);
+  }
 });

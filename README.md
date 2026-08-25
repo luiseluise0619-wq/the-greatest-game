@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 227 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 228 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -658,7 +658,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 227 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 228 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -968,8 +968,16 @@ later, and — worse — **HE HAS YOU** went up on men in no danger at all. In a
 where the only warning anybody gets is watching the barrel come round, a warning
 that means nothing is not a small thing.
 
-The star's hits, swept again at the table (`HNH_SHERIFFHEALTH`), and again
-after the bot deputies stopped guarding the wrong man:
+The star's hits — read as a **bonus**, not a total. The code is
+`healthOf(gunhand) + (sheriff ? sheriffHealth - health : 0)`, so the star adds
+three hits to whatever the man was dealt, which is the original's rule: one
+bullet more than that character's own life total rather than a fixed number.
+`sheriffHealth: 7` is therefore what a Sheriff has on a gunhand worth the
+default four — fourteen of the sixteen. The two worth three give him six, and
+both of them buy that hit back with something else.
+
+Swept again at the table (`HNH_SHERIFFHEALTH`), and again after the bot
+deputies stopped guarding the wrong man:
 
 | Star's hits | The Law | Outlaws | Renegade |
 |---|---|---|---|

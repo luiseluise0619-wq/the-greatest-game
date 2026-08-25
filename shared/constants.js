@@ -473,11 +473,25 @@ export const DUEL = {
   // the star is the only man at the table anybody can identify and the law has
   // nothing like that to aim back with.
   //
-  // Sixty rounds a setting at the table, HNH_SHERIFFHEALTH:
-  //     5 hits  gang 80%  law 15%
-  //     6 hits  gang 55%  law 42%
-  //     7 hits  gang 57%  law 37%
-  //     8 hits  law  60%  gang 33%
+  // Read this as a BONUS, not as a total. The code is
+  //     maxHealth = healthOf(gunhand) + (sheriff ? sheriffHealth - health : 0)
+  // so what the star actually adds is three hits on top of whatever the
+  // gunhand gives - which is the original's rule, where the star is one bullet
+  // more than that character's own life total rather than a fixed number.
+  //
+  // So this is what a Sheriff has when his gunhand is worth the default four,
+  // which is fourteen of the sixteen. The two that are worth three - the one
+  // everybody reaches a step short of and the one who takes a card back off
+  // whoever hits him - give a Sheriff six, and both of them buy that hit back
+  // with something else. Do not "fix" it into an absolute: a three-hit gunhand
+  // dealt the star would then be strictly better than a four-hit one, and the
+  // whole point of dealing a gunhand is that it is not a menu.
+  //
+  // Sixty rounds a setting at the table, HNH_SHERIFFHEALTH, and again after
+  // the bot deputies stopped guarding the wrong man:
+  //     5 hits  gang 68%  law 30%
+  //     6 hits  gang 58%  law 35%
+  //     7 hits  gang 50%  law 47%
   sheriffHealth: 7,
   draw: 2,                 // cards at the start of your turn
   // A hit is a hit. Where you put it decides whether it lands, not what it is
