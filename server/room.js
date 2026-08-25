@@ -44,6 +44,22 @@ export function chestOf(p) {
 
 let nextId = 1;
 
+/**
+ * What the two roles whose situation the turn mode changes are told about
+ * themselves. The other two read the same in either game: an Outlaw rode in
+ * with the gang wherever he is standing, and a Renegade is in everybody's way.
+ */
+const DUEL_BLURB = {
+  sheriff: {
+    key: 'role.sheriff.blurbDuel',
+    text: 'The star is on you from the bell. Every man at this table knows exactly who to shoot.',
+  },
+  deputy: {
+    key: 'role.deputy.blurbDuel',
+    text: 'You were sworn in at dawn. The man you answer for is the one wearing the star.',
+  },
+};
+
 export class Room {
   constructor(opts = {}) {
     this.code = opts.code || 'LOCAL';
@@ -1918,6 +1934,23 @@ export class Room {
   buildIntel(p, all) {
     const others = all.filter((o) => o.id !== p.id);
     if (p.role === 'deputy') {
+      // In the turn mode the star goes on at the bell and everybody can see
+      // it, so "the Sheriff is one of these two" is a thread with nothing on
+      // the end of it - the man is stood there wearing it. What a deputy in
+      // that mode actually needs is the mirror of what an outlaw gets: one
+      // face that is not on his side. Same shape, same plumbing, and it is
+      // the question that mode leaves open.
+      if (this.duel) {
+        const enemies = others.filter((o) => o.faction !== 'law');
+        if (!enemies.length) {
+          return { kind: 'none', k: 'intel.noEnemies', text: 'Nobody here means the star any harm. Somebody is lying.' };
+        }
+        const name = pick(enemies).name;
+        return {
+          kind: 'name', k: 'intel.notLaw', p: { name },
+          text: `You were sworn in at dawn and given one name: ${name} is no friend of the star.`,
+        };
+      }
       const sheriff = all.find((o) => o.role === 'sheriff');
       const decoyPool = others.filter((o) => o.role !== 'sheriff' && o.role !== 'deputy');
       const decoy = pick(decoyPool.length ? decoyPool : others);
@@ -1936,7 +1969,11 @@ export class Room {
       return { kind: 'name', k: 'intel.mate', p: { name: mate }, text: `You recognise one face from the gang: ${mate}.` };
     }
     if (p.role === 'renegade') {
-      const lawmen = others.filter((o) => o.faction === 'law');
+      // Not the man wearing the star, in the mode where he is wearing it.
+      // Being told the one name the whole table already has is being told
+      // nothing, and it is the only thread this role gets.
+      const lawmen = others.filter((o) => o.faction === 'law'
+        && !(this.duel && o.role === 'sheriff'));
       if (!lawmen.length) {
         return { kind: 'none', k: 'intel.nothing', text: 'You know nothing about anyone here. Good.' };
       }
@@ -1944,6 +1981,12 @@ export class Room {
       return {
         kind: 'name', k: 'intel.lawman', p: { name: lawman },
         text: `You know ${lawman} wears a badge of some kind - star or not.`,
+      };
+    }
+    if (this.duel) {
+      return {
+        kind: 'none', k: 'intel.sheriffDuel',
+        text: 'The star is on you and everybody can see it. You get no thread; you are the thread.',
       };
     }
     return {
@@ -1967,7 +2010,16 @@ export class Room {
       faction: p.faction,
       color: r.color,
       objective: r.objective,
+      // The blurb under the role name says who you are to the town, and for
+      // two of the four that is a different thing in each mode. The Sheriff's
+      // said "nobody knows your face" while his star was on him from the bell,
+      // and the Deputy's said he had a hunch who pinned it on while he could
+      // see it across the table. A key each rather than a sentence each: the
+      // client already asks for role.<id>.blurb, so this only has to hand it a
+      // different id in the mode that needs one.
       blurb: r.blurb,
+      blurbKey: this.duel && DUEL_BLURB[p.role] ? DUEL_BLURB[p.role].key : null,
+      blurbDuel: this.duel && DUEL_BLURB[p.role] ? DUEL_BLURB[p.role].text : null,
       intel: p.intel?.text || '',
       // The one sentence that decides your whole round, so it travels as a key
       // and its names as holes rather than as English prose.

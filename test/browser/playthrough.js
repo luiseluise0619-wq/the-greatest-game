@@ -42,7 +42,14 @@ const CARD_NAMES = {
 // page, dropping the socket - has to finish inside it. A round can otherwise
 // be over in half a minute of combat, and there is nothing to reconnect to
 // after that. So: a long wind-up and a short round.
-const PREP = 105, COMBAT = 20, ENDGAME = 8;
+//
+// 105 seconds of wind-up was not long enough. On a box drawing every pixel of
+// the town on the CPU the run down to the reconnect block took longer than
+// that, and the check that exists to say so - "there is still a round to
+// reconnect to" - fired for real. Making this generous costs nothing now: the
+// wait for the aftermath screen is budgeted from what the server says is
+// actually left rather than from this number.
+const PREP = 260, COMBAT = 20, ENDGAME = 8;
 const server = spawn('node', ['server/index.js'], {
   env: {
     ...process.env, PORT: String(PORT), HNH_TELEMETRY: '0',
@@ -605,12 +612,15 @@ try {
   // page, and a browser throttles the animation frames of a window nobody is
   // looking at - which is what this wait is polled on.
   await A.bringToFront();
+  // What is left of the phase this is standing in, plus the phases after it.
+  // This used to budget a whole prep from here, which was already wrong (the
+  // checks above have eaten an unknown amount of it) and became expensive the
+  // moment prep got long enough to be reliable. The server sends the seconds
+  // remaining with every phase packet, so ask.
+  const phaseLeft = await A.evaluate(() => Math.max(0, Math.ceil(window.game.phaseLeft || 0)));
   const reachedResults = await A.waitForFunction(
     () => !document.getElementById('results').classList.contains('hidden'),
-    // A whole round is prep + combat + endgame, and the checks above have
-    // already eaten some of it - but not reliably a known amount, so this
-    // waits out a full round from here rather than the remainder of one.
-    null, { timeout: (PREP + COMBAT + ENDGAME + 20) * 1000 },
+    null, { timeout: (phaseLeft + COMBAT + ENDGAME + 30) * 1000 },
   ).then(() => true).catch(() => false);
   const endPhase = await A.evaluate(() => window.game.phase || '?');
   check(reachedResults, `the round reaches the aftermath screen (phase ${endPhase})`);

@@ -577,3 +577,79 @@ test('the round out of a man\'s back is a round like any other', () => {
       'nothing in front of him and nothing in his hand, and it still missed');
   } finally { clock.restore(); }
 });
+
+test('the turn mode does not tell the star that nobody knows his face', () => {
+  const { room, clock } = seatedRoom('STAI');
+  try {
+    const all = [...room.players.values()];
+    const star = all.find((p) => p.role === 'sheriff');
+    const dep = all.find((p) => p.role === 'deputy');
+    assert.ok(star, 'no Sheriff was dealt');
+
+    // Everything a man is told about himself, in a mode where the star is on
+    // from the bell and everybody can see it. Three of these used to be
+    // written for the other game and were flatly untrue in this one.
+    const told = (p) => {
+      const out = [];
+      const real = room.emit.bind(room);
+      room.emit = (who, m) => { if (who === p && m.t === 'role') out.push(m); return real(who, m); };
+      const wasBot = p.bot; p.bot = false;
+      p.client = p.client || { ws: { readyState: 1, send: () => {} } };
+      room.sendRole(p);
+      p.bot = wasBot;
+      room.emit = real;
+      return out[0];
+    };
+
+    const s = told(star);
+    assert.ok(s, 'the Sheriff was never told what he is');
+    assert.equal(s.blurbKey, 'role.sheriff.blurbDuel',
+      'he is being told the free-for-all\'s line about nobody knowing his face');
+    assert.ok(!/nobody knows your face/i.test(s.blurbDuel || ''),
+      `and it still says it: ${s.blurbDuel}`);
+    assert.ok(!/nobody knows your face/i.test(s.intel || ''),
+      `and so does his one thread: ${s.intel}`);
+
+    if (dep) {
+      const d = told(dep);
+      assert.equal(d.blurbKey, 'role.deputy.blurbDuel',
+        'the Deputy is still being told he has a hunch about a star he can see');
+      assert.ok(!/one of these two/i.test(d.intel || ''),
+        `and his thread still points at a man wearing it: ${d.intel}`);
+      // What he gets instead has to be a real name at this table.
+      const names = all.map((p) => p.name);
+      const named = names.some((n) => (d.intel || '').includes(n));
+      assert.ok(named || /lying/i.test(d.intel || ''),
+        `his thread names nobody at this table: ${d.intel}`);
+    }
+  } finally { clock.restore(); }
+});
+
+test('and the free-for-all keeps every word of its own', () => {
+  TIMING.prep = 1; TIMING.combat = 900;
+  const clock = fakeClock();
+  const room = new Room({ code: 'STAJ', isPublic: false, mode: MODES.FREE });
+  room.botFillTarget = 5;
+  room.resetClock();
+  const stub = stubClient();
+  room.addConnection(stub.client);
+  room.handleMessage(stub.client, { t: 'join', name: 'Tester' });
+  room.beginMatch();
+  try {
+    const all = [...room.players.values()];
+    const star = all.find((p) => p.role === 'sheriff');
+    const out = [];
+    const real = room.emit.bind(room);
+    room.emit = (who, m) => { if (who === star && m.t === 'role') out.push(m); return real(who, m); };
+    const wasBot = star.bot; star.bot = false;
+    star.client = star.client || { ws: { readyState: 1, send: () => {} } };
+    room.sendRole(star);
+    star.bot = wasBot;
+    room.emit = real;
+    assert.ok(out[0], 'the Sheriff was never told what he is');
+    assert.equal(out[0].blurbKey, null,
+      'the free-for-all was handed the turn mode\'s line');
+    assert.match(out[0].blurb, /nobody knows your face/i,
+      'and lost its own, which is the whole game over there');
+  } finally { clock.restore(); }
+});

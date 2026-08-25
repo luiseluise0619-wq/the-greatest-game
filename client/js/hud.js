@@ -325,7 +325,11 @@ export class HUD {
       ? this.t('faction.law', 'THE LAW')
       : msg.faction === 'outlaw' ? this.t('faction.outlaw', 'THE GANG')
         : this.t('faction.renegade', 'NOBODY BUT YOU');
-    $('roleBlurb').textContent = this.t(`role.${role}.blurb`, msg.blurb);
+    // The turn mode hands two of the four roles a different sentence, because
+    // the star is public there and the free-for-all's line says it is not.
+    $('roleBlurb').textContent = msg.blurbKey
+      ? this.t(msg.blurbKey, msg.blurbDuel || msg.blurb)
+      : this.t(`role.${role}.blurb`, msg.blurb);
     $('roleObjective').textContent = objective;
     $('roleIntel').textContent = msg.intelK
       ? this.t(msg.intelK, msg.intel, msg.intelP)

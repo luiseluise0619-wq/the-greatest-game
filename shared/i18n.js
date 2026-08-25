@@ -296,6 +296,9 @@ const KO = {
   'intel.nothing': '여기 있는 누구에 대해서도 아는 것이 없습니다. 잘된 일입니다.',
   'intel.lawman': '{name} — 별이든 아니든, 어떤 종류의 배지를 달고 있다는 것을 압니다.',
   'intel.sheriff': '아무도 당신 얼굴을 모릅니다. 계속 그렇게 두거나, 별을 달고 덤벼보라고 하거나.',
+  'intel.sheriffDuel': '별은 이미 당신 가슴에 있고 모두가 봅니다. 당신에게는 실마리가 없습니다 — 당신이 실마리입니다.',
+  'intel.notLaw': '새벽에 선서하면서 이름 하나를 받았습니다 — {name:은/는} 별의 편이 아닙니다.',
+  'intel.noEnemies': '여기 아무도 별에게 해를 끼칠 생각이 없습니다. 누군가는 거짓말을 하고 있습니다.',
 
   // ------------------------------------------------------- the kill feed
   // The one line everybody reads. Composed on the client, because who is told
@@ -488,6 +491,8 @@ const KO = {
   'role.renegade.objective': '이 마을에서 마지막까지 서 있는 사람이 되십시오.',
   'role.sheriff.blurb': '이 마을은 당신이 지켜야 합니다. 아직은 아무도 당신 얼굴을 모릅니다.',
   'role.deputy.blurb': '새벽에 선서했습니다. 누가 별을 달았는지 짚이는 데가 있습니다.',
+  'role.sheriff.blurbDuel': '종이 울릴 때부터 별은 당신 가슴에 있습니다. 이 탁자의 모두가 누구를 쏘면 되는지 정확히 압니다.',
+  'role.deputy.blurbDuel': '새벽에 선서했습니다. 당신이 책임져야 할 사람은 별을 단 그 사람입니다.',
   'role.outlaw.blurb': '패거리와 함께 들어왔습니다. 알아본 얼굴은 딱 하나뿐입니다.',
   'role.renegade.blurb': '여기 있는 전부가 당신 앞을 막고 있습니다. 그중 몇은 아직 그걸 모릅니다.',
 
