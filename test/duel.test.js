@@ -302,3 +302,40 @@ test('the free-for-all is still the free-for-all', () => {
     assert.ok(living.filter((p) => room.canFire(p)).length > 1, 'the free-for-all rationed the trigger');
   } finally { clock.restore(); }
 });
+
+test('a dead man does not hold the go for the rest of his six seconds', () => {
+  // The stick goes off in your hands, or you put the chamber to your own head
+  // and it was live. You are out, and the running order drops you the instant
+  // you fall - but the go was still yours, and it stayed yours until the clock
+  // ran out. Every screen at the table highlighted a name that was no longer
+  // in the order, and nobody could take a turn for six seconds.
+  TIMING.prep = 1; TIMING.combat = 900; TIMING.endgame = 60; TIMING.results = 5;
+  const clock = fakeClock();
+  try {
+    const room = new Room({ code: 'DEAD', isPublic: false, mode: MODES.DUEL });
+    room.botFillTarget = 6;
+    room.resetClock();
+    room.beginMatch();
+    tick(clock, room, 40);
+
+    // Somebody whose death does not end the round, so what is measured is the
+    // turn machinery and not the victory check.
+    let victim = null;
+    for (let guard = 0; guard < 400 && !victim; guard += 1) {
+      const h = room.turnHolder ? room.players.get(room.turnHolder) : null;
+      if (h && h.role === 'outlaw') victim = h; else tick(clock, room, 4);
+    }
+    assert.ok(victim, 'no outlaw ever got a go');
+
+    room.killPlayer(victim, null, 'dynamite', null);
+    assert.equal(room.phase, PHASE.COMBAT, 'the round ended and proved nothing');
+    assert.notEqual(room.turnHolder, victim.id, 'a corpse kept the gun');
+
+    const msg = room.turnMsg();
+    if (msg.kind === 'turn') {
+      assert.ok(room.players.get(msg.holder)?.alive, 'the go went to somebody who is not alive');
+      assert.ok(msg.order.includes(msg.holder),
+        'the table was told to watch a man who is not in the running order');
+    }
+  } finally { clock.restore(); }
+});

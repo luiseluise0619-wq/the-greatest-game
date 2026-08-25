@@ -937,6 +937,13 @@ export class Room {
 
     this.emit(victim, { t: S.SELF, dead: true });
     this.checkVictory();
+
+    // A dead man does not get the rest of his go. The stick that went off in
+    // his hands, or the chamber he put to his own head, used to leave the
+    // table watching a corpse hold the gun for the remaining seconds - the
+    // running order had already dropped him, so every screen highlighted
+    // nobody and nobody could do a thing. Move it on the moment he falls.
+    if (this.duel && this.turn && this.turnHolder === victim.id) this.advanceTurn(now());
   }
 
   /**
