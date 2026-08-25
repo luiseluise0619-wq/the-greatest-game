@@ -948,7 +948,8 @@ Putting the table in fixed it as a game before it fixed it as a balance:
 | at the table | 59% | 45% |
 | and with the deck not printing itself | 64% | 48% |
 | and the deputies watching the right man | 66% | 46% |
-| **and the crosshair counting seats too** | **68%** | 47% |
+| and the crosshair counting seats too | 68% | 47% |
+| **and nothing spent on a shot going nowhere** | **66–68%** | 46–48% |
 
 None of the rows below the second are tuning changes; every one of them is a
 bug the mode had been played around. The third: The deck was quietly growing: every
@@ -997,9 +998,16 @@ comes out even at seven rather than merely least-bad.
 So still seven, and it is still the one deviation from the original left in the
 mode — the star is the only man at the table anybody can identify, and the law
 has nothing like that to aim back with. But it is no longer papering over
-anything: four runs of sixty on the fixed build read **55 / 42**, **47 / 50**,
-**53 / 37** and **40 / 55** law to outlaw, which averages about even and is the
-closest this mode has measured.
+anything. Six runs on the fixed build, law to outlaw: **47/47**, **64/30**,
+**55/42**, **47/50**, **53/37**, **40/55**. That averages to about even and the
+spread is the noise floor doing what the section below says it does — the two
+widest readings, 64/30 and 40/55, are the same build measured twice.
+
+The number that did move, and stayed moved, is the share of the Sheriff's
+killers who had actually picked him out: **62%** before any of this session's
+fixes, **90% and 94%** on the last two runs. He dies to somebody deciding now,
+not to crossfire, which is the difference between a deduction game and a
+shooting gallery.
 
 ### Eight at the table
 
