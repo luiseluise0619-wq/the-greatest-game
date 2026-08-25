@@ -2383,16 +2383,30 @@ export class Room {
       this.pushDuel(victim);
     }
     if (victim.gunhand === 'scavenger' && attacker && attacker !== victim) {
+      let got = 0;
       for (let i = 0; i < hits; i += 1) {
         const taken = this.stripCard(attacker);
         if (!taken) break;
         victim.duelHand.push(taken);
+        got += 1;
       }
-      this.emit(attacker, {
-        t: S.FEED, k: 'feed.takesItBack', p: { name: victim.name },
-        text: `${victim.name} takes one off you for it.`, tone: 'bad',
-      });
-      this.pushDuelAll();
+      // Nothing to take off a man holding nothing, and telling him he lost one
+      // when he did not is worse than saying nothing.
+      if (got) {
+        this.emit(attacker, {
+          t: S.FEED, k: 'feed.takesItBack', p: { name: victim.name },
+          text: `${victim.name} takes one off you for it.`, tone: 'bad',
+        });
+        // And the man whose hands did it hears about it too. Every other
+        // gunhand in the sixteen says something to the person it fired for;
+        // this one told the victim's attacker and left the victim to notice
+        // his own hand had grown.
+        this.emit(victim, {
+          t: S.FEED, k: 'feed.tookItBack', p: { name: attacker.name, n: got },
+          text: `You take ${got} out of ${attacker.name}'s hand for it.`, tone: 'good',
+        });
+        this.pushDuelAll();
+      }
     }
   }
 

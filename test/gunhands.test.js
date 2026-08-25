@@ -106,6 +106,30 @@ test('one bleeds a card for every hit, and one takes it off whoever landed it', 
     assert.equal(a.duelHand.length + (a.gear || []).length, 1, 'the shooter kept everything he had');
     assert.equal(c.duelHand.length, 1, 'and it did not end up in the hand it was taken for');
     assert.equal(healthOf('scavenger', DUEL.health), 3, 'and he is meant to be cheaper to kill for it');
+
+    // And the man whose hands did it is told. Every other gunhand in the
+    // sixteen says something to the person it fired for; this one told the
+    // shooter he had lost a card and left the scavenger to notice his own
+    // hand had grown. Nothing to take is nothing said, either way.
+    const said = [];
+    const real = room.emit.bind(room);
+    room.emit = (who, m) => { said.push({ to: who.id, k: m.k }); return real(who, m); };
+    c.duelHand = [];
+    a.duelHand = ['bang'];
+    a.shotSerial = (a.shotSerial || 0) + 1; a.shotSpent = null;
+    room.applyDamage(c, a, 99, 'shot', null, 'body');
+    assert.ok(said.some((x) => x.to === c.id && x.k === 'feed.tookItBack'),
+      'his own ability fired and he was not told');
+    assert.ok(said.some((x) => x.to === a.id && x.k === 'feed.takesItBack'),
+      'and the man it was taken from was not told either');
+
+    said.length = 0;
+    a.duelHand = []; a.gear = [];
+    a.shotSerial += 1; a.shotSpent = null;
+    room.applyDamage(c, a, 99, 'shot', null, 'body');
+    assert.ok(!said.some((x) => x.k === 'feed.takesItBack'),
+      'a man holding nothing was told he had lost a card');
+    room.emit = real;
   } finally { clock.restore(); }
 });
 

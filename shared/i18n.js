@@ -381,6 +381,7 @@ const KO = {
   'feed.showsBlack': '{name} — 「{card}」을 뒤집어 보입니다. 검은 패, 여기까지입니다.',
   'feed.bleedsSlow': '손에 {n}장이 더 들어옵니다.',
   'feed.takesItBack': '{name} — 그 대가로 당신에게서 한 장 가져갑니다.',
+  'feed.tookItBack': '그 대가로 {name}의 손에서 {n}장 빼왔습니다.',
   'feed.pockets': '{name}의 주머니를 뒤집니다. 손에 {n}장이 더 들어옵니다.',
   'feed.neverEmpty': '손이 비는 순간 이미 무언가가 들려 있습니다.',
   'gun.nothingToPress': '당신의 능력은 부탁하지 않아도 알아서 일합니다.',
