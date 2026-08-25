@@ -58,25 +58,44 @@ test('a go that ends in a shot is told apart from one that does not', () => {
     // A go where nothing happened at all.
     p.bangsThisTurn = 0;
     p.cardsThisTurn = 0;
+    p.firedThisTurn = false;
     room.onTurnEnd(p);
     assert.equal(telemetry.agg.goes, goes + 1, 'the empty go was not counted');
     assert.equal(telemetry.agg.goesWithShot, withShot, 'an empty go counted as a shot');
     assert.equal(telemetry.agg.goesWithCard, withCard, 'an empty go counted as a card');
 
-    // A go where a Bang! left the gun. That is a shot and a card both.
-    p.bangsThisTurn = 1;
+    // A go where a Bang! left the gun, spent the way the room spends it. That
+    // is a shot and a card both.
+    p.duelHand = ['bang'];
+    p.bangsThisTurn = 0;
     p.cardsThisTurn = 0;
+    p.firedThisTurn = false;
+    assert.equal(room.spendBang(p), true, 'the Bang! never left his hand');
     room.onTurnEnd(p);
     assert.equal(telemetry.agg.goesWithShot, withShot + 1, 'the shot was not counted');
     assert.equal(telemetry.agg.goesWithCard, withCard + 1,
       'a Bang! is a card as well as a shot');
 
+    // The barrel turned round on a blank buys the go back and zeroes the one
+    // shot a man gets. It does not un-fire the round: the gun went off, and a
+    // go spent hearing a click is not a go where nothing happened.
+    p.duelHand = ['bang'];
+    p.bangsThisTurn = 0;
+    p.cardsThisTurn = 0;
+    p.firedThisTurn = false;
+    room.spendBang(p);
+    p.bangsThisTurn = 0;                       // what the blank does
+    room.onTurnEnd(p);
+    assert.equal(telemetry.agg.goesWithShot, withShot + 2,
+      'a blank out of the barrel turned round wrote the go down as a quiet one');
+
     // A go where something was played but nothing was fired.
     p.bangsThisTurn = 0;
     p.cardsThisTurn = 2;
+    p.firedThisTurn = false;
     room.onTurnEnd(p);
-    assert.equal(telemetry.agg.goesWithShot, withShot + 1, 'a beer counted as a shot');
-    assert.equal(telemetry.agg.goesWithCard, withCard + 2, 'the played card was not counted');
+    assert.equal(telemetry.agg.goesWithShot, withShot + 2, 'a beer counted as a shot');
+    assert.equal(telemetry.agg.goesWithCard, withCard + 3, 'the played card was not counted');
   } finally { clock.restore(); }
 });
 

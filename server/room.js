@@ -575,6 +575,14 @@ export class Room {
     p.duelHand.splice(at, 1);
     this.pile.put(card);
     p.bangsThisTurn = (p.bangsThisTurn || 0) + 1;
+    // Two different questions. bangsThisTurn is the RULE - one shot a go, and
+    // a blank out of the barrel turned round buys the go back and zeroes it.
+    // These two are the RECORD, and nothing gives them back: the round went
+    // off, whatever the chamber had in it. Reading the rule for the record
+    // meant a go spent putting the gun to your own head and hearing a click
+    // was written down as a go where nothing happened at all.
+    p.firedThisTurn = true;
+    p.cardsThisTurn = (p.cardsThisTurn || 0) + 1;
     // A Bang! is fired rather than played, but it is still a card that left
     // this man's hand, so it belongs on the account of the round with the rest.
     p.cardsPlayed.push(card);
@@ -2239,6 +2247,7 @@ export class Room {
     p.vel = { x: 0, y: 0, z: 0 };
     p.bangsThisTurn = 0;
     p.cardsThisTurn = 0;
+    p.firedThisTurn = false;
     if (!this.pile) { this.pushSelf(p); return; }
 
     // 1. The lit stick, if it stopped with you. It travels with the turn, so
@@ -2557,8 +2566,7 @@ export class Room {
     if (!this.duel || !p || !this.pile) return;
     // What the go amounted to, before the hand is trimmed. A Bang! spent is
     // both a shot and a card, so the two counts overlap on purpose.
-    telemetry.goEnd(this, p, (p.bangsThisTurn || 0) > 0,
-      (p.bangsThisTurn || 0) + (p.cardsThisTurn || 0) > 0);
+    telemetry.goEnd(this, p, !!p.firedThisTurn, (p.cardsThisTurn || 0) > 0);
     const limit = handLimit(p);
     while (p.duelHand.length > limit) this.pile.put(p.duelHand.pop());
     this.pushDuel(p);
