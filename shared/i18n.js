@@ -310,6 +310,8 @@ const KO = {
   // says them, in whichever language it is in.
   'kill.youDiedTo': '{killer} — 당신을 {where} 눕혔습니다.',
   'kill.youDied': '{where} 죽었습니다.',
+  'kill.youDiedOnGo': '{name}의 차례에 쓰러졌습니다.',
+  'kill.unseenOnGo': '{name}의 차례에 총성 한 발. {victim} 사망 — 정체 {role}. 누가 쐈는지는 아무도 못 봤습니다.',
   'kill.youKilled': '{victim} 사살 — 정체 {role}.',
   'kill.watched': '{killer} — {victim} 죽이는 장면을 당신이 봤습니다. 정체 {role}.',
   'kill.storm': '{victim} — 모래폭풍 속에서 숨이 막혔습니다. 정체 {role}.',

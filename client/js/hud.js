@@ -954,11 +954,20 @@ export class HUD {
     const killer = `<b>${escapeHtml(msg.killerName || '')}</b>`;
     const victim = `<b>${escapeHtml(msg.victimName)}</b>`;
     const where = this.place(msg.place);
+    // At a table a place is the same place every time, so the lines that lean
+    // on one lean on the go instead: everybody has been standing on the same
+    // four metres of Main Street since the bell, and "a shot on Main Street"
+    // was the whole of what the town was told about every death in the round.
+    const onGo = msg.onGo ? `<b>${escapeHtml(msg.onGo)}</b>` : null;
     let line;
     if (msg.youDied) {
-      line = msg.killerName
-        ? this.t('kill.youDiedTo', `${killer} put you down ${where}.`, { killer, where })
-        : this.t('kill.youDied', `You died ${where}.`, { where });
+      if (msg.killerName) {
+        line = this.t('kill.youDiedTo', `${killer} put you down ${where}.`, { killer, where });
+      } else if (onGo) {
+        line = this.t('kill.youDiedOnGo', `You went down on ${onGo}'s go.`, { name: onGo });
+      } else {
+        line = this.t('kill.youDied', `You died ${where}.`, { where });
+      }
     } else if (msg.youKilled) {
       line = this.t('kill.youKilled', `You killed ${victim} — they were the ${role}.`, { victim, role });
     } else if (msg.witnessed && msg.killerName) {
@@ -968,6 +977,10 @@ export class HUD {
       line = this.t('kill.storm', `${victim} choked out in the storm — the ${role}.`, { victim, role });
     } else if (msg.cause === 'left') {
       line = this.t('kill.left', `${victim} rode out of town — the ${role}.`, { victim, role });
+    } else if (onGo) {
+      line = this.t('kill.unseenOnGo',
+        `A shot on ${onGo}'s go. ${victim} is dead — the ${role}. Nobody saw who fired.`,
+        { name: onGo, victim, role });
     } else {
       line = this.t('kill.unseen',
         `A shot ${where}. ${victim} is dead — the ${role}. Nobody saw who.`,

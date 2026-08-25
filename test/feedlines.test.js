@@ -172,7 +172,24 @@ test('the lines a round might not reach on its own get reached', () => {
     hand(them, 'undertaker'); me.duelHand = ['bang', 'beer'];
     room.onDeathSpoils(me);
 
-    // The round out of a man's back, and the two things that stop it. Neither
+    // The kill feed at a table. A place is the same place every time there -
+  // everybody has stood on the same four metres of Main Street since the bell
+  // - so the two lines that leaned on one name the go instead, and a round of
+  // bots only reaches them when somebody dies with nobody facing the shooter.
+  // These two are composed on the client rather than sent by the server, so
+  // the English travels with them here the way it travels in hud.js.
+  said.push({
+    t: 'feed', k: 'kill.unseenOnGo',
+    text: `A shot on ${me.name}'s go. ${them.name} is dead - the Outlaw. Nobody saw who fired.`,
+    p: { name: me.name, victim: them.name, role: 'Outlaw' },
+  });
+  said.push({
+    t: 'feed', k: 'kill.youDiedOnGo',
+    text: `You went down on ${me.name}'s go.`,
+    p: { name: me.name },
+  });
+
+  // The round out of a man's back, and the two things that stop it. Neither
     // line is ever said by a round of bots that did not happen to gamble in
     // front of a man with a barrel.
     // Nobody's gunhand in the way. If the shooter happened to be dealt the one
@@ -207,10 +224,11 @@ test('the lines a round might not reach on its own get reached', () => {
     for (const k of ['feed.bleedsSlow', 'feed.takesItBack', 'feed.tookItBack',
       'feed.neverEmpty', 'gun.nothingToPress', 'gun.notYourGo', 'gun.needTwoCards',
       'gun.twoForOne', 'feed.throughWood', 'feed.throughMissed', 'feed.squareOff',
-      'feed.lightFingers', 'feed.lifted', 'feed.threeForTwo']) {
+      'feed.lightFingers', 'feed.lifted', 'feed.threeForTwo',
+      'kill.unseenOnGo', 'kill.youDiedOnGo']) {
       assert.ok(keys.has(k), `${k} was never said, so nothing here checked its holes`);
     }
-    assert.ok(keys.size >= 32, `only ${keys.size} different lines were reached`);
+    assert.ok(keys.size >= 34, `only ${keys.size} different lines were reached`);
     check(said, 'the lines a round does not always reach');
   } finally { clock.restore(); }
 });

@@ -880,6 +880,13 @@ export class Room {
         killerName: saw && killer ? killer.name : null,
         witnessed: saw,
         place,
+        // Whose go it was, in the mode where a place says nothing. Everybody
+        // stands on the same four metres of Main Street from the bell to the
+        // last man, so "a shot on Main Street" is the same sentence about
+        // every death in the round. The go is what a rumour at a table is
+        // actually about.
+        onGo: this.duel && this.turnHolder
+          ? this.players.get(this.turnHolder)?.name || null : null,
         cause,
         youDied: p.id === victim.id,
         youKilled: killer ? p.id === killer.id : false,
