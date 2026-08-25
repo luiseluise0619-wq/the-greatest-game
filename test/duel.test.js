@@ -135,7 +135,7 @@ test('a shot out of turn does nothing at all', () => {
     room.turn = { kind: 'turn', holder: b.id, endsAt: 1e12 };
     const before = b.health;
     // Straight at the handler, the way a modified client would.
-    for (let i = 0; i < 20; i++) room.onShoot(a, { dir: [0, 0, -1] });
+    for (let i = 0; i < 20; i++) room.onShoot(a, { dir: { x: 0, y: 0, z: -1 } });
     assert.equal(b.health, before, 'a player fired twenty rounds on somebody else\'s go');
     assert.equal(a.guns[a.slot].mag, 6, 'and it cost them ammunition to do it');
   } finally { clock.restore(); }

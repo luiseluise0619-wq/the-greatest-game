@@ -610,6 +610,15 @@ export class Room {
 
   onShoot(p, msg) {
     if (!this.canFire(p)) return;
+    // Where he is pointing, checked before anything is spent on it. This used
+    // to be read a dozen lines down, after the Bang! had left his hand, after
+    // a round had come out of the chamber the whole town is counting, and
+    // after the magazine and the fire cooldown - so a packet that arrived
+    // without a usable direction cost a card, a round and a go, and quietly
+    // changed what everybody at the table believed about the chamber. Nothing
+    // is spent on a trigger pull that is not going anywhere.
+    const dir = normalize(msg.dir);
+    if (!dir) return;
     if (this.duel) {
       // The barrel has to have been steady on somebody long enough for them to
       // have seen it coming. This is the draw, and it is the only warning
@@ -633,8 +642,6 @@ export class Room {
     p.firedAt = t;
 
     const origin = eyeOf(p);
-    let dir = normalize(msg.dir);
-    if (!dir) return;
     // The client tells us where it is looking; we own everything after that.
     const ads = !!msg.ads && w.ads;
     let spread = ads ? (w.spreadAds ?? w.spread * 0.25) : (p.moving ? w.spreadMoving : w.spread);

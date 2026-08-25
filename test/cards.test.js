@@ -752,7 +752,7 @@ test('Hair Trigger rations shots by the number on the character, and says so', (
     const w = WEAPONS[shooter.slot];
     shooter.nextFireAt = 0;
     shooter.guns[shooter.slot].mag = w.magSize;
-    room.onShoot(shooter, { dir: [0, 0, -1] });
+    room.onShoot(shooter, { dir: { x: 0, y: 0, z: -1 } });
     const gap = shooter.nextFireAt - shooter.firedAt;
     assert.ok(Math.abs(gap - w.fireInterval * c.fireMult) < 1e-6,
       `the gap between shots was ${gap}, not ${w.fireInterval * c.fireMult}`);

@@ -143,7 +143,7 @@ test('one reads a Missed! as a shot, and fires it', () => {
     a.nextFireAt = 0;
     a.aimDwell = DUEL.drawTime + 0.2;
     assert.equal(room.canFire(a), true, 'he could not fire with a hand full of ammunition');
-    room.onShoot(a, { dir: [0, 0, -1] });
+    room.onShoot(a, { dir: { x: 0, y: 0, z: -1 } });
     assert.deepEqual(a.duelHand, [], 'and it never left his hand');
 
     // And the other way: a Bang! gets him out of the way of one.
@@ -313,7 +313,7 @@ test('one is never holding nothing', () => {
     a.duelHand = ['bang'];
     a.nextFireAt = 0;
     a.aimDwell = DUEL.drawTime + 0.2;
-    room.onShoot(a, { dir: [0, 0, -1] });
+    room.onShoot(a, { dir: { x: 0, y: 0, z: -1 } });
     assert.equal(a.duelHand.length, 1, 'she fired her last card and stood there empty');
   } finally { clock.restore(); }
 });

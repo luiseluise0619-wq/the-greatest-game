@@ -93,11 +93,11 @@ test('a gun has to be steady before it will fire', () => {
     a.duelHand = ['bang'];
     a.nextFireAt = 0;
     a.aimDwell = 0;
-    room.onShoot(a, { dir: [0, 0, -1] });
+    room.onShoot(a, { dir: { x: 0, y: 0, z: -1 } });
     assert.deepEqual(a.duelHand, ['bang'], 'a snap shot went off with no warning to anybody');
 
     a.aimDwell = DUEL.drawTime + 0.05;
-    room.onShoot(a, { dir: [0, 0, -1] });
+    room.onShoot(a, { dir: { x: 0, y: 0, z: -1 } });
     assert.deepEqual(a.duelHand, [], 'a steady barrel would not fire');
   } finally { clock.restore(); }
 });

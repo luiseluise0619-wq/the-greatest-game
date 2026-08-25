@@ -851,3 +851,51 @@ test('the star is a bonus on the gunhand, not a number that replaces it', () => 
       `a Sheriff holding ${hand} came out on ${hits}`);
   }
 });
+
+test('a trigger pull that is not going anywhere costs nothing', () => {
+  const { room, clock } = seatedRoom('STAO');
+  try {
+    const all = [...room.players.values()].filter((p) => p.alive);
+    const [me, mark] = all;
+    for (const p of all) { p.gear = []; p.weaponCard = null; p.gunhand = null; }
+    seatThem(room, [me, mark, ...all.filter((p) => p !== me && p !== mark)]);
+    me.pos = { x: 40, y: 0, z: 0 };
+    mark.pos = { x: 40, y: 0, z: 1 };
+    for (const p of all) if (p !== me && p !== mark) p.pos = { x: 300, y: 0, z: 300 };
+    me.yaw = Math.PI; me.pitch = 0;
+    me.duelHand = ['bang'];
+    mark.duelHand = []; mark.gear = []; mark.health = mark.maxHealth;
+    room.phase = 'combat';
+    room.turn = { kind: 'turn', holder: me.id, endsAt: Date.now() / 1000 + 1e6 };
+    me.bangsThisTurn = 0; me.firedThisTurn = false; me.nextFireAt = 0;
+    me.aimDwell = DUEL.drawTime + 1; me.reloading = null;
+    room.chamber = [true, true, true];
+    const mag = me.guns.revolver.mag;
+
+    // A direction the server cannot use. This used to be read a dozen lines
+    // after the Bang! had left his hand, after a round had come out of the
+    // chamber the whole town counts, and after the magazine - so a packet
+    // that arrived without a usable direction cost a card, a round and a go,
+    // and quietly changed what everybody at the table believed was left in
+    // the chamber. Every shape a bad one can take.
+    for (const bad of [undefined, null, {}, { x: 0, y: 0, z: 0 }, [0, 0, -1], 'north',
+      { x: NaN, y: 0, z: 1 }, { x: 0, y: 0 }]) {
+      room.onShoot(me, { dir: bad });
+    }
+    assert.deepEqual(me.duelHand, ['bang'], 'a bad direction cost him the card in his hand');
+    assert.equal(room.chamber.length, 3, 'and took rounds out of the shared chamber');
+    assert.equal(me.guns.revolver.mag, mag, 'and emptied his gun');
+    assert.equal(me.bangsThisTurn, 0, 'and used up his one shot a turn');
+    assert.equal(mark.health, mark.maxHealth, 'and somehow hit somebody');
+
+    // And a direction it can use still works, which is the half nothing in
+    // this suite was checking: every test that fired passed an array, arrays
+    // have no .x, and the shot died at the same line - so they were all
+    // asserting on the card being spent and none on the shot landing.
+    room.onShoot(me, { dir: { x: 0, y: 0, z: 1 } });
+    assert.deepEqual(me.duelHand, [], 'the Bang! never left his hand');
+    assert.equal(room.chamber.length, 2, 'and no round came out of the chamber');
+    assert.ok(mark.health < mark.maxHealth,
+      `he fired at a man one seat away with a live round and missed (${mark.health})`);
+  } finally { clock.restore(); }
+});
