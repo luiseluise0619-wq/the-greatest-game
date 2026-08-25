@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick } from './helpers.js';
-import { TIMING, MODES, PHASE } from '../shared/constants.js';
+import { TIMING, MODES, PHASE, DUEL } from '../shared/constants.js';
 import { line, has } from '../shared/i18n.js';
 
 const { Room } = await import('../server/room.js');
@@ -122,8 +122,48 @@ test('the lines a round might not reach on its own get reached', () => {
     them.hasDynamite = true;
     room.onTurnStart(them);
 
+    // The sixteen. A round of bots reaches whichever handful got dealt, so
+    // twelve of these lines can go a hundred rounds without ever being said -
+    // which is exactly how a hole in one of them survives.
+    // Both of them back on their feet: the barrel turned round and the stick
+    // above may well have put one of them in the ground, and a dead man's
+    // hands do nothing.
+    for (const who of [me, them]) {
+      who.alive = true;
+      who.maxHealth = who.maxHealth || DUEL.health;
+      who.health = who.maxHealth;
+      who.gear = [];
+    }
+    const hand = (who, id) => { who.gunhand = id; };
+    hand(them, 'ironhide'); them.duelHand = [];
+    room.onHitTaken(them, me, 1);
+    hand(them, 'scavenger'); me.duelHand = ['bang']; them.duelHand = [];
+    room.onHitTaken(them, me, 1);
+    hand(them, 'scavenger'); me.duelHand = []; me.gear = [];
+    room.onHitTaken(them, me, 1);
+    hand(them, 'emptyhand'); them.duelHand = [];
+    room.checkEmptyHand(them);
+    hand(them, 'undertaker'); me.duelHand = ['bang', 'beer'];
+    room.onDeathSpoils(me);
+
+    // The one with a key to press, and every way it can be refused.
+    room.turn = { kind: 'turn', holder: me.id, endsAt: 1e12 };
+    hand(me, 'cooper'); room.onGunhandAbility(me);          // nothing to press
+    hand(me, 'fieldsurgeon');
+    room.turn = { kind: 'turn', holder: them.id, endsAt: 1e12 };
+    room.onGunhandAbility(me);                              // not your go
+    room.turn = { kind: 'turn', holder: me.id, endsAt: 1e12 };
+    me.health = me.maxHealth; room.onGunhandAbility(me);    // not hurt enough
+    me.health = 1; me.duelHand = ['bang']; room.onGunhandAbility(me);  // needs two
+    me.duelHand = ['bang', 'beer', 'missed']; room.onGunhandAbility(me);  // and it works
+
     const keys = new Set(said.map((m) => m.k));
-    assert.ok(keys.size >= 18, `only ${keys.size} different lines were reached`);
+    for (const k of ['feed.bleedsSlow', 'feed.takesItBack', 'feed.tookItBack',
+      'feed.neverEmpty', 'gun.nothingToPress', 'gun.notYourGo', 'gun.needTwoCards',
+      'gun.twoForOne']) {
+      assert.ok(keys.has(k), `${k} was never said, so nothing here checked its holes`);
+    }
+    assert.ok(keys.size >= 26, `only ${keys.size} different lines were reached`);
     check(said, 'the lines a round does not always reach');
   } finally { clock.restore(); }
 });
