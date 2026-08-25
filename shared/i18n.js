@@ -542,6 +542,8 @@ const KO = {
   'sb.status': '상태',
   'sb.knownRole': '알아낸 역할',
   'sb.kills': '목격한 처치',
+  'res.kills': '처치',
+  'res.gunhandCol': '총잡이 기질',
   'sb.standing': '생존',
   'sb.deadStatus': '사망',
   'sb.unknown': '모름',

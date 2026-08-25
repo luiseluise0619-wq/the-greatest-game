@@ -790,14 +790,18 @@ export class HUD {
         // The role card is the one quiet moment there is time to look at a
         // face, so this is where the plate goes rather than the HUD, where a
         // hundred-pixel card is a smudge and the words are the whole point.
-        return `<div class="handCard duelHandCard">
-          <img src="${duelCardUrl(id)}" alt="${escapeHtml(c.name)}">
+        // The face is left out of the markup and filled in below: pressing
+        // nine plates costs the best part of a second of frozen main thread,
+        // and this is drawn at the exact moment the round starts.
+        return `<div class="handCard duelHandCard" data-face="${escapeHtml(id)}">
+          <span class="handSlot"></span>
           <div class="handText">
             <h5><span>${escapeHtml(this.t(`duel.${id}.name`, c.name))}</span><em>${i + 1}</em></h5>
             <div class="handKind">${escapeHtml(this.t(`duel.kind.${c.kind}`, c.kind.toUpperCase()))}</div>
             <p>${escapeHtml(this.t(`duel.${id}.rules`, c.rules))}</p>
           </div></div>`;
       }).join('');
+      this.printHandFaces(box);
       return;
     }
     if (!this.hand.length && !this.armed.length) { box.innerHTML = ''; return; }
@@ -994,6 +998,16 @@ export class HUD {
   // --------------------------------------------------------------- results
   showResults(msg) {
     $('resultTitle').textContent = this.t(`res.title.${msg.winner}`, msg.title);
+    // The third column is one thing in one mode and another in the other: a
+    // character somebody picked, or a gunhand they were dealt. The rows below
+    // already print the right one; the header has to agree with them.
+    const head = $('resultTable').querySelector('thead th:nth-child(3)');
+    const duel = msg.rows.some((r) => r.duel);
+    if (head) {
+      head.setAttribute('data-i18n', duel ? 'res.gunhandCol' : 'res.character');
+      head.textContent = duel
+        ? this.t('res.gunhandCol', 'Gunhand') : this.t('res.character', 'Character');
+    }
     $('resultTitle').className = msg.winner;
     $('resultBlurb').textContent = msg.blurbKey
       ? this.t(msg.blurbKey, msg.blurb) : msg.blurb;
@@ -1019,6 +1033,44 @@ export class HUD {
     this.resetReady();
     $('hud').classList.add('resultsUp');
     $('results').classList.remove('hidden');
+  }
+
+  /**
+   * The faces on the role card's hand, one idle slice at a time. The words
+   * are up immediately - they are what the card is for - and the plates land
+   * behind them. Same run-token trick as the deck strip: a second deal while
+   * the first is still printing would otherwise drop its faces into the new
+   * hand's slots.
+   */
+  printHandFaces(box) {
+    const slots = [...box.querySelectorAll('.handCard[data-face] .handSlot')];
+    if (!slots.length) return;
+    this.handRun = (this.handRun || 0) + 1;
+    const run = this.handRun;
+    const queue = slots.map((s) => ({ slot: s, id: s.parentElement.dataset.face }));
+    const one = () => {
+      const next = queue.shift();
+      if (!next) return false;
+      const c = DUEL_CARDS[next.id];
+      if (c && next.slot.parentElement) {
+        const img = document.createElement('img');
+        img.src = duelCardUrl(next.id);
+        img.alt = c.name;
+        next.slot.replaceWith(img);
+      }
+      return true;
+    };
+    const step = (deadline) => {
+      if (run !== this.handRun) return;
+      if (!one()) return;
+      while (queue.length && deadline && typeof deadline.timeRemaining === 'function'
+        && deadline.timeRemaining() > 6) one();
+      if (!queue.length) return;
+      if (typeof requestIdleCallback === 'function') requestIdleCallback(step, { timeout: 150 });
+      else setTimeout(step, 16);
+    };
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(step, { timeout: 150 });
+    else setTimeout(step, 16);
   }
 
   /**

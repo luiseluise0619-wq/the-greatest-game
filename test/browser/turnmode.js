@@ -111,6 +111,15 @@ try {
 
   // The role card, which is the only quiet moment there is to read four cards
   // you have never seen - and the one place the gunhand you were dealt is said.
+  // The faces are pressed a slice at a time behind the words - nine plates in
+  // one frame is the best part of a second of frozen main thread, drawn at the
+  // exact moment the round starts - so wait for the press to catch up before
+  // counting them.
+  await A.waitForFunction(() => {
+    const slots = document.querySelectorAll('#roleCards .handCard').length;
+    const faces = document.querySelectorAll('#roleCards .handCard img').length;
+    return slots > 0 && faces === slots;
+  }, null, { timeout: 30000 }).catch(() => {});
   const role = await A.evaluate(() => ({
     gunhand: window.game.selfRole.gunhand,
     hands: document.getElementById('roleCharacter').textContent,

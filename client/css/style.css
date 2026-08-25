@@ -562,6 +562,14 @@ button.big { width: 100%; padding: 14px; font-size: 15px; letter-spacing: .22em;
   box-shadow: 0 4px 12px rgba(50, 32, 14, .38);
 }
 .handCard.live img { filter: saturate(.6) brightness(.92); box-shadow: 0 0 0 2px rgba(150,100,30,.55); }
+/* The space a face will occupy while the press is still working through the
+   hand. Same box as the image it becomes, so the words beside it do not jump
+   sideways when each one lands. */
+.handCard .handSlot {
+  flex: 0 0 auto; display: block; width: 84px; aspect-ratio: 5 / 7; border-radius: 5px;
+  background: rgba(90, 66, 38, .12); border: 1px solid rgba(90, 66, 38, .16);
+}
+#manual .handCard .handSlot, .duelHandCard .handSlot { width: 62px; }
 /* Five of the eighty at once is a taller list than two of the six, so their
    faces are printed smaller - it is a reading aid on that card, not the
    showcase, which is the strip in the lobby. */

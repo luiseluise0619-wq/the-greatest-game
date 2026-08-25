@@ -4,3 +4,9 @@ npm-debug.log*
 *.local
 data/
 test/browser/screenshots/
+
+# Throwaway scripts written at the repo root while debugging - they have to
+# live here rather than in a temp dir because that is where node_modules is,
+# and one of them once rode into a commit on a `git add -A`.
+/*.mjs
+!/tools/*.mjs
