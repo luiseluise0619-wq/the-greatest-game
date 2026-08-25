@@ -262,9 +262,15 @@ try {
     check(true, 'no card in hand this go could be played at nobody (skipped)');
   } else {
     check(play.left < play.before, `a number key spends the card it is printed on (${play.card})`);
+    // Where it ends up depends on what it is: a horse or a barrel goes face up
+    // in front of him, a gun goes down in place of the last one, and the ones
+    // that fetch cards put them in his hand. The General Store is the third
+    // kind and has no `draw` on it - it lays a shelf out for the whole table -
+    // so judging it by the first two called a card that worked a failure.
+    const def = DUEL_CARDS[play.card] || {};
     const landed = play.gear.includes(play.card) || play.weapon === play.card
-      || DUEL_CARDS[play.card]?.draw;
-    check(!!landed, 'and it ends up where the card says it goes');
+      || def.draw || play.card === 'store';
+    check(!!landed, `and it ends up where the card says it goes (${play.card})`);
     check(play.table >= 2, `what is in front of everybody is public (${play.table} men on the table)`);
   }
 
@@ -329,13 +335,19 @@ try {
     return {
       head: [...document.querySelectorAll('#sbTable thead th')].map((t) => t.textContent.trim()),
       last: rows.map((r) => r[r.length - 1]),
-      counted: hud.seenKills.get(ids[0]) - (before[0] || 0),
-      unseen: [...hud.seenKills.values()].reduce((a, b) => a + b, 0),
+      counted: (hud.seenKills.get(ids[0]) || 0) - (before[0] || 0),
+      // The DELTA across the whole table, not the total. A real killing can
+      // land between the two readings - five bots are shooting at each other
+      // the whole time this runs - and counting the total called that a bug in
+      // the tally rather than a round going on around it.
+      unseen: [...hud.roster.keys()].reduce((n, id, i) =>
+        n + ((hud.seenKills.get(id) || 0) - (before[i] || 0)), 0),
       rows: rows.length,
     };
   });
   check(sb.counted === 2, `a killing you watched is counted against the man who did it (${sb.counted})`);
-  check(sb.unseen === 2, `and one nobody watched is counted against nobody (${sb.unseen} in all)`);
+  check(sb.unseen === 2,
+    `and one nobody watched is counted against nobody (${sb.unseen} new entries)`);
   check(sb.last.some((c) => c === '2'), `and the scoreboard prints it (${sb.last.join('/')})`);
   check(sb.head[sb.head.length - 1].length > 0, `under a header that says what it is (${sb.head[sb.head.length - 1]})`);
 
