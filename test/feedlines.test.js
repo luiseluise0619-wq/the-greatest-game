@@ -146,6 +146,20 @@ test('the lines a round might not reach on its own get reached', () => {
     hand(them, 'undertaker'); me.duelHand = ['bang', 'beer'];
     room.onDeathSpoils(me);
 
+    // The round out of a man's back, and the two things that stop it. Neither
+    // line is ever said by a round of bots that did not happen to gamble in
+    // front of a man with a barrel.
+    them.gear = ['barrel'];
+    them.duelHand = ['missed'];
+    them.bracedUntil = Date.now() / 1000 + 5;
+    const realDraw = room.drawFor.bind(room);
+    room.drawFor = () => true;
+    room.throughStopped(them, me);
+    room.drawFor = () => false;
+    room.throughStopped(them, me);
+    room.drawFor = realDraw;
+    them.gear = [];
+
     // The one with a key to press, and every way it can be refused.
     room.turn = { kind: 'turn', holder: me.id, endsAt: 1e12 };
     hand(me, 'cooper'); room.onGunhandAbility(me);          // nothing to press
@@ -160,10 +174,10 @@ test('the lines a round might not reach on its own get reached', () => {
     const keys = new Set(said.map((m) => m.k));
     for (const k of ['feed.bleedsSlow', 'feed.takesItBack', 'feed.tookItBack',
       'feed.neverEmpty', 'gun.nothingToPress', 'gun.notYourGo', 'gun.needTwoCards',
-      'gun.twoForOne']) {
+      'gun.twoForOne', 'feed.throughWood', 'feed.throughMissed']) {
       assert.ok(keys.has(k), `${k} was never said, so nothing here checked its holes`);
     }
-    assert.ok(keys.size >= 26, `only ${keys.size} different lines were reached`);
+    assert.ok(keys.size >= 28, `only ${keys.size} different lines were reached`);
     check(said, 'the lines a round does not always reach');
   } finally { clock.restore(); }
 });
