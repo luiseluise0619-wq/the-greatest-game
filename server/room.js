@@ -1598,8 +1598,14 @@ export class Room {
    */
   resolveDuel(caller, target) {
     this.broadcast({
-      t: S.FEED, k: 'feed.callsOut', p: { a: caller.name, b: target.name },
-      text: `${caller.name} calls out ${target.name}.`, tone: 'bad',
+      // Not the same sentence as pressing F. Both mechanics exist in this mode
+      // and both used to print "X calls out Y" - one of them a man pointing a
+      // finger across the table, the other two men putting Bang! after Bang!
+      // down until one of them runs out. Reading the feed, you could not tell
+      // which had just happened.
+      t: S.FEED, k: 'feed.squareOff', p: { a: caller.name, b: target.name },
+      text: `${caller.name} squares off against ${target.name} — Bang! for Bang! until one of them is out.`,
+      tone: 'bad',
     });
     let turn = target;
     let other = caller;

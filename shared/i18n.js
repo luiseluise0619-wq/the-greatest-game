@@ -353,6 +353,7 @@ const KO = {
   'feed.youPatched': '{name} 치료 완료.',
   'feed.bandagedSelf': '스스로 붕대를 감았습니다 (+{n}).',
   'feed.callsOut': '{a} — {b} 앞으로 불러냈습니다.',
+  'feed.squareOff': '{a:이/가} {b}에게 결투를 신청합니다 — 한 발씩 주고받다 먼저 떨어지는 쪽이 맞습니다.',
   'feed.pinsStar': '{name} — 별을 달고 법을 자처합니다. 믿을지 말지는 각자 알아서.',
   'feed.starIsOn': '{name:이/가} 별을 답니다. 그것만큼은 마을 전체가 확실히 압니다.',
   'feed.storeOut': '{name} — 잡화점을 펼쳤습니다.',

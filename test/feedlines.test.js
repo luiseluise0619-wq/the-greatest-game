@@ -108,6 +108,11 @@ test('the lines a round might not reach on its own get reached', () => {
     play('stagecoach'); play('saloon'); play('store');
     play('indians'); play('gatling');
     play('jail', them); play('panic', them); play('catbalou', them);
+    // Calling somebody out with the card, which is not the same thing as
+    // pointing at him with F and no longer says the same sentence.
+    them.duelHand = ['bang']; them.jailed = false;
+    them.gear = (them.gear || []).filter((g) => g !== 'jail');
+    play('duel', them);
     me.health = 1; play('beer');
     // The chamber, both ways round.
     room.chamber = [false]; me.duelHand = ['bang']; me.bangsThisTurn = 0;
@@ -180,7 +185,7 @@ test('the lines a round might not reach on its own get reached', () => {
     const keys = new Set(said.map((m) => m.k));
     for (const k of ['feed.bleedsSlow', 'feed.takesItBack', 'feed.tookItBack',
       'feed.neverEmpty', 'gun.nothingToPress', 'gun.notYourGo', 'gun.needTwoCards',
-      'gun.twoForOne', 'feed.throughWood', 'feed.throughMissed']) {
+      'gun.twoForOne', 'feed.throughWood', 'feed.throughMissed', 'feed.squareOff']) {
       assert.ok(keys.has(k), `${k} was never said, so nothing here checked its holes`);
     }
     assert.ok(keys.size >= 28, `only ${keys.size} different lines were reached`);
