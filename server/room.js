@@ -392,6 +392,7 @@ export class Room {
     if (humans.length > 1) {
       this.broadcast({
         t: S.FEED,
+        k: 'feed.rideAgain', p: { name: p.name, n: ready, of: humans.length },
         text: `${p.name} is ready to ride again (${ready}/${humans.length}).`,
         tone: 'system',
       });
@@ -1727,6 +1728,7 @@ export class Room {
         });
         this.emit(p, {
           t: S.FEED,
+          k: star ? 'feed.posterStar' : 'feed.posterNoStar', p: { name: target.name },
           text: star
             ? `The poster answers you: ${target.name} wears the star.`
             : `The poster answers you: ${target.name} does not wear the star.`,

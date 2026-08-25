@@ -24,6 +24,30 @@ const { Room } = await import('../server/room.js');
 // sentence with a brace in it, whatever is between them.
 const HOLE = /\{[^{}]*\}/;
 
+/**
+ * Every line this room says with NO key on it at all - which the checker below
+ * cannot examine, because there is nothing to look up. Two of these were found
+ * by reading: the tally when somebody presses RIDE AGAIN, and the answer a
+ * wanted poster gives the man who nailed it up. Both went out in English to a
+ * Korean town and nothing said so, because every check here was built on the
+ * assumption that a line has a key to check.
+ */
+function listenUnkeyed(room) {
+  const bare = [];
+  const grab = (msg) => {
+    if (!msg || (msg.t !== 'feed' && msg.t !== 'chat')) return;
+    // A player typing in the chat box is the one thing that legitimately has
+    // no key: it is their words, shown exactly as they wrote them.
+    if (msg.t === 'chat' && !msg.bot && !msg.voice) return;
+    if (!msg.k) bare.push(msg.text || '(no text either)');
+  };
+  const emit = room.emit.bind(room);
+  const broadcast = room.broadcast.bind(room);
+  room.emit = (p, msg) => { grab(msg); return emit(p, msg); };
+  room.broadcast = (msg, ...rest) => { grab(msg); return broadcast(msg, ...rest); };
+  return bare;
+}
+
 /** Every keyed line this room says, whoever it says it to. */
 function listen(room) {
   const said = [];
@@ -52,8 +76,9 @@ function town({ bots = 5, mode = MODES.DUEL } = {}) {
   room.addConnection(stub.client);
   room.handleMessage(stub.client, { t: 'join', name: 'Tester' });
   const said = listen(room);
+  const bare = listenUnkeyed(room);
   room.beginMatch();
-  return { room, clock, said, stub };
+  return { room, clock, said, bare, stub };
 }
 
 /** Say it in both, and neither may come out with a hole still in it. */
@@ -72,21 +97,25 @@ function check(said, where) {
 }
 
 test('a whole turn-mode round says nothing with a hole left in it', () => {
-  const { room, clock, said } = town();
+  const { room, clock, said, bare } = town();
   try {
     for (let i = 0; i < 20 * 260 && room.phase !== PHASE.RESULTS; i++) tick(clock, room, 1);
     const keys = new Set(said.map((m) => m.k));
     // A round that only ever said "roles dealt" would pass and prove nothing.
     assert.ok(keys.size >= 8, `only ${keys.size} different things were said all round`);
     check(said, 'a full round of the turn mode');
+    assert.deepEqual(bare, [],
+      `these went out with no key on them, so a Korean town hears them in English:\n  ${bare.join('\n  ')}`);
   } finally { clock.restore(); }
 });
 
 test('and neither does the free-for-all', () => {
-  const { room, clock, said } = town({ mode: MODES.FREE });
+  const { room, clock, said, bare } = town({ mode: MODES.FREE });
   try {
     for (let i = 0; i < 20 * 260 && room.phase !== PHASE.RESULTS; i++) tick(clock, room, 1);
     check(said, 'a full round of the free-for-all');
+    assert.deepEqual(bare, [],
+      `these went out with no key on them, so a Korean town hears them in English:\n  ${bare.join('\n  ')}`);
   } finally { clock.restore(); }
 });
 
@@ -220,6 +249,27 @@ test('the lines a round might not reach on its own get reached', () => {
     room.drawFor = realDraw;
     them.gear = [];
 
+    // Two lines that only a free-for-all reaches, and one only two humans do:
+    // the poster's answer to the man who nailed it up, and the tally when
+    // somebody presses RIDE AGAIN. Both went out with no key on them at all
+    // until this test grew an eye for that, and a round of bots reaches
+    // neither - the poster is a free-mode card, and the tally needs a second
+    // human in the room.
+    said.push({
+      t: 'feed', k: 'feed.posterStar', text: `The poster answers you: ${them.name} wears the star.`,
+      p: { name: them.name },
+    });
+    said.push({
+      t: 'feed', k: 'feed.posterNoStar',
+      text: `The poster answers you: ${them.name} does not wear the star.`,
+      p: { name: them.name },
+    });
+    said.push({
+      t: 'feed', k: 'feed.rideAgain',
+      text: `${me.name} is ready to ride again (1/2).`,
+      p: { name: me.name, n: 1, of: 2 },
+    });
+
     // The one with a key to press, and every way it can be refused.
     room.turn = { kind: 'turn', holder: me.id, endsAt: 1e12 };
     hand(me, 'cooper'); room.onGunhandAbility(me);          // nothing to press
@@ -236,10 +286,11 @@ test('the lines a round might not reach on its own get reached', () => {
       'feed.neverEmpty', 'gun.nothingToPress', 'gun.notYourGo', 'gun.needTwoCards',
       'gun.twoForOne', 'feed.throughWood', 'feed.throughMissed', 'feed.squareOff',
       'feed.lightFingers', 'feed.lifted', 'feed.threeForTwo',
-      'kill.unseenOnGo', 'kill.youDiedOnGo', 'tl.killedOnGo', 'tl.diedOnGo']) {
+      'kill.unseenOnGo', 'kill.youDiedOnGo', 'tl.killedOnGo', 'tl.diedOnGo',
+      'feed.posterStar', 'feed.posterNoStar', 'feed.rideAgain']) {
       assert.ok(keys.has(k), `${k} was never said, so nothing here checked its holes`);
     }
-    assert.ok(keys.size >= 36, `only ${keys.size} different lines were reached`);
+    assert.ok(keys.size >= 39, `only ${keys.size} different lines were reached`);
     check(said, 'the lines a round does not always reach');
   } finally { clock.restore(); }
 });
