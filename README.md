@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 199 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 204 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -655,7 +655,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 199 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 204 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -800,6 +800,13 @@ They are grouped by what they protect:
   says all of them in both languages; then it reaches by hand for the dozen a
   round of bots never gets to, which is most of the refusals. It found two on
   the way in.
+- **`test/duelstats.test.js`** — what `/stats` knows about the mode people
+  actually play. The readout was built for the free-for-all, and the turn mode
+  reports `cardsDealt(0)` on purpose, so `cardsPerMatch` and `cardPlayRate` read
+  as zero for every round anybody was playing. These lock in the figures worth
+  watching at a table: goes taken, the share of them that ended in a shot, the
+  share where a man could do nothing at all with his six seconds, and which
+  gunhand went out and was still standing at the end.
 - **`test/i18n.test.js`** — the Korean overlay. There is only ever one English
   copy of any string — the one in the HTML, in `constants.js`, or in the
   sentence the server built — and Korean is keyed to it, so two English copies
@@ -922,7 +929,11 @@ The other numbers to watch if the bots ever change: about **42 goes a round**,
 shared chamber, a man out of range, and a man who saw it coming and spent the
 card — and about **one man a round** putting the gun to his own head.
 
-Balance over **120 headless bot-only rounds** (`npm run balance -- 120`) sits at:
+### The free-for-all, over 120 rounds
+
+The other mode, and the numbers below are its alone — `npm run balance` runs the
+free-for-all unless `HNH_MODE=duel` says otherwise. Balance over **120 headless
+bot-only rounds** (`npm run balance -- 120`) sits at:
 
 | | Outlaws | The Law | Renegade |
 |---|---|---|---|

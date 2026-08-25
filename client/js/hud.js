@@ -174,10 +174,9 @@ export class HUD {
     this.deckRun = (this.deckRun || 0) + 1;
     const run = this.deckRun;
     const queue = [...order];
-    const next = () => {
-      if (run !== this.deckRun) return;
+    const printOne = () => {
       const id = queue.shift();
-      if (!id) return;
+      if (!id) return false;
       const slot = strip.querySelector(`.deckCard[data-id="${id}"] .deckSlot`);
       if (slot) {
         const img = document.createElement('img');
@@ -185,11 +184,26 @@ export class HUD {
         img.alt = defs[id].name;
         slot.replaceWith(img);
       }
-      if (typeof requestIdleCallback === 'function') requestIdleCallback(next, { timeout: 900 });
-      else setTimeout(next, 40);
+      return true;
     };
-    if (typeof requestIdleCallback === 'function') requestIdleCallback(next, { timeout: 1500 });
-    else setTimeout(next, 300);
+    // A slice is worth more than one card. The first cut printed exactly one
+    // per callback and asked for a 900ms fallback timeout, and because the
+    // town is rendering behind the menu the browser never has a real idle
+    // slice to give - so every card waited out the full timeout and the
+    // twenty-two of them took twenty seconds to appear. Long enough that the
+    // strip looked broken rather than slow. Now a slice prints until its
+    // deadline runs out, and the fallback is short enough to keep moving.
+    const next = (deadline) => {
+      if (run !== this.deckRun) return;
+      if (!printOne()) return;
+      while (queue.length && deadline && typeof deadline.timeRemaining === 'function'
+        && deadline.timeRemaining() > 6) printOne();
+      if (!queue.length) return;
+      if (typeof requestIdleCallback === 'function') requestIdleCallback(next, { timeout: 200 });
+      else setTimeout(next, 16);
+    };
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(next, { timeout: 400 });
+    else setTimeout(next, 120);
   }
 
   buildVoiceWheel() {
@@ -219,8 +233,11 @@ export class HUD {
       this.roster.set(p.id, { ...cur, name: p.name, character: p.character, bot: p.bot });
       const li = document.createElement('li');
       const c = CHARACTERS[p.character];
-      li.innerHTML = `<b>${escapeHtml(p.name)}</b><span>${c ? c.role : ''}${p.bot ? ' · bot' : ''}</span>`;
-      void 0;
+      // The roster is the first thing a Korean player reads, so the character
+      // trade and the bot tag go through the overlay like everything else.
+      const trade = c ? this.t(`char.${p.character}.role`, c.role) : '';
+      const tag = p.bot ? ` · ${this.t('ui.botTag', 'bot')}` : '';
+      li.innerHTML = `<b>${escapeHtml(p.name)}</b><span>${escapeHtml(trade + tag)}</span>`;
       ul.appendChild(li);
     }
     if (!msg.players.length) {
@@ -382,16 +399,50 @@ export class HUD {
       ? this.t('turn.betweenHint', 'count what went into it')
       : this.t('turn.rootedHint', 'nobody may move');
 
+    this.renderTurnOrder();
+    this.tickTurnClock();
+  }
+
+  /**
+   * The running order, and what is in front of each man on it.
+   *
+   * The server has always sent the public half of the table with every hand -
+   * everybody's gear, everybody's gun, how many cards they are holding, and
+   * who is sitting with the lit stick - and for a long time the HUD read none
+   * of it and drew a row of bare names. In a game where you choose who to
+   * shoot, a man holding one card is a different proposition from a man
+   * holding six, and a man with a barrel in front of him is a different one
+   * again. It was all being sent and shown to nobody.
+   *
+   * Both packets can arrive first, so both call this and it reads whatever it
+   * has: the order off the turn packet, the table off the hand packet.
+   */
+  renderTurnOrder() {
     const ol = $('turnOrder');
+    if (!ol || !this.turn) return;
+    const table = new Map((this.duel?.table || []).map((o) => [o.id, o]));
     ol.innerHTML = '';
     for (const id of this.turn.order || []) {
+      const at = table.get(id);
       const li = document.createElement('li');
-      li.textContent = this.nameOf(id);
       li.className = (id === this.turn.holder ? 'now ' : '')
         + (id === this.game.selfId ? 'self' : '');
+      const bits = [`<span class="who">${escapeHtml(this.nameOf(id))}</span>`];
+      if (at) {
+        // How many cards, which is how many hits they have left as well: the
+        // hand limit is the health, so a man down to one card is nearly out.
+        bits.push(`<i class="held" title="${escapeHtml(this.t('turn.heldTitle', 'cards in hand'))}">${at.cards}</i>`);
+        const out = [];
+        if (at.weapon) out.push(this.t(`duel.${at.weapon}.name`, DUEL_CARDS[at.weapon]?.name || at.weapon));
+        for (const g of at.gear || []) out.push(this.t(`duel.${g}.name`, DUEL_CARDS[g]?.name || g));
+        if (out.length) bits.push(`<em class="out">${escapeHtml(out.join(' · '))}</em>`);
+        // The lit stick travels with the turn, so where it is now is the one
+        // thing on this row that changes who wants the go to come round.
+        if (at.dynamite) bits.push(`<b class="stick" title="${escapeHtml(this.t('turn.stickTitle', 'holding the lit stick'))}">!</b>`);
+      }
+      li.innerHTML = bits.join('');
       ol.appendChild(li);
     }
-    this.tickTurnClock();
   }
 
   /** The seconds left, ticked locally so the server sends one packet, not thirty. */
@@ -482,6 +533,21 @@ export class HUD {
       </div>`;
     }).join('');
 
+    // What you are holding against what you may keep. The hand limit is your
+    // health, and at the end of your go everything over it goes on the pile -
+    // which used to happen silently, with the limit sent every update and
+    // printed nowhere. A man cannot plan a go around a number nobody told him.
+    const count = $('duelCount');
+    if (count) {
+      const over = msg.hand.length > (msg.limit ?? Infinity);
+      count.classList.toggle('hidden', !msg.hand.length);
+      count.classList.toggle('over', over);
+      count.innerHTML = this.t('duel.holding', `<b>${msg.hand.length}</b> of ${msg.limit} you may keep`,
+        { n: msg.hand.length, limit: msg.limit })
+        + (Number.isFinite(msg.pile)
+          ? ` <span class="pile">${escapeHtml(this.t('duel.pileLeft', `${msg.pile} in the pile`, { n: msg.pile }))}</span>` : '');
+    }
+
     const gear = $('duelGear');
     const mine = [...(msg.gear || [])];
     if (msg.weapon) mine.unshift(msg.weapon);
@@ -490,6 +556,10 @@ export class HUD {
       const c = DUEL_CARDS[id];
       return `<span>${escapeHtml(this.t(`duel.${id}.name`, c?.name || id))}</span>`;
     }).join('');
+
+    // The table travels with the hand, so the running order is redrawn here
+    // as well as on a turn packet - whichever of the two arrived last.
+    this.renderTurnOrder();
   }
 
   // ------------------------------------------------------------- hud state

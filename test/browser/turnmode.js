@@ -189,12 +189,23 @@ try {
   // A card, played with the number printed on it, and the table seeing it.
   // Two attempts, because a go is six seconds and the card in hand this lap may
   // be one the room is right to refuse - a second Scope on a man who has one.
+  //
+  // Four attempts, and the go ending under us is a retry rather than a result.
+  // A go is six seconds, myGo() resolves on the animation frame after the turn
+  // packet lands, and the round trip out to the browser and back costs a few
+  // more - so a fixed 900ms wait can land after the turn has moved on, and the
+  // server is then right to refuse the card. That read as "a number key does
+  // not spend the card", which is a false alarm about the game and a real one
+  // about the harness. Wait for the hand to change or for the go to end,
+  // whichever comes first, and only judge the ones that got played.
   let play = { skipped: true };
-  for (let attempt = 0; attempt < 2 && play.skipped; attempt += 1) {
+  for (let attempt = 0; attempt < 4 && play.skipped; attempt += 1) {
     await myGo(A);
     // eslint-disable-next-line no-await-in-loop
     play = await A.evaluate(async () => {
       const g = window.game;
+      const mine = () => g.turn?.kind === 'turn' && g.turn.holder === g.selfId;
+      if (!mine()) return { skipped: true };
       // Something playable at nobody that this man has not already got out:
       // gear he is not wearing, a longer gun than the one in front of him, or
       // simply more cards.
@@ -206,10 +217,15 @@ try {
       const card = g.duel.hand[at];
       const before = g.duel.hand.filter((c) => c === card).length;
       g.playDuelCard(at);
-      await new Promise((r) => setTimeout(r, 900));
+      const count = () => g.duel.hand.filter((c) => c === card).length;
+      for (let i = 0; i < 40 && count() === before; i += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((r) => setTimeout(r, 50));
+        if (!mine()) return { skipped: true };   // the go ran out; try the next
+      }
       return {
         card,
-        left: g.duel.hand.filter((c) => c === card).length,
+        left: count(),
         before,
         gear: [...(g.duel.gear || [])],
         weapon: g.duel.weapon,
@@ -227,6 +243,35 @@ try {
     check(!!landed, 'and it ends up where the card says it goes');
     check(play.table >= 2, `what is in front of everybody is public (${play.table} men on the table)`);
   }
+
+  // ...and that being public means it is on screen. The table travelled with
+  // every hand for a long time and the HUD drew a row of bare names off it,
+  // so the one thing you choose a target on - how many cards a man is holding
+  // and what he has out in front of him - was sent every update and shown to
+  // nobody. So is the hand limit, which is what you lose cards to at the end
+  // of your own go.
+  const board = await A.evaluate(() => {
+    const rows = [...document.querySelectorAll('#turnOrder li')];
+    const count = document.getElementById('duelCount');
+    return {
+      rows: rows.length,
+      withCount: rows.filter((l) => l.querySelector('.held')).length,
+      counts: rows.map((l) => l.querySelector('.held')?.textContent).filter(Boolean),
+      anyGear: rows.some((l) => l.querySelector('.out')),
+      limitShown: !!count && !count.classList.contains('hidden') && count.textContent.trim().length > 0,
+      limitText: count?.textContent.trim() || '',
+      hand: window.game.duel.hand.length,
+      limit: window.game.duel.limit,
+    };
+  });
+  check(board.rows >= 4, `the running order lists the table (${board.rows} men)`);
+  check(board.withCount === board.rows,
+    `and how many cards each of them is holding (${board.counts.join('/')})`);
+  check(board.counts.every((c) => /^\d+$/.test(c)), 'as a number rather than a guess');
+  check(board.limitShown, `and what you may keep at the end of your go (${board.limitText})`);
+  check(board.limitText.includes(String(board.hand)) && board.limitText.includes(String(board.limit)),
+    `the count is your hand against your limit (${board.hand} of ${board.limit})`);
+
   await A.screenshot({ path: `${SHOTS}/d3-your-go.png` });
 
   // A refresh in the middle of a lap. The hand IS the ammunition, so coming

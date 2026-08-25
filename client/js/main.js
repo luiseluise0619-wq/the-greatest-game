@@ -326,8 +326,17 @@ class Game {
     $('setLang').value = v.lang;
   }
 
-  /** True while the whole town is standing at its marks. */
-  rooted() { return !!this.turn && this.turn.kind !== 'reposition'; }
+  /**
+   * True while the whole town is standing at its marks - which, in the turn
+   * mode, is the whole round. Nobody walks: not between laps, not before the
+   * bell, not on their own go. This used to read `this.turn && kind !==
+   * 'reposition'`, which let the client walk during the four-second beat
+   * between laps and through the whole of prep while `Room.rooted` - a plain
+   * `this.duel` - was pinning the same player on the server. The result was
+   * four seconds of rubber-banding every lap, since movement is simulated on
+   * the client and only validated on the server.
+   */
+  rooted() { return !!this.duelMode; }
 
   /** This string, in the language the player asked for. */
   tr(key, english = '', params = null) {
@@ -1379,6 +1388,18 @@ class Game {
     });
   }
 
+  /**
+   * Is the menu an opaque sheet over the canvas right now? #menu paints a
+   * solid background, so when it is up there is nothing of the scene to see.
+   * Read off the DOM rather than tracked in a flag, because the menu is opened
+   * and closed from half a dozen places and a flag would go stale in one of
+   * them - and a stale flag here means a black screen.
+   */
+  menuCovering() {
+    const menu = document.getElementById('menu');
+    return !!menu && !menu.classList.contains('hidden');
+  }
+
   // ---------------------------------------------------------------- frame
   start() {
     let last = performance.now();
@@ -1430,6 +1451,14 @@ class Game {
       this.audio.setListener(this.camera.position.x, this.camera.position.y, this.camera.position.z, this.self.yaw);
 
       if (this.settings.get('showFps')) this.tickFps(t);
+
+      // The menu is an opaque sheet over the whole canvas, so while it is up
+      // every pixel of the town and of the gun is drawn and then covered.
+      // Two full scene passes a frame for nothing: on software GL that alone
+      // held the lobby at three frames a second, which starved the idle slices
+      // the deck strip prints in and made twenty-two cards take twenty seconds
+      // to appear. Nothing to see means nothing to draw.
+      if (this.menuCovering && this.menuCovering()) return;
 
       this.renderer.render(this.scene, this.camera);
       // No first-person gun during a killcam, and none once you are dead: in

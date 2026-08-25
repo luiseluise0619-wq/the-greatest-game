@@ -38,6 +38,16 @@ class Telemetry {
       badgeReveals: 0,
       cardsDealt: 0,
       cardsPlayed: 0,
+      // The turn mode is the default one, and until these existed /stats knew
+      // nothing about it: cardsPerMatch and cardPlayRate are free-mode numbers
+      // and read as zero for every round actually being played. A go that ends
+      // without a shot is the one that tells you the mode is stalling.
+      duelMatches: 0,
+      goes: 0,
+      goesWithShot: 0,
+      goesWithCard: 0,
+      byGunhand: {},
+      gunhandWins: {},
       byCard: {},
       wins: { law: 0, outlaw: 0, renegade: 0, none: 0 },
       deathsByZone: {},
@@ -161,6 +171,36 @@ class Telemetry {
 
   cardsDealt(n) { this.agg.cardsDealt += n; }
 
+  // ------------------------------------------------------------- turn mode
+  /** A round of the turn mode began, with everyone's dealt gunhand. */
+  duelStart(room, players) {
+    this.agg.duelMatches += 1;
+    for (const p of players) {
+      if (!p.gunhand) continue;
+      this.agg.byGunhand[p.gunhand] = (this.agg.byGunhand[p.gunhand] || 0) + 1;
+    }
+  }
+
+  /**
+   * One player's go is over. `shot` is whether a live round left their gun and
+   * `card` whether they played anything at all - a go with neither is a man
+   * who could not do a thing with his turn, which is the failure mode of the
+   * whole design and the reason this is counted.
+   */
+  goEnd(room, player, shot, card) {
+    this.agg.goes += 1;
+    if (shot) this.agg.goesWithShot += 1;
+    if (card) this.agg.goesWithCard += 1;
+  }
+
+  /** Who was still standing at the end, so a gunhand's record can be read. */
+  duelEnd(room, survivors) {
+    for (const p of survivors) {
+      if (!p.gunhand) continue;
+      this.agg.gunhandWins[p.gunhand] = (this.agg.gunhandWins[p.gunhand] || 0) + 1;
+    }
+  }
+
   social(room, kind) {
     const s = room.stats;
     if (kind === 'accuse') { this.agg.accusations += 1; if (s) s.accusations += 1; }
@@ -201,6 +241,15 @@ class Telemetry {
       // holding anything back, which is its own problem.
       cardPlayRate: per(a.cardsPlayed, a.cardsDealt),
       cardsPlayed: top(a.byCard, 6),
+      // The turn mode's own readout. Below about half a go ending in a shot
+      // and the table has gone quiet; a go with no card played at all is a
+      // player who was handed six seconds and nothing to do with them.
+      duelMatches: a.duelMatches,
+      goesPerDuel: per(a.goes, a.duelMatches),
+      shotPerGo: per(a.goesWithShot, a.goes),
+      cardPerGo: per(a.goesWithCard, a.goes),
+      gunhandsDealt: top(a.byGunhand, 6),
+      gunhandsStanding: top(a.gunhandWins, 6),
       wins: a.wins,
       avgHumanSessionMinutes: per(a.humanSessionSeconds / 60, a.humanSessions),
       humanSessions: a.humanSessions,

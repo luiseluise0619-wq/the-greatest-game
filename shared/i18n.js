@@ -180,6 +180,8 @@ const KO = {
   'turn.theirs': '{name} 차례',
   'turn.betweenHint': '무엇이 들어갔는지 세십시오',
   'turn.rootedHint': '아무도 못 움직입니다',
+  'turn.heldTitle': '손에 든 카드 수',
+  'turn.stickTitle': '불붙은 다이너마이트를 들고 있음',
 
   // 약실 · 겨눔
   'cham.left': '약실에 {n}발',
@@ -190,6 +192,11 @@ const KO = {
 
   // 여든 장
   'duel.aimFirst': '먼저 상대를 조준하십시오',
+  'man.readTitle': '판 읽기',
+  'man.read': '누구의 손패도 공개되지 않지만, <b>몇 장을 들고 있는지</b>는 공개되며 <b>앞에 펼쳐 놓은 것</b>도 전부 공개됩니다 — 내려놓은 총, 뒤에 선 빗물통, 한 자리 더 멀어지게 해주는 말. 전부 화면 위쪽 차례 순서에 이름과 나란히 표시되고, 한 바퀴가 도는 동안 계속 바뀝니다. 카드가 한 장 남은 사람은 대꾸할 수단이 거의 없다는 뜻입니다.',
+  'man.keepHint': '자기 손패 위에 <b>가질 수 있는 장수</b>가 적혀 있습니다. 넘는 만큼은 차례가 끝날 때 더미로 버려지니, 아껴 둔 카드는 버린 카드입니다. 그 옆의 숫자는 마을 전체가 뽑아 쓰는 <b>더미에 남은 장수</b>입니다.',
+  'duel.holding': '<b>{n}</b>장 — 가질 수 있는 건 {limit}장',
+  'duel.pileLeft': '더미에 {n}장',
   'duel.bang.name': '한 발',
   'duel.missed.name': '빗나감',
   'duel.beer.name': '맥주',
@@ -582,6 +589,7 @@ const KO = {
   'chip.dust': '흙먼지',
   'chip.resist': '쇳조각을 덧댔다',
   'ui.nobodyYet': '아직 아무도 없음',
+  'ui.botTag': '봇',
 
   'res.title.law': '법이 이겼다',
   'res.title.outlaw': '무법자들이 떠난다',

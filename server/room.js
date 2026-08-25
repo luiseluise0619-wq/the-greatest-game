@@ -1340,7 +1340,11 @@ export class Room {
     if (at < 0) return;
 
     const target = msg.target != null ? this.players.get(msg.target) : null;
-    const spend = () => { p.duelHand.splice(at, 1); this.pile.put(id); };
+    const spend = () => {
+      p.duelHand.splice(at, 1);
+      this.pile.put(id);
+      p.cardsThisTurn = (p.cardsThisTurn || 0) + 1;
+    };
     // Key, English, holes. The English is the line; the key is how the same
     // line gets said in Korean, where the card names decline and the verb is
     // at the end - which is why the holes travel as data rather than as a
@@ -1802,6 +1806,7 @@ export class Room {
 
     telemetry.matchStart(this);
     telemetry.cardsDealt(this.duel ? 0 : all.length * CARD_DEAL);
+    if (this.duel) telemetry.duelStart(this, all);
     this.pushLobby();          // seeds every client's scoreboard roster
     this.setPhase(PHASE.PREP);
     // The hand is dealt face down to everybody else and face up to you, and it
@@ -1958,6 +1963,9 @@ export class Room {
 
     this.results = { winner, blurb, blurbKey, rows, timeline };
     telemetry.matchEnd(this, winner, blurb);
+    if (this.duel) {
+      telemetry.duelEnd(this, [...this.players.values()].filter((x) => x.alive));
+    }
     this.setPhase(PHASE.RESULTS);
     this.broadcast({
       t: S.RESULTS, winner, blurb, blurbKey, rows, timeline: this.results.timeline,
@@ -2156,6 +2164,7 @@ export class Room {
     p.moving = false;
     p.vel = { x: 0, y: 0, z: 0 };
     p.bangsThisTurn = 0;
+    p.cardsThisTurn = 0;
     if (!this.pile) { this.pushSelf(p); return; }
 
     // 1. The lit stick, if it stopped with you. It travels with the turn, so
@@ -2432,6 +2441,10 @@ export class Room {
    */
   onTurnEnd(p) {
     if (!this.duel || !p || !this.pile) return;
+    // What the go amounted to, before the hand is trimmed. A Bang! spent is
+    // both a shot and a card, so the two counts overlap on purpose.
+    telemetry.goEnd(this, p, (p.bangsThisTurn || 0) > 0,
+      (p.bangsThisTurn || 0) + (p.cardsThisTurn || 0) > 0);
     const limit = handLimit(p);
     while (p.duelHand.length > limit) this.pile.put(p.duelHand.pop());
     this.pushDuel(p);
