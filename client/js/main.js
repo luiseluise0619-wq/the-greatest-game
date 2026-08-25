@@ -987,7 +987,16 @@ class Game {
 
       // In the turn mode the hand is up to five cards and the number keys are
       // the hand, not a rack of guns - the guns are cards too.
-      if (this.duel && /^Digit[1-9]$/.test(k)) { this.playDuelCard(Number(k.slice(5)) - 1); return; }
+      // 1 to 9, then 0 for the tenth. A hand is the size of your health and
+      // you draw two on every go, so a Sheriff on seven who plays a Stagecoach
+      // is holding ten - and the tenth card had no key at all on it and could
+      // not be played that go. Twelve headless rounds never produced an
+      // eleventh, and the row runs out at ten either way.
+      if (this.duel && /^Digit[0-9]$/.test(k)) {
+        const d = Number(k.slice(5));
+        this.playDuelCard(d === 0 ? 9 : d - 1);
+        return;
+      }
       if (this.duel && k === 'Space') { this.send({ t: C.BRACE }); return; }
       // G is dynamite in the free-for-all, where dynamite is a thing you carry.
       // Here it is a card, so the key is free for the one gunhand in sixteen

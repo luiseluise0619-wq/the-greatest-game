@@ -318,6 +318,41 @@ try {
     `the count is your hand against your limit (${board.hand} of ${board.limit})`);
   }
 
+  // Ten cards, ten keys. A hand is the size of your health and you draw two on
+  // every go, so a Sheriff on seven who plays a Stagecoach is holding ten -
+  // and the tenth card had a "10" printed on it and no key that could reach
+  // it. Twelve headless rounds produced tens and never an eleven, so the row
+  // is 1 to 9 then 0, and anything past that is greyed rather than labelled
+  // with a number nobody can press.
+  const keys = await A.evaluate(() => {
+    const g = window.game;
+    const twelve = ['bang', 'missed', 'beer', 'saloon', 'barrel', 'scope',
+      'mustang', 'stagecoach', 'wells', 'store', 'panic', 'duel'];
+    const held = { ...g.duel, hand: twelve, limit: 7, pile: 40, table: g.duel.table || [] };
+    const wasTurn = g.turn;
+    g.turn = { kind: 'turn', holder: g.selfId, left: 6 };
+    g.hud.setDuel(held);
+    const printed = [...document.querySelectorAll('#duelHand .dCard b i')].map((n) => n.textContent);
+    const grey = [...document.querySelectorAll('#duelHand .dCard')].map((n) => n.classList.contains('cannot'));
+    // And the key actually reaches that card rather than printing a number
+    // into the void.
+    const sent = [];
+    const realSend = g.send.bind(g);
+    g.send = (m) => { sent.push(m); };
+    g.playDuelCard(9);
+    g.send = realSend;
+    g.turn = wasTurn;
+    g.hud.setDuel(g.duel);
+    return { printed, grey, sent };
+  });
+  check(keys.printed.slice(0, 10).join(',') === '1,2,3,4,5,6,7,8,9,0',
+    `ten cards get ten keys (${keys.printed.slice(0, 10).join('')})`);
+  check(keys.printed.slice(10).every((k) => k === ''),
+    'and the eleventh is not labelled with a number nobody can press');
+  check(keys.grey.slice(10).every(Boolean), 'and is greyed out for saying so');
+  check(keys.sent.length === 1 && keys.sent[0].card === 'store',
+    `and zero reaches the tenth card (${keys.sent[0]?.card})`);
+
   // The scoreboard's last column. It said "Kills" and printed a dash for the
   // living and an empty cell for the dead, because nothing on the client ever
   // counted anything - a header promising a number over a column that never

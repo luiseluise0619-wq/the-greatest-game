@@ -87,7 +87,7 @@ export class HUD {
     // and Space is a jump in one and getting out of the way in the other.
     const duelKeys = [
       ['man.key.fire', 'LMB', 'fire — once the barrel has been on him a moment'],
-      ['man.key.cards', '1…9', 'play a card'],
+      ['man.key.cards', '1…9 0', 'play a card'],
       ['man.key.brace', 'Space', 'get out of the way'],
       ['man.key.look', 'mouse', 'turn your head — the feet stay put'],
       ['man.key.self', 'Q', 'turn it on yourself'],
@@ -515,6 +515,19 @@ export class HUD {
    * The eighty-card hand. Text for now rather than printed faces - the press
    * in cardart.js knows six cards and these are twenty-two others.
    */
+  /**
+   * The key printed on the card at this place in the hand. One to nine, then
+   * zero for the tenth, and nothing at all past that: a hand only gets to ten
+   * through a Stagecoach on top of a Sheriff's seven, and to eleven never in
+   * twelve headless rounds - but a card with a number on it you cannot press
+   * is worse than a card with no number on it.
+   */
+  handKey(i) {
+    if (i < 9) return String(i + 1);
+    if (i === 9) return '0';
+    return '';
+  }
+
   setDuel(msg) {
     const first = !this.duel;
     this.duel = msg;
@@ -529,9 +542,9 @@ export class HUD {
       if (!c) return '';
       // Greyed when it cannot be played: not your go, or it is the card you
       // fire with rather than press a key for.
-      const dead = !yours || c.kind === 'shot' || c.kind === 'reaction';
+      const dead = !yours || c.kind === 'shot' || c.kind === 'reaction' || i > 9;
       return `<div class="dCard ${c.kind}${dead ? ' cannot' : ''}">
-        <b><span>${escapeHtml(this.t(`duel.${id}.name`, c.name))}</span><i>${i + 1}</i></b>
+        <b><span>${escapeHtml(this.t(`duel.${id}.name`, c.name))}</span><i>${this.handKey(i)}</i></b>
         <p>${escapeHtml(this.t(`duel.${id}.rules`, c.rules))}</p>
         ${c.kind === 'target' || c.kind === 'curse'
           ? `<em>${escapeHtml(this.t('duel.aimFirst', 'aim at somebody first'))}</em>` : ''}
@@ -800,7 +813,7 @@ export class HUD {
         return `<div class="handCard duelHandCard" data-face="${escapeHtml(id)}">
           <span class="handSlot"></span>
           <div class="handText">
-            <h5><span>${escapeHtml(this.t(`duel.${id}.name`, c.name))}</span><em>${i + 1}</em></h5>
+            <h5><span>${escapeHtml(this.t(`duel.${id}.name`, c.name))}</span><em>${this.handKey(i)}</em></h5>
             <div class="handKind">${escapeHtml(this.t(`duel.kind.${c.kind}`, c.kind.toUpperCase()))}</div>
             <p>${escapeHtml(this.t(`duel.${id}.rules`, c.rules))}</p>
           </div></div>`;
