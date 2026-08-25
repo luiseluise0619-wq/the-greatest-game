@@ -388,6 +388,8 @@ const KO = {
   'feed.takesItBack': '{name} — 그 대가로 당신에게서 한 장 가져갑니다.',
   'feed.throughWood': '등을 뚫고 나온 총알이 {name}의 빗물통에 박힙니다.',
   'feed.throughMissed': '등을 뚫고 나왔지만 {name:은/는} 이미 거기 없습니다.',
+  'feed.lightFingers': '더미가 아니라 {name}의 손에서 한 장 빼옵니다.',
+  'feed.threeForTwo': '위에서 세 장. 그중 {card:은/는} 뒷면으로 다시 올려 둡니다 — 다음에 뽑는 사람 몫입니다.',
   'feed.tookItBack': '그 대가로 {name}의 손에서 {n}장 빼왔습니다.',
   'feed.pockets': '{name}의 주머니를 뒤집니다. 손에 {n}장이 더 들어옵니다.',
   'feed.neverEmpty': '손이 비는 순간 이미 무언가가 들려 있습니다.',

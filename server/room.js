@@ -2395,6 +2395,13 @@ export class Room {
             t: S.FEED, k: 'feed.lifted', p: { name: p.name },
             text: `${p.name} lifted one out of your hand.`, tone: 'bad',
           });
+          // And she is told whose pocket it came out of. Every one of the
+          // sixteen says something to the person it fires for; this one told
+          // the man it was taken from and left her to notice her own hand.
+          this.emit(p, {
+            t: S.FEED, k: 'feed.lightFingers', p: { name: from.name },
+            text: `You take one out of ${from.name}'s hand instead of off the pile.`, tone: 'good',
+          });
           take(DUEL.draw - 1);
         } else take(DUEL.draw);
         break;
@@ -2440,7 +2447,21 @@ export class Room {
         const three = this.pile.takeMany(DUEL.draw + 1);
         three.sort((a, b) => this.cardWorth(p, b) - this.cardWorth(p, a));
         p.duelHand.push(...three.slice(0, DUEL.draw));
-        for (const back of three.slice(DUEL.draw)) this.pile.draw.push(back);
+        const back = three.slice(DUEL.draw);
+        for (const card of back) this.pile.draw.push(card);
+        // The only one of the six that said nothing at all. Three seen and two
+        // kept is the whole ability, and it happened silently - so the player
+        // was left to work out from a hand that grew by two that anything had.
+        // What went back is hers to know and nobody else's: it is face down on
+        // top of a pile the whole town draws from.
+        if (back.length) {
+          this.emit(p, {
+            t: S.FEED, k: 'feed.threeForTwo',
+            p: { card: DUEL_CARDS[back[0]]?.name || back[0], cardKey: `duel.${back[0]}.name` },
+            text: `Three off the top. The ${DUEL_CARDS[back[0]]?.name || back[0]} goes back, face down, for whoever draws next.`,
+            tone: 'good',
+          });
+        }
         break;
       }
       default:

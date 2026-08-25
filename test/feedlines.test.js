@@ -16,7 +16,13 @@ import { line, has } from '../shared/i18n.js';
 
 const { Room } = await import('../server/room.js');
 
-const HOLE = /\{\w+(?::[^{}]+)?\}/;
+// Anything still in braces, not just an ASCII-named hole. The filler's own
+// regex is \w-based and \w does not match Hangul, so a Korean string that
+// wrote a particle as {는} instead of {card:은/는} was left with literal
+// braces in it AND sailed past a detector built out of the same \w. Two
+// mistakes cancelling is not a safety net. Nothing should come out of a
+// sentence with a brace in it, whatever is between them.
+const HOLE = /\{[^{}]*\}/;
 
 /** Every keyed line this room says, whoever it says it to. */
 function listen(room) {
@@ -148,6 +154,14 @@ test('the lines a round might not reach on its own get reached', () => {
     room.onHitTaken(them, me, 1);
     hand(them, 'emptyhand'); them.duelHand = [];
     room.checkEmptyHand(them);
+    // The two of the six draw-changers that used to say nothing to their own
+    // man: one takes it out of somebody's hand and told only the pocket it
+    // came out of, and one was silent altogether.
+    hand(them, 'cutpurse'); them.duelHand = [];
+    me.duelHand = ['bang', 'beer'];
+    room.drawForTurn(them);
+    hand(them, 'surveyor'); them.duelHand = [];
+    room.drawForTurn(them);
     hand(them, 'undertaker'); me.duelHand = ['bang', 'beer'];
     room.onDeathSpoils(me);
 
@@ -185,10 +199,11 @@ test('the lines a round might not reach on its own get reached', () => {
     const keys = new Set(said.map((m) => m.k));
     for (const k of ['feed.bleedsSlow', 'feed.takesItBack', 'feed.tookItBack',
       'feed.neverEmpty', 'gun.nothingToPress', 'gun.notYourGo', 'gun.needTwoCards',
-      'gun.twoForOne', 'feed.throughWood', 'feed.throughMissed', 'feed.squareOff']) {
+      'gun.twoForOne', 'feed.throughWood', 'feed.throughMissed', 'feed.squareOff',
+      'feed.lightFingers', 'feed.lifted', 'feed.threeForTwo']) {
       assert.ok(keys.has(k), `${k} was never said, so nothing here checked its holes`);
     }
-    assert.ok(keys.size >= 28, `only ${keys.size} different lines were reached`);
+    assert.ok(keys.size >= 32, `only ${keys.size} different lines were reached`);
     check(said, 'the lines a round does not always reach');
   } finally { clock.restore(); }
 });
