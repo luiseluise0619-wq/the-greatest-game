@@ -400,3 +400,57 @@ test('and a whole round of it leaves the eighty as eighty', () => {
     assert.equal(count(), start, `the round ended with ${count()} cards instead of ${start}`);
   } finally { clock.restore(); }
 });
+
+test('a dead man does not take his gun to the ground with him', () => {
+  const { room, clock } = seatedRoom('STAD');
+  try {
+    const all = [...room.players.values()].filter((p) => p.alive);
+    const victim = all.find((p) => p.gunhand !== 'undertaker');
+    for (const p of all) if (p.gunhand === 'undertaker') p.gunhand = 'cooper';
+    victim.gear = ['barrel', 'scope'];
+    victim.weaponCard = 'winchester';
+    victim.duelHand = ['bang', 'beer'];
+    victim.hasDynamite = true;
+    const before = room.pile.discard.length;
+
+    room.onDeathSpoils(victim);
+
+    // Everything he had, back in circulation. This used to clear only the
+    // hand, so a barrel and a gun in front of a corpse were out of the game
+    // and out of the pile at the same time - and a round where five of seven
+    // go down froze a dozen cards on a table nobody could reach across.
+    assert.deepEqual(victim.gear, [], 'his gear is still lying in front of him');
+    assert.equal(victim.weaponCard, null, 'and so is his gun');
+    assert.equal(victim.hasDynamite, false, 'and the lit stick is still his problem');
+    assert.deepEqual(victim.duelHand, [], 'and his hand was never emptied');
+    const went = room.pile.discard.slice(before);
+    for (const id of ['barrel', 'scope', 'winchester', 'dynamite', 'bang', 'beer']) {
+      assert.ok(went.includes(id), `${id} never made it back to the pile`);
+    }
+  } finally { clock.restore(); }
+});
+
+test('and the one who goes through pockets still gets the hand', () => {
+  const { room, clock } = seatedRoom('STAE');
+  try {
+    const all = [...room.players.values()].filter((p) => p.alive);
+    const [victim, sam] = all;
+    sam.gunhand = 'undertaker';
+    sam.duelHand = [];
+    victim.gunhand = 'cooper';
+    victim.gear = ['barrel'];
+    victim.weaponCard = 'schofield';
+    victim.duelHand = ['bang', 'missed'];
+    const before = room.pile.discard.length;
+
+    room.onDeathSpoils(victim);
+
+    assert.deepEqual(sam.duelHand.sort(), ['bang', 'missed'],
+      'the hand did not end up in the hand it was promised to');
+    const went = room.pile.discard.slice(before);
+    assert.ok(went.includes('barrel') && went.includes('schofield'),
+      'what was on the table should go on the pile, not into his hand');
+    assert.ok(!sam.duelHand.includes('barrel'),
+      'he takes what was in the hands, which is what his gunhand says he takes');
+  } finally { clock.restore(); }
+});

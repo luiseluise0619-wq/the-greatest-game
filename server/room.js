@@ -2488,6 +2488,22 @@ export class Room {
   onDeathSpoils(victim) {
     if (!this.duel || !this.pile) return;
     const sam = [...this.players.values()].find((o) => o.alive && o.gunhand === 'undertaker' && o !== victim);
+
+    // What was in front of him goes on the pile. Only the hand was being
+    // cleared, so a dead man's gun and his barrel and his horse stayed lying
+    // on a table nobody could reach across - out of the game and out of the
+    // pile both. Five men down in a round of seven is a dozen cards frozen in
+    // front of corpses, and everybody still standing drawing from what is
+    // left of eighty. The gunhand that goes through pockets takes the hand,
+    // which is what it says it takes; the table is cleared either way.
+    const table = [...(victim.gear || [])];
+    if (victim.weaponCard) table.push(victim.weaponCard);
+    victim.gear = [];
+    victim.weaponCard = null;
+    victim.jailed = false;
+    if (victim.hasDynamite) { table.push('dynamite'); victim.hasDynamite = false; }
+    this.pile.putMany(table);
+
     const hand = [...(victim.duelHand || [])];
     victim.duelHand = [];
     if (!hand.length) return;
