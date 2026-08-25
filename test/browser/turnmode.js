@@ -172,6 +172,7 @@ try {
     mix: document.getElementById('chamberMix').textContent,
     hand: window.game.duel?.hand?.length || 0,
     reach: window.game.duel?.reach,
+    reachSeats: window.game.duel?.reachSeats,
     corner: document.getElementById('mag').textContent,
     cornerLabel: document.getElementById('reserve').textContent,
   }));
@@ -179,8 +180,15 @@ try {
   check(/\d/.test(table.chamber) && /\d/.test(table.mix),
     `the chamber is counted in the open (${table.chamber} ${table.mix})`);
   check(table.hand > 0, `and the hand arrived before the bell (${table.hand} cards)`);
-  check(Number(table.corner) === Math.round(table.reach) && /reach|사거리/.test(table.cornerLabel),
-    `the corner counts reach rather than a magazine (${table.corner} ${table.cornerLabel})`);
+  // Seats, not metres. Metres are true of the ground and false of the game:
+  // the table is three and a half metres across so every man on it is inside a
+  // belt gun's twenty-two, and the corner was telling a player he could reach
+  // the whole room while the gun would not come up on anyone but his
+  // neighbours.
+  check(Number(table.corner) === table.reachSeats && Number.isFinite(table.reachSeats),
+    `the corner counts reach in seats (${table.corner} vs ${table.reachSeats})`);
+  check(/seat|자리/.test(table.cornerLabel) && !/\bm\b|metre/.test(table.cornerLabel),
+    `and says so rather than counting metres (${table.cornerLabel})`);
 
   // Feet. This game is played standing at a table: the mark you were dealt is
   // the mark you keep, all round, and heads are the only thing that moves.

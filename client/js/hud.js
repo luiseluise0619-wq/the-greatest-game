@@ -679,8 +679,22 @@ export class HUD {
       $('weaponName').textContent = gun
         ? this.t(`duel.${this.duel.weapon}.name`, gun.name).toUpperCase()
         : this.t('hud.beltGun', 'BELT GUN');
-      $('mag').textContent = String(Math.round(this.duel.reach || 0));
-      $('reserve').textContent = this.t('hud.metres', 'm of reach');
+      // Seats, because that is what the rule is. It used to read metres, which
+      // was true of the ground and false of the game: the table is three and a
+      // half metres across so every man on it is inside a belt gun's
+      // twenty-two, and the corner was telling a player he could reach the
+      // whole room while the gun would not come up on anyone but his
+      // neighbours.
+      const seats = this.duel.reachSeats;
+      if (Number.isFinite(seats)) {
+        $('mag').textContent = String(seats);
+        $('reserve').textContent = seats === 1
+          ? this.t('hud.seatOfReach', 'seat of reach')
+          : this.t('hud.seatsOfReach', 'seats of reach', { n: seats });
+      } else {
+        $('mag').textContent = String(Math.round(this.duel.reach || 0));
+        $('reserve').textContent = this.t('hud.metres', 'm of reach');
+      }
       $('ammo').classList.remove('empty');
       $('dynCount').classList.add('hidden');
     } else {

@@ -16,7 +16,7 @@ import { raycastWorld, rayPlayerBox, lineOfSight, moveAndCollide } from '../shar
 import { C, S } from '../shared/protocol.js';
 import { BotBrain, BOT_NAMES } from './bots.js';
 import { Pile, handLimit, drawCheck } from './deck.js';
-import { DUEL_CARDS, KIND, inReach, reachOf, DISTANCE_UNIT } from '../shared/deck.js';
+import { DUEL_CARDS, KIND, inReach, reachOf, reachSeats, DISTANCE_UNIT } from '../shared/deck.js';
 import { GUNHANDS, GUNHAND_ORDER, healthOf, trait } from '../shared/gunhands.js';
 import { telemetry } from './telemetry.js';
 import { randomUUID } from 'node:crypto';
@@ -2950,6 +2950,11 @@ export class Room {
       gear: p.gear || [],
       weapon: p.weaponCard || null,
       reach: r2(reachOf(p)),
+      // Metres are what the free-for-all measures in. Here the rule is seats -
+      // the crosshair asks the seats and so does the shot - so the corner has
+      // to say seats too, or it reads "22 m of reach" at a table three and a
+      // half metres across while the gun refuses at two seats.
+      reachSeats: reachSeats(p),
       limit: handLimit(p),
       bangs: p.bangsThisTurn || 0,
       pile: this.pile ? this.pile.remaining : 0,
