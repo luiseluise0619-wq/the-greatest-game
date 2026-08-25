@@ -325,7 +325,12 @@ test('no card in the eighty prints itself a second copy when it is played', () =
       // card's refusal.
       for (const p of all) {
         p.gear = []; p.weaponCard = null; p.hasDynamite = false;
-        p.jailed = false; p.duelHand = []; p.health = Math.max(1, p.maxHealth - 1);
+        p.jailed = false; p.health = Math.max(1, p.maxHealth - 1);
+        // Everybody holding something, because half the eighty reach into
+        // other people's hands - a Duel is answered with a Bang!, an Indians!
+        // is, a Cat Balou takes one - and with empty hands round the table
+        // those branches do nothing and count nothing.
+        p.duelHand = ['bang', 'missed', 'beer'];
       }
       a.duelHand = [id];
       a.cardsThisTurn = 0;
@@ -337,5 +342,39 @@ test('no card in the eighty prints itself a second copy when it is played', () =
     }
     assert.deepEqual(bad, [],
       `these cards changed how many cards are in the game when played: ${bad.join(', ')}`);
+  } finally { clock.restore(); }
+});
+
+test('and a whole round of it leaves the eighty as eighty', () => {
+  // The card-by-card check plays each one from a clean table. This runs a real
+  // round of bots at the table for as long as it takes and counts the whole
+  // game at the end: every hand, everything face up in front of anybody, the
+  // draw pile and the discard pile. A leak that only shows up in a resolution
+  // reaching across three players, or in the recycle, or in a dead man's
+  // pockets, only shows up here.
+  const { room, clock } = seatedRoom('STAC');
+  try {
+    const count = () => {
+      let n = room.pile.draw.length + room.pile.discard.length;
+      for (const p of room.players.values()) {
+        n += (p.duelHand || []).length;
+        n += (p.gear || []).length;
+        if (p.weaponCard) n += 1;
+        if (p.hasDynamite) n += 1;
+      }
+      return n;
+    };
+    const start = count();
+    for (let i = 0; i < 20 * 400 && room.phase !== 'results'; i += 1) {
+      tick(clock, room, 1);
+      // Dead men's hands are emptied into the undertaker's or onto the pile,
+      // and either way the count has to hold every single step of the way -
+      // not just at the end, where two opposite leaks would cancel.
+      if (i % 200 === 0) {
+        assert.equal(count(), start,
+          `the game had ${count()} cards in it instead of ${start} after ${i} steps`);
+      }
+    }
+    assert.equal(count(), start, `the round ended with ${count()} cards instead of ${start}`);
   } finally { clock.restore(); }
 });

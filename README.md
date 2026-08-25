@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 211 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 212 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -655,7 +655,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 211 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 212 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -824,7 +824,11 @@ They are grouped by what they protect:
   game by being played. The second one found ten that did — every weapon, every
   piece of gear and the cell went onto the discard pile *and* face up in front
   of a player, so the deck grew a copy of itself every time anybody laid a gun
-  down, and the odds of drawing gear climbed all round.
+  down, and the odds of drawing gear climbed all round. A third runs a whole
+  round of bots at the table and counts the entire game every two hundred
+  steps, because a leak inside a resolution that reaches across three players,
+  or inside the recycle, or in a dead man's pockets, shows up nowhere else —
+  and counting only at the end would let two opposite leaks cancel.
 - **`test/i18n.test.js`** — the Korean overlay. There is only ever one English
   copy of any string — the one in the HTML, in `constants.js`, or in the
   sentence the server built — and Korean is keyed to it, so two English copies
