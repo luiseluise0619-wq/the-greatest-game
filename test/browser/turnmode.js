@@ -318,6 +318,30 @@ try {
     `the count is your hand against your limit (${board.hand} of ${board.limit})`);
   }
 
+  // Reach is seats and the whole table stands inside four metres, so "he is
+  // right there" and "the rules will not let you shoot him" are true of the
+  // same man most of the time. The gun simply does not come up - which used
+  // not to be true, and used to cost a Bang! and a go on a shot thrown out a
+  // moment later - so something has to say why.
+  const reach = await A.evaluate(() => {
+    const hud = window.game.hud;
+    hud.setAimed({ on: false, tooFar: 'somebody' });
+    const note = document.getElementById('reachNote');
+    const said = {
+      shown: !!note && !note.classList.contains('hidden'),
+      text: note?.textContent.trim() || '',
+      dim: document.getElementById('crosshair')?.classList.contains('tooFar'),
+    };
+    hud.setAimed({ on: false, tooFar: null });
+    said.gone = !!note && note.classList.contains('hidden');
+    said.bright = !document.getElementById('crosshair')?.classList.contains('tooFar');
+    return said;
+  });
+  check(reach.shown && reach.text.length > 10,
+    `a man your gun does not reach is said so (${reach.text.slice(0, 34)})`);
+  check(!!reach.dim, 'and the crosshair says it too');
+  check(reach.gone && reach.bright, 'and both go away when he does');
+
   // Ten cards, ten keys. A hand is the size of your health and you draw two on
   // every go, so a Sheriff on seven who plays a Stagecoach is holding ten -
   // and the tenth card had a "10" printed on it and no key that could reach
