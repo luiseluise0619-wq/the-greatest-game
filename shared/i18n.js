@@ -351,6 +351,7 @@ const KO = {
   'feed.bandagedSelf': '스스로 붕대를 감았습니다 (+{n}).',
   'feed.callsOut': '{a} — {b} 앞으로 불러냈습니다.',
   'feed.pinsStar': '{name} — 별을 달고 법을 자처합니다. 믿을지 말지는 각자 알아서.',
+  'feed.starIsOn': '{name:이/가} 별을 답니다. 그것만큼은 마을 전체가 확실히 압니다.',
   'feed.storeOut': '{name} — 잡화점을 펼쳤습니다.',
   'feed.noSights': '조준선 안에 이름 붙일 사람이 없습니다.',
   'feed.swept': '뒤쪽 거리를 쓸었습니다. 남긴 발자국이 전부 사라졌고, 한동안 남지도 않습니다.',

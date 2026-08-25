@@ -1335,7 +1335,18 @@ export class Room {
     }
     this.timeline.push({ at: Math.max(0, Math.round(now() - (this.stats?.started || now()))), type: 'badge', who: p.name });
     this.broadcast({ t: S.BADGE, id: p.id, name: p.name });
-    this.broadcast({
+    // Two different sentences for two different games. In the free-for-all
+    // anybody could be wearing it as far as the town knows, and the doubt is
+    // the point. In the turn mode the manual says in as many words that the
+    // star is the one role that is not a secret - so telling that town to
+    // believe it at their own risk is telling them to doubt the one fact the
+    // mode hands them.
+    this.broadcast(this.duel ? {
+      t: S.FEED,
+      k: 'feed.starIsOn', p: { name: p.name },
+      text: `${p.name} wears the star. That much the whole town knows for certain.`,
+      tone: 'badge',
+    } : {
       t: S.FEED,
       k: 'feed.pinsStar', p: { name: p.name },
       text: `${p.name} pins on the star and claims the law. Believe it at your own risk.`,
