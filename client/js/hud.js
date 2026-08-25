@@ -575,10 +575,13 @@ export class HUD {
    * the other, whichever of the two he is holding first.
    */
   shotCardOf(msg) {
-    const swap = !!GUNHANDS[this.selfRole?.gunhand]?.swap;
+    // The same order the server picks in, which is a Bang! first and the other
+    // card only if there is no Bang!. Reading the hand in the order it happens
+    // to be held instead would light the wrong card in front of the one man
+    // who can fire either.
     const hand = msg.hand || [];
-    if (!swap) return hand.includes('bang') ? 'bang' : null;
-    for (const id of hand) if (id === 'bang' || id === 'missed') return id;
+    if (hand.includes('bang')) return 'bang';
+    if (GUNHANDS[this.selfRole?.gunhand]?.swap && hand.includes('missed')) return 'missed';
     return null;
   }
 

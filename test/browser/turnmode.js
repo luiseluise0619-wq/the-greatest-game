@@ -501,6 +501,52 @@ try {
   check(phantom.feed.some((l) => /hand|손/.test(l)),
     `and says what is wrong instead (${phantom.feed[phantom.feed.length - 1] || 'nothing'})`);
 
+  // The barrel turned round asks the same question and used to ask it a
+  // different way: it looked for the literal card while the server asks what
+  // this man reads AS a shot and whether he has one left. So the one of the
+  // sixteen who fires a Missed! was refused a move he is allowed, and a man
+  // who had already taken his shot was let through to a packet nobody acted on.
+  const self = await A.evaluate(() => {
+    const g = window.game;
+    const wasTurn = g.turn; const wasDuel = g.duel; const wasRole = g.hud.selfRole;
+    g.turn = { kind: 'turn', holder: g.selfId, left: 6 };
+    const sent = [];
+    const realSend = g.send.bind(g);
+    g.send = (m) => { if (m.t === 'selfshot') sent.push(m); else realSend(m); };
+    const ask = (hand, bangs, gunhand) => {
+      g.hud.selfRole = { ...(wasRole || {}), gunhand };
+      const d = { ...g.duel, hand, limit: 7, pile: 40, bangs, weapon: null, table: g.duel.table || [] };
+      g.duel = d; g.hud.setDuel(d);
+      const before = sent.length;
+      g.trySelfShot();
+      return sent.length > before;
+    };
+    const out = {
+      plain: ask(['bang'], 0, null),
+      spent: ask(['bang'], 1, null),
+      swap: ask(['missed'], 0, 'ambidexter'),
+      swapPlain: ask(['missed'], 0, null),
+    };
+    // And the card the HUD lights for the man who can fire either has to be
+    // the one the server would actually spend, which is the Bang! whichever
+    // order he happens to be holding them in.
+    g.hud.selfRole = { ...(wasRole || {}), gunhand: 'ambidexter' };
+    const both = { ...g.duel, hand: ['missed', 'bang'], limit: 7, pile: 40, bangs: 0,
+      weapon: null, table: g.duel.table || [] };
+    g.duel = both; g.hud.setDuel(both);
+    out.lit = document.querySelector('#duelHand .dCard.live b span')?.textContent || '';
+    g.send = realSend;
+    g.hud.selfRole = wasRole;
+    g.turn = wasTurn; g.duel = wasDuel; g.hud.setDuel(wasDuel);
+    return out;
+  });
+  check(self.plain, 'a man holding a shot may put it to his own head');
+  check(!self.spent, 'and one who has already fired may not');
+  check(self.swap, 'the man who fires a Missed! may too');
+  check(!self.swapPlain, 'and anybody else holding one may not');
+  check(/Bang/i.test(self.lit) || self.lit.includes('한 발'),
+    `and the card lit for him is the one the server would spend (${self.lit || 'none'})`);
+
   // The scoreboard's last column. It said "Kills" and printed a dash for the
   // living and an empty cell for the dead, because nothing on the client ever
   // counted anything - a header promising a number over a column that never
@@ -586,13 +632,29 @@ try {
       && (window.game?.inGame || window.game?.phase === 'results'),
     null, { timeout: 30000 },
   ).then(() => true).catch(() => false);
+  // What it actually came back to. A round with five bots in it can finish
+  // while the page is reloading, and a page that comes back to a lobby has no
+  // round to be handed: there is no deal waiting for it, so the wait above can
+  // only ever time out. That is the round ending, not the resume failing, and
+  // reporting it as a bug in the resume path sends somebody looking in the
+  // wrong file. Say which of the two happened.
+  const state = await A.evaluate(() => ({
+    phase: window.game?.phase || '?',
+    role: !!window.game?.selfRole,
+    inGame: !!window.game?.inGame,
+  }));
+  const noRoundLeft = !resumed && (state.phase === 'lobby' || !state.role);
+  if (noRoundLeft) {
+    check(true, `the round ended while the page was reloading (phase ${state.phase})`);
+  } else {
+    check(resumed, `a refresh mid-lap hands the round back rather than an empty screen (phase ${state.phase}, role ${state.role})`);
+  }
   const alive = resumed && await A.evaluate(() => window.game?.self?.alive !== false);
   const gotHand = resumed && await A.waitForFunction(
     () => window.game?.duel?.hand?.length > 0 && !!window.game?.turn?.kind,
     null, { timeout: alive ? 15000 : 1 },
   ).then(() => true).catch(() => false);
-  check(resumed, 'a refresh mid-lap hands the round back rather than an empty screen');
-  check(!alive || gotHand, 'and a living man gets his hand back with it');
+  check(noRoundLeft || !alive || gotHand, 'and a living man gets his hand back with it');
   if (resumed && alive && gotHand) {
     const back = await A.evaluate(() => ({
       hand: window.game.duel.hand,

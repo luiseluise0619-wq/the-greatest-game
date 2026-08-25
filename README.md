@@ -1031,6 +1031,14 @@ rule ("nobody is pouring with two men left") copied onto it. Three points, which
 at this sample size is inside the noise the six runs above measured; both rows
 are the same game, and the Sheriff-killer figure below did not move at all.
 
+A third two hundred, after the Renegade stopped drawing on the star with three
+men left, read 56 / 39 / 5. Shooting the star while an outlaw is still standing
+ends the round as an OUTLAW win, so holding fire until the last two is strictly
+better play — and it did not move his share, which stays at five or six however
+he is asked to play it. Seven men is a long way to be the last one standing, and
+that is structural rather than a bug in how he picks a mark. It is recorded here
+because a fix that changes nothing measurable is worth saying so about.
+
 A lean to the law either way, where before this session's fixes the same
 setting was a patch over an outlaw runaway. Seven is still the right number —
 six measured 58/35 the other way and there is nothing between them — and it is

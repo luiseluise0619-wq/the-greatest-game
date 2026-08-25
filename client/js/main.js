@@ -1160,8 +1160,15 @@ class Game {
       this.deny(['deny.notYourTurn', 'Not your go. Wait to be called.']);
       return;
     }
-    if (!(this.duel?.hand || []).includes('bang')) {
-      this.deny(['deny.noBang', 'Nothing in the hand to load it with.']);
+    // The same question the server asks, asked the same way. This looked for
+    // the literal card, and the server asks what this man reads AS a shot and
+    // whether he has one left this go - so the one of the sixteen who fires a
+    // Missed! was refused a move he is allowed, and a man who had already
+    // taken his shot was let through to a packet that was silently dropped.
+    if (!this.hud.shotLeft(this.duel || {})) {
+      this.deny(this.hud.shotCardOf(this.duel || {})
+        ? ['deny.shotSpent', 'You have had your shot this go.']
+        : ['deny.noBang', 'Nothing in your hand to fire.']);
       return;
     }
     this.send({ t: C.SELFSHOT });
