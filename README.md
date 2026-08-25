@@ -739,7 +739,13 @@ They are grouped by what they protect:
   something up across town, hear a shout from the far side of the map,
   be told about players it cannot see, or learn the name of a shooter it could
   not have seen. One check runs the other way and makes sure an honest sprint at
-  30Hz is never clamped.
+  30Hz is never clamped. And one goes at the door: fifty-four shapes of nonsense
+  a client can put on the wire — a shot whose direction is a string, an array,
+  an object of letters or a NaN; cards that are numbers or names of nothing,
+  aimed at players who do not exist; positions of Infinity; a hundred thousand
+  characters of chat; bot counts of minus nine hundred — none of which may
+  throw, after which the town still has its people, has not grown past eight,
+  and is still in one of the four phases a round can be in.
 - **`test/ratelimit.test.js`** — the socket token bucket: a burst gets through,
   a flood does not, an idle socket cannot save up more than one burst, and a
   stream at exactly the limit is never refused.
@@ -836,7 +842,17 @@ They are grouped by what they protect:
   emptied, so his gun and his barrel and his horse stayed lying on a table
   nobody could reach across — out of the game and out of the pile at the same
   time. Five men down in a round of seven is a dozen cards frozen in front of
-  corpses while everybody still standing draws from what is left.
+  corpses while everybody still standing draws from what is left. And the
+  fire path, which nothing had ever exercised: `onShoot` read the direction
+  the client sent a dozen lines *after* spending the Bang!, a round out of the
+  shared chamber and the magazine on it, so a packet without a usable one cost
+  a card and a go and quietly changed what the whole table believed was left in
+  the chamber. The reason nothing caught it is the same reason the check is
+  worth having — six call sites in this suite passed `[0,0,-1]`, an array has
+  no `.x`, and every one of those shots died at exactly that line. They were
+  all asserting on the card being spent and not one of them on the shot
+  landing. Eight shapes of bad direction that must cost nothing, one good one
+  that must take a hit off a man a seat away.
 - **`test/i18n.test.js`** — the Korean overlay. There is only ever one English
   copy of any string — the one in the HTML, in `constants.js`, or in the
   sentence the server built — and Korean is keyed to it, so two English copies
