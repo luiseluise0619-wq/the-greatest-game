@@ -940,16 +940,16 @@ Putting the table in fixed it as a game before it fixed it as a balance:
 |---|---|---|
 | walking a town | 29% | 45% |
 | at the table | 59% | 45% |
-| **and with the deck not printing itself** | **65%** | 46% |
+| **and with the deck not printing itself** | **64%** | 48% |
 
 The third row is not a tuning change. The deck was quietly growing: every
 weapon, every piece of gear and the cell went onto the discard pile *and* face
 up in front of a player, so ten of the twenty-two existed twice the moment they
 were played and the pile thickened with guns and barrels all round. Fixing it
-put six points on the share of goes that end in a shot, and it moved the number
+put five points on the share of goes that end in a shot, and it moved the number
 that matters more — the share of the Sheriff's killers who had actually picked
-him out went from **62%** to **82% and 89%** across two runs of sixty. A correct
-deck means he dies to somebody deciding rather than to crossfire.
+him out went from **62%** to **79%** over eighty rounds. A correct deck means he
+dies to somebody deciding rather than to crossfire.
 
 The star's hits, swept again at the table (`HNH_SHERIFFHEALTH`):
 
@@ -963,8 +963,9 @@ The star's hits, swept again at the table (`HNH_SHERIFFHEALTH`):
 So seven, and the confirming run of sixty came out **50 / 43 / 7**. It is the one
 deviation from the original left in the mode, and it is there because the star is
 the only man at the table anybody can identify while the law has nothing like
-that to aim back with. Two runs of sixty on the fixed deck read **50 / 35 / 15**
-and **53 / 37 / 10**, which is the same answer inside the noise floor below.
+that to aim back with. Eighty rounds on the fixed deck read **50 / 34 / 16**, and
+two runs of sixty beside it **50 / 35 / 15** and **53 / 37 / 10** — the same
+answer three times, which is more than the noise floor below usually allows.
 
 The other numbers to watch if the bots ever change: about **40 goes a round**,
 **46% of shots finding somebody** — the rest split between a blank out of the
@@ -979,7 +980,10 @@ bot-only rounds** (`npm run balance -- 120`) sits at:
 
 | | Outlaws | The Law | Renegade |
 |---|---|---|---|
-| win share | **59%** | 34% | 7% |
+| win share | **63%** | 31% | 6% |
+
+(An earlier 120 read 59 / 34 / 7 and a 60 taken beside this one read 75 / 18 / 7,
+which is the noise floor below doing exactly what it says it does.)
 
 with 98% of rounds resolving on a kill rather than running out on the storm, and
 those averaging about **five minutes**. The Sheriff dies in about two rounds in
