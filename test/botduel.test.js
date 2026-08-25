@@ -119,7 +119,13 @@ test('a bot plays the eighty rather than sitting on them', () => {
     turn(bot);
     // A gun that reaches five times as far as the one in his hand. There is no
     // reading of this game in which that stays in the hand.
-    bot.duelHand = ['winchester', 'bang', 'missed', 'barrel'];
+    //
+    // No Bang! in the hand on purpose. With one he sometimes fired it, and if
+    // the man he fired at was the one who takes a card back off whoever hits
+    // him, the barrel he had just put down came straight off the table again -
+    // so the check failed on a game that had done everything right. One flake
+    // in thirty. This test is about whether he plays what is worth playing.
+    bot.duelHand = ['winchester', 'missed', 'barrel'];
     bot.weaponCard = null;
     bot.brain.nextDuelActAt = 0;
     secs(clock, room, 2);

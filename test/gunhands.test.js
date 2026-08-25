@@ -175,9 +175,18 @@ test('a bot spends what it can spend, and keeps what would be wasted', () => {
     room.aimedAt = mark.id;
     mark.brain.skill = 1;
 
+    // Twenty-eight tries rather than fourteen, and the mark kept on his feet
+    // and the floor kept with the shooter for every one of them. This is a
+    // nerve check with a coin in it - 0.83 at skill 1 - so it can only be
+    // asserted on a sample, and the sample has to actually happen: the other
+    // five at the table take their goes during these ticks and one of them
+    // shooting the mark dead turned every remaining try into a silent zero.
     const rolls = (hand) => {
       let moved = 0;
-      for (let i = 0; i < 14; i++) {
+      for (let i = 0; i < 28; i++) {
+        mark.alive = true;
+        mark.health = mark.maxHealth;
+        turn(shooter);
         mark.duelHand = [...hand];
         mark.bracedUntil = 0;
         mark.brain.braceRolled = false;
@@ -192,13 +201,13 @@ test('a bot spends what it can spend, and keeps what would be wasted', () => {
     };
 
     deal(mark, 'ambidexter');
-    assert.ok(rolls(['bang']) >= 6, 'he could get out of the way with it and did not try');
+    assert.ok(rolls(['bang']) >= 10, 'he could get out of the way with it and did not try');
 
     // And against the man who puts two in, one card is worth nothing.
     deal(shooter, 'butcher');
     deal(mark, null);
     assert.equal(rolls(['missed']), 0, 'he spent his last card on a shot it could not stop');
-    assert.ok(rolls(['missed', 'missed']) >= 6, 'and would not spend two when two was the price');
+    assert.ok(rolls(['missed', 'missed']) >= 10, 'and would not spend two when two was the price');
   } finally { clock.restore(); }
 });
 

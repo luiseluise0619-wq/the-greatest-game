@@ -525,3 +525,55 @@ test('and the same the other way round when the street opens up', () => {
     assert.ok((janet.cardsPlayed || []).includes('bang'), 'and it is not on the account either');
   } finally { clock.restore(); }
 });
+
+test('the round out of a man\'s back is a round like any other', () => {
+  const { room, clock } = seatedRoom('STAH');
+  try {
+    const all = [...room.players.values()].filter((p) => p.alive);
+    const [me, behind] = all;
+    for (const p of all) { p.gear = []; p.weaponCard = null; p.gunhand = null; p.duelHand = []; }
+    // Him directly out of my back, well inside the corridor.
+    me.pos = { x: 40, y: 0, z: 0 };
+    me.yaw = 0;                                   // facing -z, so behind is +z
+    behind.pos = { x: 40, y: 0, z: 3 };
+    for (const o of all) { if (o !== me && o !== behind) o.pos = { x: 200, y: 0, z: 200 }; }
+    assert.equal(room.linedUpBehind(me)?.id, behind.id, 'he is not in the corridor at all');
+
+    // A barrel behind you still stops it. The gunhand whose whole sentence is
+    // "every shot at him may find wood" had one shot in the eighty that could
+    // not, because 'selfshot' is not a weapon id and the gate that applies the
+    // barrel waves through anything that is not one.
+    behind.gunhand = 'cooper';                    // born behind one, so it is always there
+    behind.health = behind.maxHealth;
+    behind.bracedUntil = 0;
+    // The barrel is a draw rather than a wall, so asserting on a sample of it
+    // is asserting on a coin - and one run in a hundred of a fair coin looks
+    // like a bug. Force the draw both ways instead: what this is checking is
+    // that the wood is CONSULTED at all, which for a shot out of somebody's
+    // back it never used to be.
+    const realDraw = room.drawFor.bind(room);
+    const asked = [];
+    room.drawFor = (who, what) => { asked.push(what); return true; };
+    assert.equal(room.throughStopped(behind, me), true, 'the wood was never asked');
+    assert.ok(asked.includes('barrel'), `it asked for ${asked.join(',')} instead of the barrel`);
+    room.drawFor = () => false;
+    assert.equal(room.throughStopped(behind, me), false,
+      'the wood stopped it on a draw that did not come up - it is a draw, not a wall');
+    room.drawFor = realDraw;
+
+    // And a man who was already moving spends the card for it.
+    behind.gunhand = null;
+    behind.duelHand = ['missed'];
+    behind.bracedUntil = Date.now() / 1000 + 5;
+    assert.equal(room.throughStopped(behind, me), true, 'he braced and it found him anyway');
+    assert.deepEqual(behind.duelHand, [], 'and the card never left his hand');
+    assert.ok((behind.cardsPlayed || []).includes('missed'),
+      'and the account of the round never heard about it');
+
+    // Standing there with nothing is standing there with nothing.
+    behind.duelHand = [];
+    behind.bracedUntil = 0;
+    assert.equal(room.throughStopped(behind, me), false,
+      'nothing in front of him and nothing in his hand, and it still missed');
+  } finally { clock.restore(); }
+});

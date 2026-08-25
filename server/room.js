@@ -2693,6 +2693,21 @@ export class Room {
     const behind = this.linedUpBehind(p);
     this.applyDamage(p, p, 1, 'selfshot', null);
     if (behind) {
+      // The round out of your back is still a round. It used to be the one
+      // thing in the game no card could stop - not a barrel, not a Missed! -
+      // because 'selfshot' is not a weapon id and duelShotLands waves anything
+      // that is not through without looking. So the gunhand whose whole
+      // sentence is "every shot at him may find wood" had one shot in the
+      // eighty that could not, and turning on your heel was a guaranteed hit
+      // on any man at the table for the price of one of your own.
+      //
+      // Reach is deliberately not checked: the corridor out of your back is
+      // its own measure and the manual says so. What a man gets is what he
+      // has in front of him and what he did about it.
+      if (this.throughStopped(behind, p)) {
+        this.pushDuelAll();
+        return;
+      }
       this.broadcast({
         t: S.FEED,
         k: 'feed.throughInto', p: { name: behind.name },
@@ -2702,6 +2717,50 @@ export class Room {
       this.applyDamage(behind, p, 1, 'selfshot', null);
     }
     this.pushDuelAll();
+  }
+
+  /**
+   * The two things that stop a bullet nobody warned you about: wood in front
+   * of you, and having already got out of the way. Range is not one of them -
+   * the corridor out of a man's back is its own measure - and neither is the
+   * draw, because there was no barrel levelled at anybody to see.
+   */
+  throughStopped(victim, shooter) {
+    if ((victim.gear || []).includes('barrel') || trait(victim, 'barrel')) {
+      if (this.drawFor(victim, 'barrel')) {
+        this.broadcast({
+          t: S.FEED, k: 'feed.throughWood', p: { name: victim.name },
+          text: `It comes out of his back and buries itself in ${victim.name}'s barrel.`,
+          tone: 'system',
+        });
+        return true;
+      }
+    }
+    const need = trait(shooter, 'needsTwo') ? 2 : 1;
+    const answers = [];
+    for (const card of ['missed', 'bang']) {
+      if (card === 'bang' && !trait(victim, 'swap')) continue;
+      for (const c of (victim.duelHand || [])) if (c === card) answers.push(card);
+    }
+    if (answers.length >= need && (victim.bracedUntil || 0) > now()) {
+      victim.bracedUntil = 0;
+      for (let i = 0; i < need; i += 1) {
+        const at = victim.duelHand.indexOf(answers[i]);
+        if (at >= 0) {
+          victim.duelHand.splice(at, 1);
+          this.pile.put(answers[i]);
+          victim.cardsPlayed.push(answers[i]);
+        }
+      }
+      this.broadcast({
+        t: S.FEED, k: 'feed.throughMissed', p: { name: victim.name },
+        text: `It comes out of his back and ${victim.name} is not there any more.`,
+        tone: 'system',
+      });
+      this.checkEmptyHand(victim);
+      return true;
+    }
+    return false;
   }
 
   /**
