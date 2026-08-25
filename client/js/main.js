@@ -570,7 +570,12 @@ class Game {
         if (msg.phase === PHASE.COMBAT) this.hud.playDealAnimation();
         if (msg.phase === PHASE.RESULTS) this.exitToResults();
         if (msg.phase === PHASE.LOBBY) { this.inGame = false; this.hud.showMenu(true); this.hud.hideResults(); document.exitPointerLock?.(); }
-        this.ringMesh.visible = msg.phase === PHASE.ENDGAME;
+        // No storm at a table. It stops shrinking at fourteen metres from the
+        // middle of the map and the furthest anybody seated stands from that
+        // point is seven and a half, so drawing one is drawing a hazard that
+        // cannot touch anybody - and in a mode where nobody may move, a wall
+        // closing in is a thing to watch and do nothing about.
+        this.ringMesh.visible = msg.phase === PHASE.ENDGAME && !this.duelMode;
         break;
 
       case S.SNAPSHOT: this.onSnapshot(msg); break;
@@ -706,7 +711,7 @@ class Game {
 
     if (msg.ring > 0) {
       this.ringMesh.scale.set(msg.ring, 1, msg.ring);
-      this.ringMesh.visible = true;
+      this.ringMesh.visible = !this.duelMode;
     }
   }
 

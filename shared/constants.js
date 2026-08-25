@@ -187,6 +187,27 @@ export const ROLE_TABLE = {
   8: ['sheriff', 'deputy', 'deputy', 'deputy', 'outlaw', 'outlaw', 'outlaw', 'renegade'],
 };
 
+/**
+ * Where the turn mode wants a different table, and only there.
+ *
+ * At eight the shared table is a Sheriff, three Deputies, three Outlaws and a
+ * Renegade - four of the law against four. In the free-for-all that measures
+ * 48/43 to the outlaws over sixty rounds, which is the same answer every other
+ * size gives. At a table it measures **72/23 to the LAW**: reach is capped at
+ * a seat there, so an extra body on the law's side is worth far more than an
+ * extra one on the gang's, and the biggest table in the game was the one size
+ * that was not a contest.
+ *
+ * Swapping the third Deputy for a fourth Outlaw brings it to 53/43, in line
+ * with every other size. It is left out of the free-for-all deliberately: the
+ * same swap measured there takes it from 48/43 to 70/30, because a man who can
+ * walk the whole town and pick his moment is a different quantity from a man
+ * who gets six seconds and reaches one seat.
+ */
+export const DUEL_ROLE_TABLE = {
+  8: ['sheriff', 'deputy', 'deputy', 'outlaw', 'outlaw', 'outlaw', 'outlaw', 'renegade'],
+};
+
 export const MIN_PLAYERS = 4;
 export const MAX_PLAYERS = 8;
 
@@ -604,8 +625,11 @@ export const HITBOX = {
 
 export const LOOT_RESPAWN = 28;   // seconds before a picked-up crate refills
 
-export function rolesForPlayerCount(n) {
-  const table = ROLE_TABLE[n] || ROLE_TABLE[MAX_PLAYERS];
+export function rolesForPlayerCount(n, duel = false) {
+  const table = (duel && DUEL_ROLE_TABLE[n])
+    || ROLE_TABLE[n]
+    || (duel && DUEL_ROLE_TABLE[MAX_PLAYERS])
+    || ROLE_TABLE[MAX_PLAYERS];
   return table.slice();
 }
 

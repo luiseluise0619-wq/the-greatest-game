@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, seatThem } from './helpers.js';
-import { TIMING, MODES, DUEL } from '../shared/constants.js';
+import { TIMING, MODES, DUEL, rolesForPlayerCount } from '../shared/constants.js';
 import { GUNHANDS } from '../shared/gunhands.js';
 import { DUEL_CARDS } from '../shared/deck.js';
 
@@ -780,4 +780,38 @@ test('and nobody is warned about a gun that cannot get to them', () => {
     assert.ok(!warned.some((w) => w.id === far.id && w.on),
       'a man two seats out of reach was told a gun was on him');
   } finally { clock.restore(); }
+});
+
+test('the biggest table is a contest in both games, not only in one', () => {
+  // At eight the shared table is a Sheriff, three Deputies, three Outlaws and
+  // a Renegade. In the free-for-all that measures about even; at a table it
+  // measured 72/23 to the LAW over sixty rounds, because reach there is capped
+  // at a seat and an extra body on the law's side is worth far more than an
+  // extra one on the gang's. The biggest table in the game was the one size
+  // that was not a contest.
+  const free = rolesForPlayerCount(8, false);
+  const duel = rolesForPlayerCount(8, true);
+  const count = (list, role) => list.filter((r) => r === role).length;
+
+  assert.equal(free.length, 8);
+  assert.equal(duel.length, 8, 'the turn mode seats a different number of people');
+  assert.equal(count(duel, 'sheriff'), 1, 'a town has one star');
+  assert.equal(count(duel, 'renegade'), 1, 'and one man playing for himself');
+  assert.equal(count(duel, 'deputy'), count(free, 'deputy') - 1,
+    'the turn mode was meant to give one of the law\'s bodies to the gang');
+  assert.equal(count(duel, 'outlaw'), count(free, 'outlaw') + 1,
+    'and the gang was meant to get it');
+
+  // And only at eight. Every other size measured in line already, and the two
+  // modes wanting different tables is a thing to do once rather than a habit.
+  for (const n of [4, 5, 6, 7]) {
+    assert.deepEqual(rolesForPlayerCount(n, true), rolesForPlayerCount(n, false),
+      `the two modes were given different tables at ${n}`);
+  }
+
+  // The free-for-all keeps its own, which the same swap measured there takes
+  // from 48/43 to 70/30 - a man who can walk the town and pick his moment is
+  // a different quantity from one who gets six seconds and reaches one seat.
+  assert.equal(count(free, 'deputy'), 3, 'the free-for-all lost a deputy it needs');
+  assert.equal(count(free, 'outlaw'), 3, 'and gained an outlaw it does not');
 });

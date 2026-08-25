@@ -318,6 +318,28 @@ try {
     `the count is your hand against your limit (${board.hand} of ${board.limit})`);
   }
 
+  // The last phase. In the free-for-all it is a dust storm closing on the town;
+  // at a table it can never reach anybody - the storm stops shrinking fourteen
+  // metres from the middle of the map and the furthest seated player stands
+  // seven and a half from that point - so calling it one told this town a
+  // hazard was coming for them that was not, and drew a wall closing in on a
+  // mode where nobody may move.
+  const last = await A.evaluate(() => {
+    const g = window.game;
+    g.hud.setPhase({ phase: 'endgame', alive: 4, total: 6 });
+    const seen = {
+      label: document.getElementById('phaseLabel').textContent.trim(),
+      obj: document.getElementById('objective')?.textContent.trim() || '',
+      ring: !!g.ringMesh?.visible,
+    };
+    g.hud.setPhase({ phase: g.phase, alive: 4, total: 6 });
+    return seen;
+  });
+  check(!/STORM|폭풍/i.test(last.label), `the last phase is not a storm here (${last.label})`);
+  check(last.label.length > 2, 'and it is called something');
+  check(last.obj.length > 10, `and says what it means (${last.obj.slice(0, 40)})`);
+  check(!last.ring, 'and no wall is drawn closing in on men who cannot move');
+
   // Reach is seats and the whole table stands inside four metres, so "he is
   // right there" and "the rules will not let you shoot him" are true of the
   // same man most of the time. The gun simply does not come up - which used
@@ -457,21 +479,25 @@ try {
   // be waiting for something the game is right not to send - and the check
   // would report a bug in the resume path that is really five bots doing their
   // job. Same guard as the table readouts above.
-  const downAlready = await A.evaluate(() => window.game?.self?.alive === false);
   await A.reload({ waitUntil: 'domcontentloaded' });
+  // Wait for the resume to land, then look at what came back rather than
+  // deciding beforehand what should. Reading "is he alive" before the reload
+  // was not enough: the round carries on while the page is reloading and five
+  // bots are shooting at him, so he can go down inside that window and come
+  // back - correctly - holding nothing.
   const resumed = await A.waitForFunction(
-    // A dead man gets his round back, not his hand: he has none, and the round
-    // may well have finished while the page was reloading. What has to come
-    // back is who he was and the game he was in.
-    (down) => (down
-      ? !!window.game?.selfRole && (window.game?.inGame || window.game?.phase === 'results')
-      : window.game?.duel?.hand?.length > 0 && !!window.game?.turn?.kind),
-    downAlready, { timeout: 30000 },
+    () => !!window.game?.selfRole
+      && (window.game?.inGame || window.game?.phase === 'results'),
+    null, { timeout: 30000 },
   ).then(() => true).catch(() => false);
-  check(resumed, downAlready
-    ? 'a refresh hands a dead man his round back - he holds no cards to hand him'
-    : 'a refresh mid-lap hands the game back rather than an empty screen');
-  if (resumed && !downAlready) {
+  const alive = resumed && await A.evaluate(() => window.game?.self?.alive !== false);
+  const gotHand = resumed && await A.waitForFunction(
+    () => window.game?.duel?.hand?.length > 0 && !!window.game?.turn?.kind,
+    null, { timeout: alive ? 15000 : 1 },
+  ).then(() => true).catch(() => false);
+  check(resumed, 'a refresh mid-lap hands the round back rather than an empty screen');
+  check(!alive || gotHand, 'and a living man gets his hand back with it');
+  if (resumed && alive && gotHand) {
     const back = await A.evaluate(() => ({
       hand: window.game.duel.hand,
       order: [...document.querySelectorAll('#turnOrder li')].length,

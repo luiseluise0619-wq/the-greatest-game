@@ -479,6 +479,9 @@ const KO = {
   'phase.prep': '준비',
   'phase.combat': '교전',
   'phase.endgame': '모래폭풍',
+  'phase.sundown': '해 질 녘',
+  'phase.sundownObjective': '빛이 사라지고 있습니다. 그때 서 있는 사람이 누구냐를 별이 결정합니다.',
+  'phase.prepObjectiveDuel': '자리에 서십시오. 아직 종이 울리지 않았고, 그 전에는 아무도 쏠 수 없습니다.',
   'phase.results': '해가 졌다',
   'phase.prepObjective': '총은 아직 총집에 있습니다. 무기를 찾고, 사람을 찾고, 누구를 믿을지 정하세요.',
 

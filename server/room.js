@@ -1797,7 +1797,7 @@ export class Room {
     }
 
     const all = [...this.players.values()];
-    const roles = shuffle(rolesForPlayerCount(all.length));
+    const roles = shuffle(rolesForPlayerCount(all.length, this.duel));
     const spawnOrder = shuffle(SPAWNS.map((s, i) => i));
     const groups = shuffle(all.map((_, i) => i));
     // Sixteen gunhands and at most eight men, dealt without repeats.

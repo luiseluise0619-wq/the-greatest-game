@@ -601,12 +601,26 @@ export class HUD {
   // ------------------------------------------------------------- hud state
   setPhase(msg) {
     this.phase = msg.phase;
-    $('phaseLabel').textContent = this.t(`phase.${msg.phase}`,
-      PHASE_LABEL[msg.phase] || msg.phase.toUpperCase());
+    // The last phase is a dust storm closing on the town in one game and the
+    // light going in the other. The storm's final radius is fourteen metres
+    // from the middle of the map; the furthest anybody at the table stands
+    // from that point is seven and a half - so in the turn mode it can never
+    // reach a single player, and calling it a dust storm told the town a
+    // hazard was coming for them that was not.
+    const duel = !!this.game.duelMode;
+    const key = duel && msg.phase === PHASE.ENDGAME ? 'phase.sundown' : `phase.${msg.phase}`;
+    const fallback = duel && msg.phase === PHASE.ENDGAME
+      ? 'SUNDOWN' : (PHASE_LABEL[msg.phase] || msg.phase.toUpperCase());
+    $('phaseLabel').textContent = this.t(key, fallback);
     this.setStanding(msg.alive, msg.total);
     if (msg.phase === PHASE.PREP) {
-      this.setObjective(this.t('phase.prepObjective',
-        'Guns are holstered. Find weapons, find people, decide who you like.'));
+      this.setObjective(this.t(duel ? 'phase.prepObjectiveDuel' : 'phase.prepObjective',
+        duel
+          ? 'Take your mark. The bell has not gone and nobody may fire before it.'
+          : 'Guns are holstered. Find weapons, find people, decide who you like.'));
+    } else if (duel && msg.phase === PHASE.ENDGAME) {
+      this.setObjective(this.t('phase.sundownObjective',
+        'The light is going. Whoever is standing when it does, the star decides it.'));
     } else if (this.selfRole) {
       this.setObjective(this.t(`role.${this.selfRole.role}.objective`, this.selfRole.objective));
     }

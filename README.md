@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 225 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 226 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -658,7 +658,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 225 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 226 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -992,6 +992,22 @@ has nothing like that to aim back with. But it is no longer papering over
 anything: four runs of sixty on the fixed build read **55 / 42**, **47 / 50**,
 **53 / 37** and **40 / 55** law to outlaw, which averages about even and is the
 closest this mode has measured.
+
+### Eight at the table
+
+Every size but the biggest measured in line. At eight the shared role table is a
+Sheriff, three Deputies, three Outlaws and a Renegade — four of the law against
+four — and in the free-for-all that comes out about even, the same as every
+other size. At a table it came out **72 / 23 to the law** over sixty rounds.
+
+Reach there is capped at a seat, so an extra body on the law's side is worth far
+more than an extra one on the gang's, and the biggest table in the game was the
+one size that was not a contest. The turn mode gets its own table at eight —
+the third Deputy becomes a fourth Outlaw — and comes out in line with seven.
+The free-for-all keeps its own: the same swap measured there takes it from
+48 / 43 to 70 / 30, because a man who can walk the whole town and pick his
+moment is a different quantity from a man who gets six seconds and reaches one
+seat. `DUEL_ROLE_TABLE` in `shared/constants.js`, and it overrides eight only.
 
 The Renegade is the number left to watch. He has come out anywhere between 2%
 and 16% across these runs, and at one player in seven a 60-round sample gives
