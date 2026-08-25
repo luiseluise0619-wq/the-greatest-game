@@ -1010,10 +1010,12 @@ bot-only rounds** (`npm run balance -- 120`) sits at:
 
 | | Outlaws | The Law | Renegade |
 |---|---|---|---|
-| win share | **63%** | 31% | 6% |
+| win share | **63–68%** | 27–31% | 6% |
 
-(An earlier 120 read 59 / 34 / 7 and a 60 taken beside this one read 75 / 18 / 7,
-which is the noise floor below doing exactly what it says it does.)
+Two runs of 120 on the same build read 63 / 31 / 6 and 68 / 27 / 6, an earlier
+one read 59 / 34 / 7, and a 60 taken beside them read 75 / 18 / 7. A range
+rather than a number, because the noise floor below is not a hedge — it is the
+measurement. The outlaw lean is the real signal in all four.
 
 with 98% of rounds resolving on a kill rather than running out on the storm, and
 those averaging about **five minutes**. The Sheriff dies in about two rounds in
