@@ -998,10 +998,21 @@ comes out even at seven rather than merely least-bad.
 So still seven, and it is still the one deviation from the original left in the
 mode — the star is the only man at the table anybody can identify, and the law
 has nothing like that to aim back with. But it is no longer papering over
-anything. Six runs on the fixed build, law to outlaw: **47/47**, **64/30**,
-**55/42**, **47/50**, **53/37**, **40/55**. That averages to about even and the
-spread is the noise floor doing what the section below says it does — the two
-widest readings, 64/30 and 40/55, are the same build measured twice.
+anything. Sixty and eighty rounds turned out not to settle it — six runs on the
+fixed build read 47/47, 64/30, 55/42, 47/50, 53/37 and 40/55 law to outlaw,
+which is the noise floor below doing exactly what it says. So: **200 rounds**,
+which is the largest sample in this repo.
+
+| | The Law | Outlaws | Renegade |
+|---|---|---|---|
+| 200 rounds at the table | **55%** | 40% | 6% |
+
+A fifteen-point lean to the law, where before this session's fixes the same
+setting was a patch over an outlaw runaway. Seven is still the right number —
+six measured 58/35 the other way and there is nothing between them — and it is
+left there rather than reached for again, because the next knob would be tuned
+against bots, and tuning a game to beat its own robots is how a game ends up
+only fun for robots.
 
 The number that did move, and stayed moved, is the share of the Sheriff's
 killers who had actually picked him out: **62%** before any of this session's

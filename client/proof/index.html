@@ -34,7 +34,21 @@
   const duel = q.get('deck') === 'duel';
   if (only) document.body.classList.add('one');
   const sheet = document.getElementById('sheet');
-  if (duel) {
+  // Two decks, one page, and asking one of them for the other's card used to
+  // throw on the first line and leave a blank sheet with the answer only in
+  // the console. `?c=bang` is a turn-mode card and wants `&deck=duel` with it.
+  const known = duel ? DUEL_CARDS : CARDS;
+  const otherHas = (duel ? CARDS : DUEL_CARDS)[only];
+  if (only && !known[only]) {
+    document.getElementById('head').textContent = 'NO SUCH CARD';
+    sheet.innerHTML = `<p style="max-width:60ch;line-height:1.7">`
+      + `There is no <b>${only}</b> in ${duel ? 'the eighty' : 'the six-card deck'}.`
+      + (otherHas
+        ? ` It is in the other one — try <a style="color:#d9b25c" href="?c=${only}${duel ? '' : '&deck=duel'}">`
+          + `?c=${only}${duel ? '' : '&amp;deck=duel'}</a>.`
+        : ` The ones there are: ${Object.keys(known).join(', ')}.`)
+      + `</p>`;
+  } else if (duel) {
     document.getElementById('head').textContent = 'THE EIGHTY — PROOF SHEET';
     for (const id of (only ? [only] : DUEL_CARD_ORDER)) {
       const d = DUEL_CARDS[id];
