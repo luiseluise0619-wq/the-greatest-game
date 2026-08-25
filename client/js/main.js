@@ -673,7 +673,10 @@ class Game {
       case S.READY: this.hud.setReady(msg); break;
       case S.SOUND: if (msg.sound === 'bell') this.audio.bell(); break;
       case S.ERROR:
-        this.hud.setStatus(msg.msg);
+        // The first sentence a player reads if their code is wrong, and for a
+        // long time the only one in the game that came out in English whatever
+        // language they asked for.
+        this.hud.setStatus(msg.k ? this.tr(msg.k, msg.msg, msg.p) : msg.msg);
         if (msg.fatal) {
           // Bad code: drop back to quick play rather than leaving them stranded.
           history.replaceState(null, '', location.pathname);

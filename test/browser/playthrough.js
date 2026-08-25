@@ -709,6 +709,19 @@ try {
   } finally { await blind.close(); }
 
   check(serverErrors.length === 0, `server stayed quiet${serverErrors.length ? `: ${serverErrors[0]}` : ''}`);
+  // The first sentence some people ever read from this game: they were sent a
+  // link, they typed the code wrong, and the town says so. It was the one
+  // sentence in the whole thing that only ever came out in English - the room
+  // manager sends it and nothing in the room manager had ever been keyed.
+  const badCode = await A.evaluate(async () => {
+    document.getElementById('joinCode').value = 'ZZZZ';
+    document.getElementById('joinBtn').click();
+    await new Promise((r) => setTimeout(r, 3000));
+    return document.getElementById('menuStatus').textContent.trim();
+  });
+  check(/ZZZZ/.test(badCode) && badCode.length > 12,
+    `a code that goes nowhere says so (${badCode.slice(0, 44)})`);
+
   check(pageErrors.length === 0, `no page errors${pageErrors.length ? `: ${pageErrors[0]}` : ''}`);
 } finally {
   await browser.close();

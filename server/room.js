@@ -288,7 +288,9 @@ export class Room {
 
     const humans = [...this.players.values()].filter((p) => !p.bot).length;
     if (humans >= MAX_PLAYERS) {
-      return this.send(client, { t: S.ERROR, msg: 'Town is full - 8 guns is the limit.' });
+      return this.send(client, {
+        t: S.ERROR, k: 'err.townFull', msg: 'Town is full - 8 guns is the limit.',
+      });
     }
     const p = this.makePlayer({
       name: String(msg.name || '').trim() || `Stranger ${humans + 1}`,

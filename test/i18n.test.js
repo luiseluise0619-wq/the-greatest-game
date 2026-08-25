@@ -26,6 +26,11 @@ const SRC = await Promise.all([
   // two versions and hands back the key with it, so the eight shouts are named
   // nowhere else and read as dead the moment this file stopped being scanned.
   readFile(new URL('../shared/constants.js', import.meta.url), 'utf8'),
+  // And the room manager, which owns the three sentences a player reads when
+  // their code is wrong or the town is full - the first words the game ever
+  // says to some people, and for a long time the only ones that came out in
+  // English whatever language they had asked for.
+  readFile(new URL('../server/rooms.js', import.meta.url), 'utf8'),
 ]).then((all) => all.join('\n'));
 
 /** Every key the page asks for by attribute. */
@@ -40,7 +45,12 @@ function htmlKeys() {
 // while the game was quite happily using all of them.
 const NAMESPACES = ['ui', 'rules', 'key', 'set', 'hud', 'phase', 'role', 'faction',
   'char', 'card', 'sb', 'res', 'deny', 'boot', 'voice', 'loot', 'turn',
-  'cham', 'aim', 'duel', 'man', 'feed', 'kill', 'place', 'intel', 'tl', 'bot', 'gun', 'end', 'chip', 'boon'];
+  'cham', 'aim', 'duel', 'man', 'feed', 'kill', 'place', 'intel', 'tl', 'bot', 'gun', 'end', 'chip', 'boon',
+  // The three sentences a player reads when their code is wrong or the town is
+  // full. A namespace that is not on this list is invisible to the scanner, so
+  // its keys read as "translated but never asked for" - which is what happened
+  // when these were added, and is exactly the alarm this list is for.
+  'err'];
 const KEYISH = new RegExp(`^(?:${NAMESPACES.join('|')})\\.[\\w.]+$`);
 
 /** Every key the client asks for in code, literal or built from an id. */

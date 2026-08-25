@@ -76,12 +76,17 @@ export class RoomManager {
       // Clipped: a code is four letters, and a socket that asks for a five
       // thousand character one should not get five thousand characters back.
       const asked = String(msg.room).toUpperCase().trim().slice(0, CODE_LEN + 4);
-      if (!room) return { error: `No town goes by "${asked}". Check the code.` };
-      if (!this.hasSpace(room)) return { error: 'That town is full - 8 guns is the limit.' };
+      if (!room) {
+        return { error: `No town goes by "${asked}". Check the code.`,
+          errorKey: 'err.noSuchTown', errorP: { code: asked } };
+      }
+      if (!this.hasSpace(room)) {
+        return { error: 'That town is full - 8 guns is the limit.', errorKey: 'err.townFull' };
+      }
       return { room };
     }
     const room = msg.create ? this.create({ isPublic: false }) : this.quickJoin();
-    if (!room) return { error: 'Server is at capacity. Try again in a minute.' };
+    if (!room) return { error: 'Server is at capacity. Try again in a minute.', errorKey: 'err.atCapacity' };
     return { room };
   }
 
@@ -91,7 +96,14 @@ export class RoomManager {
       if (msg.t !== C.JOIN) return;
       const res = this.resolve(msg);
       if (res.error) {
-        try { client.ws.send(JSON.stringify({ t: S.ERROR, msg: res.error, fatal: true })); } catch { /* gone */ }
+        try {
+          // Keyed like everything else the town says. This is the first thing
+          // a player ever reads if their code is wrong, and it was the one
+          // sentence in the game that only ever came out in English.
+          client.ws.send(JSON.stringify({
+            t: S.ERROR, msg: res.error, k: res.errorKey || null, p: res.errorP || null, fatal: true,
+          }));
+        } catch { /* gone */ }
         return;
       }
       res.room.addConnection(client);
