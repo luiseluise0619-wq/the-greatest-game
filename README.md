@@ -188,8 +188,11 @@ is modelled on prints them in — twenty-five `Bang!`, twelve `Missed!`, six
 `Beer`, one `Gatling`, and so on down to the single `Dynamite`. Your hand is the
 size of your health and you draw two at the start of every go, so **the closer
 you are to dying the less you can do about it**. Play one with the number key
-printed on it; the ones that need somebody in mind take whoever is in your
-crosshair.
+printed on it — one to nine, then `0` for a tenth, which a Sheriff on seven who
+draws a Stagecoach will have. The ones that need somebody in mind take whoever
+is in your crosshair, and only if your gun actually reaches them: reach is
+counted in seats, so most of the table is out of it most of the time and the
+gun will not come up on a man the rules would refuse.
 
 Every effect is the original's, because a game system is not anybody's property.
 Not one sentence of the rules text is: everything on those cards was written for
@@ -888,7 +891,10 @@ ever reading HE HAS YOU under the words YOUR GO. It also reads back what the
 running order is now showing — how many cards each man is holding and what he
 has face up in front of him, all of it public and all of it drawn from a packet
 the HUD used to throw away — and what you may keep at the end of your own go.
-Forty-one more.
+It also checks the two things reach being counted in seats
+made necessary: that ten cards get ten keys and the tenth is `0`, and that a man
+your gun does not reach is said to be out of it rather than leaving you pulling
+a trigger that does nothing. Forty-eight more.
 It also measures the HUD rather than trusting it: nothing may run off the edge
 of the window, no word may be written over the town without a shadow under it
 or something opaque behind it, and no two tiles of the shout wheel may sit on
