@@ -191,32 +191,41 @@ export function buildDeck() {
 
 export const DECK_SIZE = buildDeck().length;
 
-/** How far this player's gun reaches, in metres. */
-export function reachOf(player) {
-  const weapon = player?.weaponCard ? DUEL_CARDS[player.weaponCard] : null;
-  const steps = (weapon?.reach ?? DEFAULT_REACH)
-    + (player?.gear?.includes('scope') ? 1 : 0)
-    + (trait(player, 'reach') || 0);
-  return steps * DISTANCE_UNIT;
-}
-
-/** How far away this player counts as, in metres, whatever the tape says. */
-export function coverOf(player) {
-  const steps = (player?.gear?.includes('mustang') ? 1 : 0) + (trait(player, 'cover') || 0);
-  return steps * DISTANCE_UNIT;
+/**
+ * What the gear in front of a man adds up to, in seats. The two cards that
+ * move the tape - the glass that brings everything a step nearer and the horse
+ * that puts him a step further out - both declare what they do in the card
+ * table above. That was written down and then never read: the sums below named
+ * the two of them by hand instead, so a third card carrying `rangeBonus` would
+ * have printed a rule it did not have. Ask the card.
+ */
+function gearBonus(player, field) {
+  let n = 0;
+  for (const id of (player?.gear || [])) n += DUEL_CARDS[id]?.[field] || 0;
+  return n;
 }
 
 /** How many seats this gun reaches, which is what the original counts. */
 export function reachSeats(player) {
   const weapon = player?.weaponCard ? DUEL_CARDS[player.weaponCard] : null;
   return (weapon?.reach ?? DEFAULT_REACH)
-    + (player?.gear?.includes('scope') ? 1 : 0)
+    + gearBonus(player, 'rangeBonus')
     + (trait(player, 'reach') || 0);
 }
 
 /** And how many further out a man counts as sitting than he really is. */
 export function coverSeats(player) {
-  return (player?.gear?.includes('mustang') ? 1 : 0) + (trait(player, 'cover') || 0);
+  return gearBonus(player, 'distanceBonus') + (trait(player, 'cover') || 0);
+}
+
+/** How far this player's gun reaches, in metres. */
+export function reachOf(player) {
+  return reachSeats(player) * DISTANCE_UNIT;
+}
+
+/** How far away this player counts as, in metres, whatever the tape says. */
+export function coverOf(player) {
+  return coverSeats(player) * DISTANCE_UNIT;
 }
 
 /**

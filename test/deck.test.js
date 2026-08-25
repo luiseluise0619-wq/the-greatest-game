@@ -10,7 +10,8 @@ import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
 import { TIMING, MODES, DUEL } from '../shared/constants.js';
 import {
-  DECK_SIZE, DISTANCE_UNIT, DUEL_CARDS, buildDeck, reachOf, reachSeats, inReach,
+  DECK_SIZE, DISTANCE_UNIT, DUEL_CARDS, buildDeck, reachOf, reachSeats, coverSeats,
+  inReach,
 } from '../shared/deck.js';
 import { Pile, handLimit } from '../server/deck.js';
 import { healthOf } from '../shared/gunhands.js';
@@ -373,4 +374,39 @@ test('a weapon goes on the table, and the old one goes in the discard', () => {
     assert.ok(room.pile.discard.includes('volcanic'), 'the old gun vanished rather than being thrown away');
     assert.equal(reachOf(p), 2 * DISTANCE_UNIT, 'the new gun did not change what it reaches');
   } finally { clock.restore(); }
+});
+
+test('the gear that moves the tape moves it by what the card says', () => {
+  // Two cards in the deck change how far a man can reach and how far away he
+  // counts as, and both write the number down: rangeBonus and distanceBonus.
+  // Neither field was read by anything. The sums named the two cards by hand
+  // instead, so the card table was documentation of a rule kept somewhere
+  // else - and a third card carrying either field would have printed a rule
+  // it did not have.
+  const bare = { gear: [], weaponCard: null };
+  const withGear = (id) => ({ gear: [id], weaponCard: null });
+
+  const reachers = Object.values(DUEL_CARDS).filter((c) => c.rangeBonus);
+  const coverers = Object.values(DUEL_CARDS).filter((c) => c.distanceBonus);
+  assert.ok(reachers.length, 'no card claims to lengthen a gun any more');
+  assert.ok(coverers.length, 'no card claims to put a man further out any more');
+
+  for (const c of reachers) {
+    assert.equal(reachSeats(withGear(c.id)), reachSeats(bare) + c.rangeBonus,
+      `${c.name} says it is worth ${c.rangeBonus} and is not`);
+    assert.equal(reachOf(withGear(c.id)),
+      reachOf(bare) + c.rangeBonus * DISTANCE_UNIT,
+      `${c.name} moves the seats but not the metres`);
+  }
+  for (const c of coverers) {
+    assert.equal(coverSeats(withGear(c.id)), coverSeats(bare) + c.distanceBonus,
+      `${c.name} says it is worth ${c.distanceBonus} and is not`);
+  }
+
+  // And the two of them cancel: a glass against a horse is where you started.
+  const shooter = withGear(reachers[0].id);
+  const target = withGear(coverers[0].id);
+  const seats = reachSeats(bare);
+  assert.ok(inReach(shooter, target, 0, seats), 'the glass did not answer the horse');
+  assert.ok(!inReach(shooter, target, 0, seats + 1), 'and it answered it twice over');
 });
