@@ -392,3 +392,37 @@ test('the four who do not draw off the top of the pile', () => {
     assert.equal(room.pile.remaining, pile - DUEL.draw, 'and the third one did not go back');
   } finally { clock.restore(); }
 });
+
+test('the one with no limit fires every Bang! he is holding, not six of them', () => {
+  const { room, clock, all, deal, turn, face } = table();
+  try {
+    const [a, b] = all;
+    deal(a, 'quickdraw');
+    deal(b, null);
+    turn(a);
+    face(a, b, 1);
+    a.yaw = Math.PI; a.pitch = 0;
+    a.gear = []; b.gear = []; a.weaponCard = null; b.weaponCard = null;
+    b.health = 99; b.maxHealth = 99;
+    a.duelHand = Array(9).fill('bang');
+    room.chamber = Array(30).fill(true);
+    a.reloading = null;
+
+    // Ammunition is cards at a table - the manual says so and this gunhand's
+    // own sentence says "he fires every Bang! he is holding". The revolver
+    // underneath still held six, so the seventh trigger pull found an empty
+    // gun and a two-second reload ate the rest of his six seconds.
+    let fired = 0;
+    for (let i = 0; i < 12; i += 1) {
+      const before = a.duelHand.length;
+      a.nextFireAt = 0;
+      a.aimDwell = DUEL.drawTime + 1;
+      room.onShoot(a, { dir: { x: 0, y: 0, z: 1 } });
+      if (a.duelHand.length === before) break;
+      fired += 1;
+    }
+    assert.equal(fired, 9, `he was holding nine and got ${fired} of them off`);
+    assert.equal(a.reloading, null, 'and was left standing there reloading');
+    assert.deepEqual(a.duelHand, [], 'and still had Bang!s in his hand');
+  } finally { clock.restore(); }
+});

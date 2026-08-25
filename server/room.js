@@ -640,6 +640,13 @@ export class Room {
 
     const fireMult = p.buffs.fireRateMult || 1;
     g.mag -= 1;
+    // Ammunition is cards at a table. The manual says so, and the one gunhand
+    // in sixteen with no limit of one shot a turn says "he fires every Bang!
+    // he is holding" - but the revolver underneath still held six, so a man
+    // with nine of them fired six and then stood through a two-second reload
+    // with the rest of his go. An invisible magazine in a mode whose corner
+    // readout deliberately shows reach instead of one.
+    if (this.duel) g.mag = w.magSize;
     p.nextFireAt = t + w.fireInterval * fireMult;
     p.firedAt = t;
 
