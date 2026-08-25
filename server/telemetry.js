@@ -76,6 +76,13 @@ class Telemetry {
   }
 
   flush() {
+    // Switched off means switched off. This read the buffer without asking,
+    // so anything already queued when telemetry was turned off still reached
+    // the disk - either on the next flush call or on the interval, which keeps
+    // running because disabling does not stop it. That is the one thing the
+    // switch is for, and it also made "turning it off writes nothing at all"
+    // a test that passed on timing rather than on behaviour.
+    if (!this.enabled) { this.buffer.length = 0; return; }
     if (!this.buffer.length) return;
     const chunk = this.buffer.join('\n') + '\n';
     this.buffer.length = 0;

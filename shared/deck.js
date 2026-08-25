@@ -229,6 +229,24 @@ export function coverOf(player) {
 }
 
 /**
+ * How far `target` counts as sitting from `viewer`, which is not always how
+ * far he is. The glass in front of one man brings the whole table a step
+ * nearer; the horse in front of another puts him a step further out. In the
+ * original this is one number - "distance" - and every range in the game is
+ * measured against it, not only the guns.
+ *
+ * A gun's reach is measured against this. So is the arm's length that Panic!
+ * reaches, which was being compared against the raw count of seats instead -
+ * so the horse, whose entire job is to make people reach further, did nothing
+ * against the one card in the deck that reaches across the table and takes
+ * something out of your hand.
+ */
+export function sightSeats(viewer, target, seats) {
+  return seats + coverSeats(target)
+    - gearBonus(viewer, 'rangeBonus') - (trait(viewer, 'reach') || 0);
+}
+
+/**
  * Can `shooter` reach `target`?
  *
  * The card game counts seats, and so does this: `seats` is how many places

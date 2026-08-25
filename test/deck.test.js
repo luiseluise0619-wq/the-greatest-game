@@ -11,7 +11,7 @@ import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
 import { TIMING, MODES, DUEL } from '../shared/constants.js';
 import {
   DECK_SIZE, DISTANCE_UNIT, DUEL_CARDS, buildDeck, reachOf, reachSeats, coverSeats,
-  inReach,
+  sightSeats, inReach,
 } from '../shared/deck.js';
 import { Pile, handLimit } from '../server/deck.js';
 import { healthOf } from '../shared/gunhands.js';
@@ -409,4 +409,39 @@ test('the gear that moves the tape moves it by what the card says', () => {
   const seats = reachSeats(bare);
   assert.ok(inReach(shooter, target, 0, seats), 'the glass did not answer the horse');
   assert.ok(!inReach(shooter, target, 0, seats + 1), 'and it answered it twice over');
+});
+
+test('a card reaches as far as the man counts, not as far as he sits', () => {
+  // One number decides every range in this game, the way it does in the
+  // original: the horse in front of a man puts him a step further out from
+  // everybody, and the glass in front of you brings the whole table a step
+  // nearer. Both apply to the guns AND to the one card that reaches across
+  // and takes something out of somebody's hand - Panic! is an arm's length,
+  // and an arm's length to a man on a horse is not the same seat.
+  const bare = { gear: [], weaponCard: null };
+  const horse = Object.values(DUEL_CARDS).find((c) => c.distanceBonus);
+  const glass = Object.values(DUEL_CARDS).find((c) => c.rangeBonus);
+  const onHorse = { gear: [horse.id], weaponCard: null };
+  const withGlass = { gear: [glass.id], weaponCard: null };
+
+  assert.equal(sightSeats(bare, bare, 1), 1, 'a plain neighbour is one away');
+  assert.equal(sightSeats(bare, onHorse, 1), 1 + horse.distanceBonus,
+    `${horse.name} did not put him further out`);
+  assert.equal(sightSeats(withGlass, bare, 2), 2 - glass.rangeBonus,
+    `${glass.name} did not bring him nearer`);
+  // And the two cancel, which is the whole point of having both in the deck.
+  assert.equal(sightSeats(withGlass, onHorse, 1), 1, 'the glass did not answer the horse');
+
+  // What the guns ask is the same question, so the two must never disagree.
+  for (const seats of [0, 1, 2, 3]) {
+    for (const shooter of [bare, withGlass]) {
+      for (const target of [bare, onHorse]) {
+        assert.equal(
+          inReach(shooter, target, 0, seats),
+          sightSeats(shooter, target, seats) <= (DUEL_CARDS[shooter.weaponCard]?.reach ?? 1),
+          `the gun and the tape disagree at ${seats} seats`,
+        );
+      }
+    }
+  }
 });

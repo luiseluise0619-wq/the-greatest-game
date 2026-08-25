@@ -899,3 +899,42 @@ test('a trigger pull that is not going anywhere costs nothing', () => {
       `he fired at a man one seat away with a live round and missed (${mark.health})`);
   } finally { clock.restore(); }
 });
+
+test('the horse in front of a man puts him out of arm\'s reach too', () => {
+  // The original measures every range in the game against one number, and the
+  // two cards that move it move it for all of them. Panic! is an arm's length
+  // - one seat - and an arm's length to a man on a horse is not the same seat
+  // as an arm's length to a man without one. This was comparing against the
+  // raw count of seats, so the card whose entire job is to make people reach
+  // further did nothing at all against the one card in the deck that reaches
+  // across the table and takes something out of your hand.
+  const { room, clock } = seatedRoom('STHR');
+  try {
+    const all = [...room.players.values()].filter((p) => p.alive);
+    const [me, mark] = all;
+    for (const p of all) { p.gear = []; p.weaponCard = null; p.gunhand = null; }
+    seatThem(room, [me, mark, ...all.filter((p) => p !== me && p !== mark)]);
+    room.phase = 'combat';
+    room.turn = { kind: 'turn', holder: me.id, endsAt: Date.now() / 1000 + 1e6 };
+    assert.equal(room.seatsBetween(me, mark), 1, 'they are not sitting next to each other');
+
+    // Next to him, nothing in front of either of them: an arm's length.
+    me.duelHand = ['panic']; me.cardsThisTurn = 0;
+    mark.duelHand = ['beer'];
+    room.onDuelCard(me, { card: 'panic', target: mark.id });
+    assert.ok(!me.duelHand.includes('panic'), 'a neighbour was out of arm\'s reach');
+    assert.deepEqual(mark.duelHand, [], 'and nothing came off him');
+
+    // The same neighbour, on a horse: one step further out than he sits.
+    me.duelHand = ['panic']; me.cardsThisTurn = 0;
+    mark.duelHand = ['beer']; mark.gear = ['mustang'];
+    room.onDuelCard(me, { card: 'panic', target: mark.id });
+    assert.ok(me.duelHand.includes('panic'), 'the horse did not put him out of reach');
+    assert.deepEqual(mark.duelHand, ['beer'], 'and a card came off him anyway');
+
+    // And the glass answers the horse, which is why both are in the deck.
+    me.gear = ['scope'];
+    room.onDuelCard(me, { card: 'panic', target: mark.id });
+    assert.ok(!me.duelHand.includes('panic'), 'the glass did not answer the horse');
+  } finally { clock.restore(); }
+});

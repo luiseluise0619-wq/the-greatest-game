@@ -16,7 +16,9 @@ import { raycastWorld, rayPlayerBox, lineOfSight, moveAndCollide } from '../shar
 import { C, S } from '../shared/protocol.js';
 import { BotBrain, BOT_NAMES } from './bots.js';
 import { Pile, handLimit, drawCheck } from './deck.js';
-import { DUEL_CARDS, KIND, inReach, reachOf, reachSeats, DISTANCE_UNIT } from '../shared/deck.js';
+import {
+  DUEL_CARDS, KIND, inReach, reachOf, reachSeats, sightSeats, DISTANCE_UNIT,
+} from '../shared/deck.js';
 import { GUNHANDS, GUNHAND_ORDER, healthOf, trait } from '../shared/gunhands.js';
 import { telemetry } from './telemetry.js';
 import { randomUUID } from 'node:crypto';
@@ -1516,8 +1518,15 @@ export class Room {
         // next to you and Cat Balou reaches across the table.
         const range = card.range ?? 1;
         const away = this.seatsBetween(p, target);
+        // How far he COUNTS as, not how far he is. The original measures every
+        // range in the game against one number, and the two cards that move it
+        // move it for all of them - the horse puts a man a step further out
+        // from everybody, the glass brings the whole table a step nearer. This
+        // compared against the raw count of seats, so a man on a horse was as
+        // easy to reach into as a man without one, for the one card in the deck
+        // that reaches across and takes something out of your hand.
         const tooFar = away != null
-          ? away > range
+          ? sightSeats(p, target, away) > range
           : Number.isFinite(range * DISTANCE_UNIT) && metres(target) > range * DISTANCE_UNIT;
         if (tooFar) {
           say('duel.say.notClose', 'Not close enough for that.', 'bad');

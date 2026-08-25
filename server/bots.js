@@ -608,8 +608,17 @@ export class BotBrain {
         // The Renegade wants a thin crowd, not a fast kill. He turns late.
         const late = alive <= 3;
         // The star has to stay up until everyone else is down, or somebody
-        // else's win condition fires first and he gets nothing.
-        if (o.badge || this.sheriffGuess === o.id) return late ? 2.8 : -1;
+        // else's win condition fires first and he gets nothing. "Late" is not
+        // late enough for that one: with three standing, the third man may be
+        // an outlaw, and shooting the star with an outlaw alive ends the round
+        // as an OUTLAW win - the Renegade hands away the round he was two
+        // kills from taking. He goes last, and last means the last two.
+        //
+        // This needs no more than he can see. He is not asked what the third
+        // man is; he is asked to count, which is the rule a player at the
+        // table would follow.
+        const alone = alive <= 2;
+        if (o.badge || this.sheriffGuess === o.id) return alone ? 2.8 : -1;
         // Until then he draws only on somebody he is genuinely certain of. The
         // old numbers here topped out at 1.0 against a threshold of 1.25, which
         // meant a Renegade could not draw on anybody at all before the turn

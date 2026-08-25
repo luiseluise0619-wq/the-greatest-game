@@ -1244,6 +1244,12 @@ class Game {
     const t = performance.now() / 1000;
     if (!s.alive || !this.inGame) return false;
     if (this.turn && this.turn.holder !== this.selfId) return false;
+    // Ammunition is cards here, and the magazine is not it. Without this the
+    // client predicted a shot the server was always going to drop: a bang, a
+    // muzzle flash, a kick and a round off the counter, for a trigger that
+    // never moved. The counter came back on the next packet; the noise did
+    // not, and it is a noise the rest of the table never heard.
+    if (this.duelMode && !this.hud.shotLeft(this.duel || {})) return false;
     if (s.sprint && s.moving) return false;      // no shooting at a dead run
     if (s.mag <= 0 || s.reloading > 0) return false;
     if (t < s.nextFireAt || t < s.swapUntil) return false;
@@ -1262,6 +1268,12 @@ class Game {
         this.deny(this.turn.kind === 'reposition'
           ? ['deny.walkTime', 'Nobody shoots while the town is walking.']
           : ['deny.notYourTurn', 'Not your go. Wait to be called.']);
+        return;
+      }
+      if (this.duelMode && me.alive && !this.hud.shotLeft(this.duel || {})) {
+        this.deny(this.hud.shotCardOf(this.duel || {})
+          ? ['deny.shotSpent', 'You have had your shot this go.']
+          : ['deny.noBang', 'Nothing in your hand to fire.']);
         return;
       }
       if (me.alive && me.sprint && me.moving && me.mag > 0 && me.reloading <= 0) {

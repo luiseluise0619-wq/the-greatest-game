@@ -116,10 +116,19 @@ test('the readout is arithmetic anybody can check', async () => {
 });
 
 test('turning it off writes nothing at all', async () => {
+  // Drain whatever the tests above left queued first, and let the append land.
+  // Without this the sample below races the flush interval, which keeps
+  // running whatever `enabled` says.
+  telemetry.flush();
+  await new Promise((r) => setTimeout(r, 60));
   const before = fs.existsSync(FILE) ? fs.statSync(FILE).size : 0;
   telemetry.enabled = false;
   try {
     telemetry.event('death', { room: 'OFF', victimRole: 'sheriff' });
+    telemetry.flush();
+    // And anything that was already queued when the switch went off must not
+    // reach the disk either, which is a rule about flush and not about timing.
+    telemetry.buffer.push('{"t":0,"type":"should_never_be_written"}');
     telemetry.flush();
     await new Promise((r) => setTimeout(r, 60));
     const after = fs.existsSync(FILE) ? fs.statSync(FILE).size : 0;

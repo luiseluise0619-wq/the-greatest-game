@@ -428,6 +428,12 @@ try {
   const trigger = await A.evaluate(() => {
     const g = window.game;
     const wasTurn = g.turn; const wasDuel = g.duel;
+    // The gunhand is dealt, and two of the sixteen answer this question
+    // differently on purpose - one fires every Bang! he is holding, and one
+    // reads a Missed! as a Bang!. Neither is what is being measured here, so
+    // this man is dealt neither for the length of it.
+    const wasRole = g.hud.selfRole;
+    g.hud.selfRole = { ...(wasRole || {}), gunhand: null };
     const read = (bangs) => {
       const held = { ...g.duel, hand: ['bang', 'missed', 'beer'], limit: 7, pile: 40, bangs,
         weapon: null, table: g.duel.table || [] };
@@ -447,6 +453,7 @@ try {
       live: !!document.querySelector('#duelHand .dCard.live'),
       lit: [...document.querySelectorAll('#duelHand .dCard')].filter((n) => !n.classList.contains('cannot')).length,
     };
+    g.hud.selfRole = wasRole;
     g.turn = wasTurn; g.duel = wasDuel; g.hud.setDuel(wasDuel);
     return { before, after, walk };
   });
@@ -460,6 +467,39 @@ try {
     `saying so rather than nothing (${trigger.after.note})`);
   check(!trigger.walk.live && trigger.walk.lit === 0,
     `the bell puts the whole hand out (${trigger.walk.lit} still lit)`);
+
+  // And the other end of the same rule. The client predicts a shot so the
+  // click feels instant, and its list of things that stop a trigger was the
+  // free-for-all's - a magazine, a reload, a sprint. Ammunition here is cards,
+  // so with nothing to fire it predicted a shot the server was always going to
+  // drop: a bang, a muzzle flash, a kick and a round off the counter, for a
+  // trigger that never moved. The counter came back on the next packet. The
+  // noise did not, and it is a noise nobody else at the table heard.
+  const phantom = await A.evaluate(() => {
+    const g = window.game;
+    const wasTurn = g.turn; const wasDuel = g.duel; const wasMag = g.self.mag;
+    const wasNext = g.self.nextFireAt;
+    g.turn = { kind: 'turn', holder: g.selfId, left: 6 };
+    const empty = { ...g.duel, hand: ['beer'], limit: 7, pile: 40, bangs: 0, weapon: null,
+      table: g.duel.table || [] };
+    g.duel = empty; g.hud.setDuel(empty);
+    g.self.nextFireAt = 0;
+    const sent = [];
+    const realSend = g.send.bind(g);
+    g.send = (m) => { if (m.t === 'shoot') sent.push(m); else realSend(m); };
+    g.tryFire();
+    const feed = [...document.querySelectorAll('#feed .feedLine')].slice(-3).map((n) => n.textContent);
+    const out = { sent: sent.length, mag: g.self.mag, was: wasMag, feed };
+    g.send = realSend;
+    g.self.mag = wasMag; g.self.nextFireAt = wasNext;
+    g.turn = wasTurn; g.duel = wasDuel; g.hud.setDuel(wasDuel);
+    return out;
+  });
+  check(phantom.sent === 0, 'an empty hand does not send a shot the server would drop');
+  check(phantom.mag === phantom.was,
+    `and does not spend a round for it (${phantom.was} -> ${phantom.mag})`);
+  check(phantom.feed.some((l) => /hand|손/.test(l)),
+    `and says what is wrong instead (${phantom.feed[phantom.feed.length - 1] || 'nothing'})`);
 
   // The scoreboard's last column. It said "Kills" and printed a dash for the
   // living and an empty cell for the dead, because nothing on the client ever
@@ -604,6 +644,12 @@ try {
   check(man.duel > 0 && man.free === 0, `F1 describes this game and not the other (${man.duel} sections)`);
   check(man.keys.some((k) => k.startsWith('1…9')) && !man.keys.some((k) => k.startsWith('Z X')),
     'and lists this mode\'s keys');
+  // And not a key that cannot do anything here. The star is dealt face up and
+  // pinned on at the bell in this mode, so B's only two answers are "you are
+  // already wearing it" and "the star is not yours to pin on" - and a key list
+  // is a promise.
+  check(!man.keys.some((k) => k.startsWith('B ')),
+    `and not the one key that has nothing to do in it (${man.keys.filter((k) => k.startsWith('B ')).join('')})`);
   await A.screenshot({ path: `${SHOTS}/d4-manual.png`, fullPage: true });
   await A.evaluate(() => window.game.showManual(false));
 

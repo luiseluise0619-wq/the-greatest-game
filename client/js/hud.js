@@ -79,7 +79,6 @@ export class HUD {
       ['key.chat', 'T', 'chat'],
       ['key.table', 'Tab', 'table'],
       ['key.hand', 'H', 'your hand'],
-      ['key.star', 'B', 'pin the star'],
       ['key.manual', 'F1', 'this page'],
       ['key.settings', 'Esc', 'settings'],
     ];
@@ -91,6 +90,11 @@ export class HUD {
       ['man.key.brace', 'Space', 'get out of the way'],
       ['man.key.look', 'mouse', 'turn your head — the feet stay put'],
       ['man.key.self', 'Q', 'turn it on yourself'],
+      // One of the sixteen has something to press, and the corner of the
+      // screen puts a G next to his ability when he is dealt it. The key list
+      // did not have a G on it at all, so the only key in the mode that has to
+      // be found rather than guessed was the one the manual left out.
+      ['man.key.gunhand', 'G', 'your gunhand, if it is one you press'],
     ];
     const freeKeys = [
       ['key.move', 'WASD', 'move'],
@@ -105,6 +109,12 @@ export class HUD {
       ['key.guns', '1 2 3', 'guns'],
       ['key.dynamite', 'G', 'dynamite'],
       ['key.card', 'Z X', 'play a card'],
+      // Only in the free-for-all. In the turn mode the star is dealt face up
+      // and pinned on at the bell, so B has nothing left to do - and a key
+      // list is a promise. It printed "B pin the star" in a game where the
+      // only two answers the key has are "you are already wearing it" and
+      // "the star is not yours to pin on".
+      ['key.star', 'B', 'pin the star'],
     ];
     const rows = duel ? [...duelKeys, ...common] : [...freeKeys, ...common];
     box.innerHTML = rows.map(([key, cap, what]) => {
@@ -609,7 +619,10 @@ export class HUD {
     // taken his shot held the gun on somebody for a full second and it
     // silently refused to go off, with nothing anywhere saying why.
     const shot = this.shotCardOf(msg);
-    const live = this.shotLeft(msg);
+    // Lit only while the go is actually yours. The ring says "the trigger will
+    // answer this one", and during the walk between laps the trigger answers
+    // nobody - so it has to go out with everything else.
+    const live = yours && this.shotLeft(msg);
     hand.classList.toggle('hidden', !msg.hand.length);
     hand.innerHTML = msg.hand.map((id, i) => {
       const c = DUEL_CARDS[id];
