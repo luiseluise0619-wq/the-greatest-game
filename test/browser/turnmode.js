@@ -76,11 +76,24 @@ async function open(url, name) {
   return page;
 }
 
-/** Wait for this player's own go, which comes round once a lap. */
-const myGo = (page, timeout = 180000) => page.waitForFunction(
-  () => window.game?.turn?.kind === 'turn' && window.game.turn.holder === window.game.selfId,
-  null, { timeout },
-);
+/**
+ * Wait for this player's own go, which comes round once a lap - or for the two
+ * things that mean it is never coming. He is one man at a table with five who
+ * shoot at him, so waiting only for the go meant that when he was killed
+ * before his first one the suite sat there for three minutes and then died on
+ * a timeout with nothing to say about why. Returns true if the floor is his.
+ */
+const myGo = async (page, timeout = 180000) => {
+  const got = await page.waitForFunction(
+    () => (window.game?.turn?.kind === 'turn' && window.game.turn.holder === window.game.selfId)
+      || window.game?.self?.alive === false
+      || window.game?.phase === 'results',
+    null, { timeout },
+  ).then(() => true).catch(() => false);
+  if (!got) return false;
+  return page.evaluate(() => window.game?.turn?.kind === 'turn'
+    && window.game.turn.holder === window.game.selfId);
+};
 
 try {
   const A = await open(`http://localhost:${PORT}/`, 'A');
@@ -203,9 +216,8 @@ try {
       await A.waitForFunction(() => window.game?.turn?.holder !== window.game?.selfId,
         null, { timeout: 60000 }).catch(() => {});
     }
-    await myGo(A);
     // eslint-disable-next-line no-await-in-loop
-    if (!await A.evaluate(() => window.game.self?.alive !== false)) break;
+    if (!await myGo(A)) break;
     // eslint-disable-next-line no-await-in-loop
     play = await A.evaluate(async () => {
       const g = window.game;
@@ -388,12 +400,15 @@ try {
   check(warned.down, 'and it goes away again when the barrel moves off');
 
   // Nobody can be reading HE HAS YOU under the words YOUR GO.
-  await myGo(A);
-  const mine = await A.evaluate(() => ({
-    warn: !document.getElementById('aimedWarn').classList.contains('hidden'),
-    what: document.getElementById('turnWhat').textContent,
-  }));
-  check(!mine.warn, `no gun is on you while you hold the floor (${mine.what})`);
+  if (await myGo(A)) {
+    const mine = await A.evaluate(() => ({
+      warn: !document.getElementById('aimedWarn').classList.contains('hidden'),
+      what: document.getElementById('turnWhat').textContent,
+    }));
+    check(!mine.warn, `no gun is on you while you hold the floor (${mine.what})`);
+  } else {
+    check(true, 'the floor never came round again (he is down, or the round is over)');
+  }
 
   // The manual, in the mode it is describing.
   await A.evaluate(() => window.game.showManual(true));

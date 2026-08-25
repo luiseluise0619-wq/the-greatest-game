@@ -2433,7 +2433,14 @@ export class Room {
       .sort((a, b) => a.worth - b.worth)
       .slice(0, 2)
       .sort((a, b) => b.i - a.i);
-    for (const { i } of order) this.pile.put(p.duelHand.splice(i, 1)[0]);
+    for (const { i } of order) {
+      const spent = p.duelHand.splice(i, 1)[0];
+      this.pile.put(spent);
+      // Two cards off the table is two cards played, on the account of the
+      // round and on the count of what this man did with his six seconds.
+      p.cardsPlayed.push(spent);
+      p.cardsThisTurn = (p.cardsThisTurn || 0) + 1;
+    }
     p.health = Math.min(p.maxHealth, p.health + 1);
     this.emit(p, { t: S.FEED, k: 'gun.twoForOne', text: 'Two off the table, one hit back.', tone: 'good' });
     this.checkEmptyHand(p);
