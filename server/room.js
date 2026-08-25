@@ -755,6 +755,13 @@ export class Room {
       attacker.damageDealt += dmg;
       victim.lastHitBy = attacker.id;
       victim.lastHitAt = now();
+      // What this shooter knows he has put into that man. A bot picking off
+      // the wounded used to read the victim's health straight off the server,
+      // and nothing puts another man's health in a snapshot - so the bots knew
+      // who was nearly down and the human across from them did not. This is
+      // the honest version: what you saw land, because you fired it.
+      if (!attacker.dealtTo) attacker.dealtTo = new Map();
+      attacker.dealtTo.set(victim.id, (attacker.dealtTo.get(victim.id) || 0) + dmg);
     }
     if (this.duel) this.onHitTaken(victim, attacker, dmg);
 
@@ -1741,6 +1748,7 @@ export class Room {
       p.glassMarks = new Map();
       p.lastCardAt = 0;
       p.lastHitBy = null;
+      p.dealtTo = new Map();
       p.moveSlack = PLAYER.serverSlack;
       p.stamina = PLAYER.staminaMax;
       p.seenAt = new Map();

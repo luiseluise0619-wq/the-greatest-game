@@ -186,3 +186,42 @@ test('getting out of the way counts as a card spent', () => {
     assert.equal(landed, false, 'the shot landed anyway');
   } finally { clock.restore(); }
 });
+
+test('a bot only knows the wounds it put in itself', () => {
+  const { room, clock } = seatedRoom('STA7');
+  try {
+    const all = [...room.players.values()].filter((x) => x.alive);
+    const [a, b, c] = all;
+    // Nothing anywhere puts another man's health in a snapshot, so a bot that
+    // reads it is reading a number the human across the table is never sent.
+    // What it may know is what it fired and saw land.
+    assert.ok(!a.dealtTo || a.dealtTo.size === 0, 'somebody started the round already knowing');
+    room.applyDamage(b, a, 1, 'revolver', null);
+    assert.equal(a.dealtTo.get(b.id), 1, 'the shooter did not remember what he landed');
+    assert.ok(!(a.dealtTo.get(c.id) > 0), 'the shooter remembers hitting a man he never fired at');
+    assert.ok(!b.dealtTo || !b.dealtTo.get(a.id), 'being hit taught the victim what he dealt');
+    // A second pull of the trigger, which is what a new serial means: one shot
+    // finds one man, so without it the room is right to throw this one out.
+    a.shotSerial = (a.shotSerial || 0) + 1;
+    a.shotSpent = null;
+    room.applyDamage(b, a, 1, 'revolver', null);
+    assert.equal(a.dealtTo.get(b.id), 2, 'the second hit was not added on');
+  } finally { clock.restore(); }
+});
+
+test('nothing in a snapshot tells anybody how hurt anybody else is', () => {
+  const { room, clock } = seatedRoom('STA8');
+  try {
+    const entries = [];
+    const real = room.send.bind(room);
+    room.send = (client, m) => { if (m.t === 's' || m.ps) entries.push(m); return real(client, m); };
+    room.sendSnapshots(Date.now() / 1000);
+    room.send = real;
+    const fields = new Set();
+    for (const m of entries) for (const e of (m.ps || [])) Object.keys(e).forEach((k) => fields.add(k));
+    for (const bad of ['hp', 'health', 'maxHealth', 'maxHp']) {
+      assert.ok(!fields.has(bad),
+        `the snapshot carries ${bad}, so "nobody can see how hurt you are" is not true`);
+    }
+  } finally { clock.restore(); }
+});

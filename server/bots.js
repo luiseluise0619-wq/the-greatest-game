@@ -579,7 +579,10 @@ export class BotBrain {
       if (score < 0) continue;
       const d = Math.hypot(o.pos.x - me.pos.x, o.pos.z - me.pos.z);
       score *= clamp(1.35 - d / 60, 0.35, 1.35);
-      score *= 1 + (1 - o.health / o.maxHealth) * 0.8;         // finish the wounded
+      // Finish the wounded - but only the ones this bot put the wounds in.
+      // Reading o.health here was reading a number no player is ever sent.
+      const known = me.dealtTo ? (me.dealtTo.get(o.id) || 0) : 0;
+      score *= 1 + Math.min(1, known / Math.max(1, o.maxHealth)) * 0.8;
       score *= 0.7 + this.aggression * 0.6;
       if (this.target === o.id) score *= 1.35;                  // commitment
       if (score > bestScore) { bestScore = score; best = o; }
@@ -719,7 +722,16 @@ export class BotBrain {
       // out of range. Two hundred and sixty-five of them in sixty rounds.
       if (!inReach(me, o, d, this.room.seatsBetween(me, o))) continue;
       if (!lineOfSight(eyeOf(me), chestOf(o), MAP.solids)) continue;
-      const score = want * (0.7 + this.aggression * 0.6) * (1 + (1 - o.health / o.maxHealth) * 0.6);
+      // How weak he LOOKS, which is not the same as how weak he is. This used
+      // to read o.health straight off the server, and nothing puts another
+      // man's health in a snapshot - so every bot at the table knew exactly
+      // who was one hit from going down while the human across from them
+      // could only count cards. The public tell is the hand: a short one
+      // means fewer answers and, since the limit is the health, usually a man
+      // in trouble. Same instinct, read off the table like everybody else.
+      const held = (o.duelHand || []).length;
+      const looksWeak = 1 - Math.min(1, held / Math.max(1, DUEL.health));
+      const score = want * (0.7 + this.aggression * 0.6) * (1 + looksWeak * 0.6);
       if (score > bestScore) { bestScore = score; best = o; }
     }
     return best;
@@ -1229,7 +1241,13 @@ export class BotBrain {
       case 'medic': {
         if (me.health < me.maxHealth * 0.55 && !target) { want = true; break; }
         // Healing someone is a costly, public statement of trust. Bots make it.
-        const friend = this.visible.find((o) => o.health < o.maxHealth * 0.65 && this.susOf(o.id) < 0.3);
+        // Whoever this bot watched take one, recently enough to still be
+        // hurt. Reading o.health here would be the same cheat as picking off
+        // the wounded on a number nobody is sent - and it is the wrong
+        // instinct anyway: a medic goes to the man he SAW get shot.
+        const now = Date.now() / 1000;
+        const friend = this.visible.find((o) => (o.lastHitAt || 0) > now - 12
+          && this.canSee(o) && this.susOf(o.id) < 0.3);
         if (friend) {
           const aimed = this.room.playerInCrosshair(me, c.healRange);
           want = aimed === friend;
