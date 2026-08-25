@@ -947,9 +947,11 @@ Putting the table in fixed it as a game before it fixed it as a balance:
 | walking a town | 29% | 45% |
 | at the table | 59% | 45% |
 | and with the deck not printing itself | 64% | 48% |
-| **and the deputies watching the right man** | **66%** | 46% |
+| and the deputies watching the right man | 66% | 46% |
+| **and the crosshair counting seats too** | **68%** | 47% |
 
-The third row is not a tuning change. The deck was quietly growing: every
+None of the rows below the second are tuning changes; every one of them is a
+bug the mode had been played around. The third: The deck was quietly growing: every
 weapon, every piece of gear and the cell went onto the discard pile *and* face
 up in front of a player, so ten of the twenty-two existed twice the moment they
 were played and the pile thickened with guns and barrels all round. Fixing it
@@ -957,6 +959,14 @@ put five points on the share of goes that end in a shot, and it moved the number
 that matters more — the share of the Sheriff's killers who had actually picked
 him out went from **62%** to **79%** over eighty rounds. A correct deck means he
 dies to somebody deciding rather than to crossfire.
+
+The fifth is the crosshair. Reach in this mode is seats, and the whole table
+stands inside three and a half metres — so an aim lock that measured the ground
+put every man in the room inside it. The draw built on people the rules will not
+let you shoot, firing spent the Bang! and the go on a shot thrown out a moment
+later, and — worse — **HE HAS YOU** went up on men in no danger at all. In a game
+where the only warning anybody gets is watching the barrel come round, a warning
+that means nothing is not a small thing.
 
 The star's hits, swept again at the table (`HNH_SHERIFFHEALTH`), and again
 after the bot deputies stopped guarding the wrong man:
@@ -979,8 +989,9 @@ comes out even at seven rather than merely least-bad.
 So still seven, and it is still the one deviation from the original left in the
 mode — the star is the only man at the table anybody can identify, and the law
 has nothing like that to aim back with. But it is no longer papering over
-anything: two runs of sixty on the fixed build read **law 55 / outlaw 42** and
-**law 47 / outlaw 50**, which is the closest to even this mode has measured.
+anything: four runs of sixty on the fixed build read **55 / 42**, **47 / 50**,
+**53 / 37** and **40 / 55** law to outlaw, which averages about even and is the
+closest this mode has measured.
 
 The Renegade is the number left to watch. He has come out anywhere between 2%
 and 16% across these runs, and at one player in seven a 60-round sample gives
