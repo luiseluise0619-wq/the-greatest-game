@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick } from './helpers.js';
 import { TIMING, MODES, DUEL } from '../shared/constants.js';
 import { GUNHANDS, GUNHAND_ORDER, healthOf } from '../shared/gunhands.js';
-import { reachOf, coverOf, inReach, DISTANCE_UNIT } from '../shared/deck.js';
+import { reachOf, coverOf, inReach, DISTANCE_UNIT, DRAW_ODDS } from '../shared/deck.js';
 
 const { Room } = await import('../server/room.js');
 
@@ -424,5 +424,41 @@ test('the one with no limit fires every Bang! he is holding, not six of them', (
     assert.equal(fired, 9, `he was holding nine and got ${fired} of them off`);
     assert.equal(a.reloading, null, 'and was left standing there reloading');
     assert.deepEqual(a.duelHand, [], 'and still had Bang!s in his hand');
+  } finally { clock.restore(); }
+});
+
+test('the man the game asks twice is asked twice in his own favour', () => {
+  // "Every time the game asks him to draw for something, it asks twice and he
+  // picks." Two of the three draws in the game are made hoping to succeed -
+  // the wood stops the shot, the cell door opens - and one is made hoping to
+  // FAIL, because succeeding means the stick goes off in your hands. This took
+  // the better of two trues whatever it was drawing for, so the gunhand whose
+  // whole ability is a second chance was nearly twice as likely to be blown up
+  // as anybody else at the table.
+  const clock = fakeClock();
+  try {
+    const room = new Room({ code: 'LUCK', isPublic: false, mode: MODES.DUEL });
+    const lucky = { gunhand: 'fortunate' };
+    const plain = { gunhand: null };
+    assert.ok(GUNHANDS.fortunate.lucky, 'nobody draws twice any more');
+
+    const rate = (who, which, n = 6000) => {
+      let hits = 0;
+      for (let i = 0; i < n; i += 1) if (room.drawFor(who, which)) hits += 1;
+      return hits / n;
+    };
+
+    // Wood and the cell door: he wants a yes, and gets more of them.
+    for (const which of ['barrel', 'jail']) {
+      assert.ok(rate(lucky, which) > rate(plain, which) + 0.05,
+        `${which} did not go his way more often than anybody else's`);
+    }
+    // The stick: he wants a no, and now gets more of those instead.
+    assert.ok(rate(lucky, 'dynamite') < rate(plain, 'dynamite'),
+      'his second chance was a second chance at being blown up');
+    // And roughly the square of the odds, which is what asking twice means.
+    const p = DRAW_ODDS.dynamite;
+    assert.ok(Math.abs(rate(lucky, 'dynamite') - p * p) < 0.02,
+      'and not the odds of drawing twice and needing both');
   } finally { clock.restore(); }
 });

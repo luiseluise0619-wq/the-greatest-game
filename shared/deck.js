@@ -47,6 +47,20 @@ export const DRAW_ODDS = {
   barrel: 13 / 52,       // it counts as a miss
 };
 
+/**
+ * And which way round the man drawing wants it to come out. Two of these three
+ * are drawn hoping to succeed - the wood stops it, the door opens - and one is
+ * drawn hoping to fail, because succeeding means the stick goes off in your
+ * hands. The gunhand who draws twice and picks needs to know the difference:
+ * without this he was given two chances at the one outcome in the game he does
+ * not want, and his ability made him nearly twice as likely to be blown up.
+ */
+export const DRAW_WANTED = {
+  dynamite: false,
+  jail: true,
+  barrel: true,
+};
+
 export const DUEL_CARDS = {
   // ------------------------------------------------------------------ shots
   bang: {

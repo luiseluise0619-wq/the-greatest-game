@@ -18,7 +18,7 @@ import { BotBrain, BOT_NAMES } from './bots.js';
 import { Pile, handLimit, drawCheck } from './deck.js';
 import {
   DUEL_CARDS, KIND, inReach, reachOf, reachSeats, sightSeats, DISTANCE_UNIT,
-  shotCardIn, answerCardIn, shotLeftIn,
+  shotCardIn, answerCardIn, shotLeftIn, DRAW_WANTED,
 } from '../shared/deck.js';
 import { GUNHANDS, GUNHAND_ORDER, healthOf, trait } from '../shared/gunhands.js';
 import { telemetry } from './telemetry.js';
@@ -2551,7 +2551,14 @@ export class Room {
   drawFor(p, which) {
     const once = drawCheck(which);
     if (!trait(p, 'lucky')) return once;
-    return once || drawCheck(which);
+    // Twice the odds, in the direction the man drawing actually wants. This
+    // took the better of two "true"s whatever the draw was for, and one of the
+    // three is drawn hoping to FAIL - so the gunhand whose whole ability is
+    // that the game asks him twice was nearly twice as likely to have the
+    // stick go off in his hands as anybody else at the table.
+    const wanted = DRAW_WANTED[which] !== false;
+    const twice = drawCheck(which);
+    return wanted ? (once || twice) : (once && twice);
   }
 
   /**
