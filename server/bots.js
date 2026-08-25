@@ -26,8 +26,14 @@ const CHATTER = {
   suspicious: [
     ['bot.sus1', 'Somebody just took a shot at nothing. Who was that?'],
     ['bot.sus2', 'I do not like how quiet {name} is being.'],
-    ['bot.sus3', '{name} keeps circling me. Explain yourself.'],
-    ['bot.sus4', 'That was gunfire near {place}.'],
+    // Nobody circles a table and nobody is anywhere in particular at one -
+    // everybody has been standing on the same four metres since the bell, so
+    // a line that names where a shot came from names the room. A third entry
+    // on a line is what this man says at the table instead.
+    ['bot.sus3', '{name} keeps circling me. Explain yourself.',
+      'bot.sus3.duel', '{name} has looked at me twice this lap now.'],
+    ['bot.sus4', 'That was gunfire near {place}.',
+      'bot.sus4.duel', 'Somebody\'s gun just went off. Whose go was that?'],
   ],
   friendly: [
     ['bot.fr1', '{name}, you and me, back to back.'],
@@ -41,7 +47,8 @@ const CHATTER = {
   ],
   hurt: [
     ['bot.hu1', 'I am hit! {name} did it!'],
-    ['bot.hu2', 'Somebody put lead in me over by {place}.'],
+    ['bot.hu2', 'Somebody put lead in me over by {place}.',
+      'bot.hu2.duel', 'I have taken one. Whoever\'s go that was, I will remember it.'],
   ],
   lawful: [
     ['bot.la1', 'I ride with the law, whatever you believe.'],
@@ -501,8 +508,16 @@ export class BotBrain {
     }
   }
 
-  say([key, template], vars = {}) {
-    const text = template.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? 'somebody');
+  /**
+   * A line, in the game being played. Three of these are about where somebody
+   * is or where they have been walking, which means nothing at a table where
+   * nobody has moved since the bell - so those carry a third entry and this
+   * picks it.
+   */
+  say([key, template, tableKey, tableText], vars = {}) {
+    const duel = this.room.duel && !!tableKey;
+    const line = duel ? tableText : template;
+    const text = line.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? 'somebody');
     // A place is a place rather than a phrase, so it travels with its id and
     // gets named again on the other side in whatever language is over there.
     const holes = { ...vars };
@@ -510,7 +525,12 @@ export class BotBrain {
     if (where?.ids?.length) holes.placeKey = `place.${where.ids[0]}`;
     this.room.broadcast({
       t: 'chat', from: this.self.name, id: this.self.id, text, bot: true,
-      k: key, p: holes,
+      // Both spelled out in the table rather than one built out of the other.
+      // The i18n suite reads literals to find every key the code can ask for,
+      // and a key assembled at runtime is invisible to it - so a table line
+      // added without its Korean would go out in English and nothing would
+      // say so.
+      k: duel ? tableKey : key, p: holes,
     });
   }
 
