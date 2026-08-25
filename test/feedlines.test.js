@@ -149,8 +149,14 @@ test('the lines a round might not reach on its own get reached', () => {
     // The round out of a man's back, and the two things that stop it. Neither
     // line is ever said by a round of bots that did not happen to gamble in
     // front of a man with a barrel.
+    // Nobody's gunhand in the way. If the shooter happened to be dealt the one
+    // it takes two Missed! to get out of the way of, a single card is worth
+    // nothing and the line is never said - which is a real rule and a flaky
+    // test, so this asks the question it means to ask.
+    me.gunhand = null;
+    them.gunhand = null;
     them.gear = ['barrel'];
-    them.duelHand = ['missed'];
+    them.duelHand = ['missed', 'missed'];
     them.bracedUntil = Date.now() / 1000 + 5;
     const realDraw = room.drawFor.bind(room);
     room.drawFor = () => true;

@@ -852,8 +852,17 @@ export class BotBrain {
     }
     // Still being alive comes before anything you might do with the turn.
     if (has('beer') && me.health < me.maxHealth && alive > 2 && play('beer')) return true;
-    // The lit stick only punishes the man still holding it, so it goes down.
-    if (has('dynamite') && !me.hasDynamite && play('dynamite')) return true;
+    // The lit stick. Playing it means it sits in front of YOU first and you
+    // take the first draw for it at the top of your next go - which is still
+    // right, because a stick in your hand threatens nobody and a lit one
+    // threatens the whole table every lap. The old comment here had it
+    // backwards and read as though playing it got rid of it.
+    //
+    // Three hits, though, at about one draw in six. A man on three or fewer
+    // is lighting a fuse that can end him before it reaches anybody, and no
+    // reading of the game has that as his best go.
+    if (has('dynamite') && !me.hasDynamite
+      && me.health > DUEL_CARDS.dynamite.blast && play('dynamite')) return true;
     // A gun that reaches further beats any single shot you could take with the
     // one you have, because it decides every shot for the rest of the round.
     const held = DUEL_CARDS[me.weaponCard]?.reach || 1;

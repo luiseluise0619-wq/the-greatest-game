@@ -378,13 +378,23 @@ try {
     hand: [...window.game.duel.hand],
     name: document.getElementById('nameInput')?.value || 'Stranger',
   }));
+  // Whether he is still standing decides what a refresh is even supposed to
+  // hand back. A dead man holds nothing, so waiting for a hand to arrive would
+  // be waiting for something the game is right not to send - and the check
+  // would report a bug in the resume path that is really five bots doing their
+  // job. Same guard as the table readouts above.
+  const downAlready = await A.evaluate(() => window.game?.self?.alive === false);
   await A.reload({ waitUntil: 'domcontentloaded' });
   const resumed = await A.waitForFunction(
-    () => window.game?.duel?.hand?.length > 0 && window.game?.turn?.kind,
-    null, { timeout: 30000 },
+    (down) => (down
+      ? !!window.game?.turn?.kind && window.game?.inGame
+      : window.game?.duel?.hand?.length > 0 && !!window.game?.turn?.kind),
+    downAlready, { timeout: 30000 },
   ).then(() => true).catch(() => false);
-  check(resumed, 'a refresh mid-lap hands the game back rather than an empty screen');
-  if (resumed) {
+  check(resumed, downAlready
+    ? 'a refresh hands a dead man his round back (no hand: he has none)'
+    : 'a refresh mid-lap hands the game back rather than an empty screen');
+  if (resumed && !downAlready) {
     const back = await A.evaluate(() => ({
       hand: window.game.duel.hand,
       order: [...document.querySelectorAll('#turnOrder li')].length,

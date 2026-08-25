@@ -217,3 +217,32 @@ test('a bot with a card in its hand moves when a gun stops on it', () => {
     assert.ok(DUEL.drawTime > 0 && DUEL_CARDS.missed);
   } finally { clock.restore(); }
 });
+
+test('a bot does not light a fuse that can end him before it reaches anybody', () => {
+  const { room, clock, bots, turn } = town();
+  try {
+    const bot = bots()[0];
+    turn(bot);
+    bot.gear = [];
+    bot.hasDynamite = false;
+    bot.weaponCard = 'schofield';        // nothing better to reach for
+    bot.duelHand = ['dynamite'];
+    bot.brain.nextDuelActAt = 0;
+    // Three hits at about one draw in six, and he has three. Playing it puts
+    // it in front of HIM first - the draw at the top of his next go is his.
+    bot.health = DUEL_CARDS.dynamite.blast;
+    secs(clock, room, 3);
+    assert.equal(bot.hasDynamite, false,
+      'he lit a stick that can kill him outright before it moves on');
+    assert.ok(bot.duelHand.includes('dynamite'), 'and it left his hand anyway');
+
+    // One more hit than the blast and it is a sensible go again: a stick in
+    // the hand threatens nobody, and a lit one threatens the whole table.
+    bot.health = DUEL_CARDS.dynamite.blast + 1;
+    bot.maxHealth = Math.max(bot.maxHealth, bot.health);
+    bot.brain.nextDuelActAt = 0;
+    bot.brain.duelTurnKey = null;
+    secs(clock, room, 3);
+    assert.equal(bot.hasDynamite, true, 'he sat on it with room to spare');
+  } finally { clock.restore(); }
+});
