@@ -235,18 +235,50 @@ export class BotBrain {
       const mates = all.filter((o) => o.id !== p.id && o.role === 'outlaw');
       if (mates.length) this.knownFriends.add(pick(mates).id);
     } else if (p.role === 'deputy') {
-      const sheriff = all.find((o) => o.role === 'sheriff');
-      const decoys = all.filter((o) => o.id !== p.id && o.role !== 'sheriff');
-      this.pairGuess = [sheriff?.id, decoys.length ? pick(decoys).id : null].filter(Boolean);
-      this.sheriffGuess = pick(this.pairGuess);
-      this.protectee = this.sheriffGuess;
-      this.allies.add(this.protectee);
-      this.trustUp(this.protectee, 0.4);
+      // Two problems here in the turn mode, and they compounded.
+      //
+      // The star goes on at the bell there, so the badge event had already
+      // told this brain who the Sheriff is and set sheriffCertain - and then
+      // this ran, because seeding is lazy and happens on the first update
+      // AFTER beginMatch. It overwrote a known man with a coin flip between
+      // him and a decoy and left "certain" standing. Half the bot deputies at
+      // a table spent the round defending the wrong man while the star was in
+      // plain sight across it.
+      //
+      // And the pair itself is the free-for-all's thread. A human deputy in
+      // the turn mode gets the mirror of what an outlaw gets - one face that
+      // is no friend of the star - so a bot one gets the same, or the two are
+      // playing different games at the same table.
+      if (this.room.duel) {
+        const star = all.find((o) => o.role === 'sheriff');
+        if (star) {
+          this.sheriffGuess = star.id;
+          this.sheriffCertain = true;
+          this.protectee = star.id;
+          this.allies.add(star.id);
+          this.trustUp(star.id, 0.8);
+        }
+        const enemies = all.filter((o) => o.id !== p.id && o.faction !== 'law');
+        if (enemies.length) this.suspect(pick(enemies).id, 0.5);
+      } else {
+        const sheriff = all.find((o) => o.role === 'sheriff');
+        const decoys = all.filter((o) => o.id !== p.id && o.role !== 'sheriff');
+        this.pairGuess = [sheriff?.id, decoys.length ? pick(decoys).id : null].filter(Boolean);
+        this.sheriffGuess = pick(this.pairGuess);
+        this.protectee = this.sheriffGuess;
+        this.allies.add(this.protectee);
+        this.trustUp(this.protectee, 0.4);
+      }
     } else if (p.role === 'sheriff') {
       // Sheriffs sometimes go loud. It is the most interesting thing they can do.
       this.wantBadgeAt = Math.random() < BOT_TUNING.badgeOdds ? rnd(30, 190) : Infinity;
     } else if (p.role === 'renegade') {
-      const lawmen = all.filter((o) => o.id !== p.id && o.faction === 'law');
+      // Not the man in the star, in the mode where he is wearing it: being
+      // handed the one name the whole table already has is being handed
+      // nothing, and this is the only thread the role gets. Same rule as the
+      // human's, in shared/room.js buildIntel.
+      const lawmen = all.filter((o) => o.id !== p.id && o.faction === 'law'
+        && !(this.room.duel && o.role === 'sheriff'));
       if (lawmen.length) this.suspect(pick(lawmen).id, 0.25);
     }
   }

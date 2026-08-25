@@ -653,3 +653,65 @@ test('and the free-for-all keeps every word of its own', () => {
       'and lost its own, which is the whole game over there');
   } finally { clock.restore(); }
 });
+
+test('a bot deputy at the table knows the man in the star', () => {
+  const { room, clock } = seatedRoom('STAK');
+  try {
+    // Seeding is lazy - it happens on the first update after the deal, which
+    // is after the badge event that says who is wearing the star. It used to
+    // overwrite that known man with a coin flip between him and a decoy and
+    // leave `sheriffCertain` standing, so half the bot deputies at a table
+    // spent the round defending the wrong man while the star was in plain
+    // sight across it.
+    const all = [...room.players.values()];
+    const star = all.find((p) => p.role === 'sheriff');
+    const deps = all.filter((p) => p.role === 'deputy' && p.bot && p.brain);
+    tick(clock, room, 20);
+    assert.ok(star, 'no Sheriff was dealt');
+    for (const d of deps) {
+      assert.ok(d.brain.seeded, 'the brain never seeded');
+      assert.equal(d.brain.sheriffGuess, star.id,
+        'he is guessing at a man he can see the star on');
+      assert.equal(d.brain.protectee, star.id, 'and defending somebody else');
+      assert.equal(d.brain.sheriffCertain, true, 'and not certain of what he can see');
+    }
+  } finally { clock.restore(); }
+});
+
+test('and a bot deputy in the free-for-all still only has a hunch', () => {
+  TIMING.prep = 1; TIMING.combat = 900;
+  const clock = fakeClock();
+  const room = new Room({ code: 'STAL', isPublic: false, mode: MODES.FREE });
+  room.botFillTarget = 6;
+  room.resetClock();
+  room.beginMatch();
+  try {
+    tick(clock, room, 20);
+    const all = [...room.players.values()];
+    const deps = all.filter((p) => p.role === 'deputy' && p.bot && p.brain);
+    for (const d of deps) {
+      assert.ok(Array.isArray(d.brain.pairGuess) && d.brain.pairGuess.length >= 1,
+        'the free-for-all lost its pair, which is the whole of what a deputy has over there');
+      assert.equal(d.brain.sheriffCertain, false,
+        'and he is certain of a star nobody has pinned on yet');
+    }
+  } finally { clock.restore(); }
+});
+
+test('and a bot renegade at the table is never handed the man in the star', () => {
+  // Twelve tables, because this is one name picked out of the law and the
+  // Sheriff being among them is exactly what is being ruled out.
+  for (let i = 0; i < 12; i += 1) {
+    const { room, clock } = seatedRoom(`STM${i}`);
+    try {
+      tick(clock, room, 20);
+      const all = [...room.players.values()];
+      const star = all.find((p) => p.role === 'sheriff');
+      const ren = all.find((p) => p.role === 'renegade' && p.bot && p.brain);
+      if (!ren || !star) continue;
+      const onStar = ren.brain.susOf ? ren.brain.susOf(star.id) : 0;
+      assert.ok(!(onStar > 0.2),
+        `his one thread points at the man wearing the star (${onStar})`);
+    } finally { clock.restore(); }
+  }
+});
