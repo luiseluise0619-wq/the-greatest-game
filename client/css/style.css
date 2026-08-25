@@ -837,6 +837,21 @@ html[lang="ko"] {
 #aimedWarn b { display: block; font-size: 11px; letter-spacing: .14em; color: var(--sand); margin-top: 5px; }
 @keyframes aimPulse { from { opacity: .55; } to { opacity: 1; } }
 
+/* The man in your crosshair that your gun does not reach. Reach is seats and
+   the whole table stands inside four metres, so "he is right there" and "the
+   rules will not let you shoot him" are true of the same man most of the time.
+   Sits under the crosshair rather than over it - it is a note, not an alarm. */
+#reachNote {
+  position: absolute; left: 50%; top: 56%; transform: translateX(-50%);
+  text-align: center; pointer-events: none; z-index: 21; max-width: 42ch;
+  font-size: 10.5px; letter-spacing: .12em; line-height: 1.5;
+  color: rgba(232,217,189,.66);
+  background: rgba(12,9,6,.66); border: 1px solid rgba(200,180,140,.18);
+  padding: 3px 10px;
+}
+#crosshair.tooFar .ch { background: rgba(200,180,140,.3); }
+#crosshair.tooFar .dot { background: rgba(200,180,140,.35); }
+
 /* ------------------------------------------------------------- THE HAND */
 #duelHand {
   position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);

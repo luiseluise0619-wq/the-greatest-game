@@ -2725,7 +2725,28 @@ export class Room {
       if (this.aimedAt) { this.tellAimed(this.aimedAt, false); this.aimedAt = null; }
       this.aimedBy = p.id;
     }
-    const found = this.playerInCrosshair(p, reachOf(p));
+    // The crosshair used to ask the ground how far away he is, and the rules
+    // ask how many seats. A belt gun reaches twenty-two metres and one seat,
+    // and the whole table is inside three-and-a-half metres - so every man in
+    // the room was inside the aim radius, the draw built on people the rules
+    // will not let you shoot, and firing spent the Bang! and the go on a shot
+    // thrown out a moment later as too far.
+    //
+    // Worse than the wasted card: HE HAS YOU went up on men who were in no
+    // danger at all. In a game where the only warning anybody gets is watching
+    // the barrel come round, a warning that means nothing is not a small bug.
+    const seen = this.playerInCrosshair(p, reachOf(p));
+    const found = seen && this.duel
+      && !inReach(p, seen, Math.hypot(seen.pos.x - p.pos.x, seen.pos.z - p.pos.z),
+        this.seatsBetween(p, seen))
+      ? null : seen;
+    // Who he is looking at even so, so the client can say why the gun will not
+    // come up rather than leaving him pulling a trigger that does nothing.
+    const far = seen && !found ? seen.id : null;
+    if (far !== p.outOfReachAt) {
+      p.outOfReachAt = far;
+      this.emit(p, { t: S.AIMED, on: false, tooFar: far });
+    }
     const onto = found ? found.id : null;
     if (onto !== this.aimedAt) {
       p.aimAt = onto;

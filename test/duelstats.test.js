@@ -8,7 +8,7 @@
 // a go where a man could not do a thing with his six seconds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeClock, stubClient, tick } from './helpers.js';
+import { fakeClock, stubClient, tick, seatThem } from './helpers.js';
 import { TIMING, MODES, DUEL } from '../shared/constants.js';
 import { GUNHANDS } from '../shared/gunhands.js';
 import { DUEL_CARDS } from '../shared/deck.js';
@@ -714,4 +714,64 @@ test('and a bot renegade at the table is never handed the man in the star', () =
         `his one thread points at the man wearing the star (${onStar})`);
     } finally { clock.restore(); }
   }
+});
+
+test('the crosshair asks the seats, the same as the rules do', () => {
+  const { room, clock } = seatedRoom('STAM');
+  try {
+    const all = [...room.players.values()].filter((p) => p.alive);
+    const [me, near, far] = all;
+    for (const p of all) { p.gear = []; p.weaponCard = null; p.gunhand = null; }
+    // A belt gun: one seat. The table is three and a half metres across, so
+    // every one of these men is inside its twenty-two metres of ground - which
+    // is what the crosshair used to ask, while the rules asked the seats. The
+    // draw built on people you cannot shoot, the shot spent the Bang! and the
+    // go, and it was thrown out a moment later as too far.
+    seatThem(room, [me, near, far, ...all.filter((p) => p !== me && p !== near && p !== far)]);
+    assert.equal(room.seatsBetween(me, near), 1, 'the fixture did not seat them next to each other');
+    assert.equal(room.seatsBetween(me, far), 2, 'and did not put the third man two along');
+
+    room.turn = { kind: 'turn', holder: me.id, endsAt: Date.now() / 1000 + 1e6 };
+
+    // Looking at the man two seats along.
+    const real = room.playerInCrosshair.bind(room);
+    room.playerInCrosshair = () => far;
+    room.stepAim(Date.now() / 1000);
+    assert.equal(room.aimedAt, null,
+      'the gun came up on a man two seats along that a belt gun does not reach');
+    assert.equal(me.aimDwell, 0, 'and the draw was building on him');
+    assert.equal(me.outOfReachAt, far.id, 'and nothing was going to say why');
+
+    // And the man next door, who it does reach.
+    room.playerInCrosshair = () => near;
+    room.stepAim(Date.now() / 1000 + 0.05);
+    assert.equal(room.aimedAt, near.id, 'and it will not come up on the man it does reach');
+    assert.equal(me.outOfReachAt, null, 'and still says the reach is short');
+    room.playerInCrosshair = real;
+  } finally { clock.restore(); }
+});
+
+test('and nobody is warned about a gun that cannot get to them', () => {
+  const { room, clock } = seatedRoom('STAN');
+  try {
+    const all = [...room.players.values()].filter((p) => p.alive);
+    const [me, near, far] = all;
+    for (const p of all) { p.gear = []; p.weaponCard = null; p.gunhand = null; }
+    seatThem(room, [me, near, far, ...all.filter((p) => p !== me && p !== near && p !== far)]);
+    room.turn = { kind: 'turn', holder: me.id, endsAt: Date.now() / 1000 + 1e6 };
+
+    // HE HAS YOU is the only warning anybody gets in this mode. Going up on a
+    // man in no danger at all is not a small bug in a game where the whole
+    // question is who has picked whom.
+    const warned = [];
+    const realTell = room.tellAimed.bind(room);
+    room.tellAimed = (id, on, by) => { warned.push({ id, on }); return realTell(id, on, by); };
+    const real = room.playerInCrosshair.bind(room);
+    room.playerInCrosshair = () => far;
+    room.stepAim(Date.now() / 1000);
+    room.playerInCrosshair = real;
+    room.tellAimed = realTell;
+    assert.ok(!warned.some((w) => w.id === far.id && w.on),
+      'a man two seats out of reach was told a gun was on him');
+  } finally { clock.restore(); }
 });

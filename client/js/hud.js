@@ -500,6 +500,23 @@ export class HUD {
 
   /** Somebody's barrel has stopped on you, and you have a moment to move. */
   setAimed(msg) {
+    // The other half of the same packet: whoever this player is looking at
+    // that his gun does not reach. Reach is seats, and the whole table is
+    // inside four metres, so "he is right there" and "the rules will not let
+    // you shoot him" are true of the same man all the time. Without this the
+    // gun simply never comes up and nothing says why.
+    if ('tooFar' in msg) {
+      const cross = $('crosshair');
+      if (cross) cross.classList.toggle('tooFar', !!msg.tooFar);
+      const note = $('reachNote');
+      if (note) {
+        note.classList.toggle('hidden', !msg.tooFar);
+        if (msg.tooFar) {
+          note.textContent = this.t('duel.outOfReach',
+            'Too far. Your gun reaches as far as the card in front of you says.');
+        }
+      }
+    }
     const el = $('aimedWarn');
     if (!msg.on) { el.classList.add('hidden'); return; }
     el.classList.remove('hidden');

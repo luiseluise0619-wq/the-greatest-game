@@ -19,7 +19,7 @@
 // hit and carries on out of your back into whoever chose to stand behind you.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
+import { fakeClock, stubClient, tick, freezeBots, seatThem } from './helpers.js';
 import { TIMING, MODES, DUEL } from '../shared/constants.js';
 import { reachOf } from '../shared/deck.js';
 
@@ -238,6 +238,11 @@ test('a barrel comes off you when the go it belonged to ends', () => {
     first.pos = { x: 40, y: 0, z: 0 };
     second.pos = { x: 40, y: 0, z: -6 };
     for (const g of [first, second]) { g.yaw = Math.PI; g.pitch = 0; }
+    // Next to each other in the ring. The crosshair asks the seats now, not the
+    // ground - a belt gun reaches one seat and the whole table stands inside
+    // three and a half metres, so hand-placed coordinates alone would put both
+    // of these men out of reach and no gun would come up at all.
+    seatThem(room, [first, me, second, ...all.filter((p) => p !== me && p !== first && p !== second)]);
 
     room.turn = { kind: 'turn', holder: first.id, endsAt: 1e12 };
     room.stepAim(Date.now() / 1000);
@@ -250,6 +255,7 @@ test('a barrel comes off you when the go it belonged to ends', () => {
     stub.reset();
     first.pos = { x: 900, y: 0, z: 900 };
     second.pos = { x: 40, y: 0, z: 0 };
+    seatThem(room, [second, me, first, ...all.filter((p) => p !== me && p !== first && p !== second)]);
     room.turn = { kind: 'turn', holder: second.id, endsAt: 1e12 };
     room.stepAim(Date.now() / 1000 + 0.05);
     const said = stub.of('aimed');
