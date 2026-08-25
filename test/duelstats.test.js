@@ -454,3 +454,55 @@ test('and the one who goes through pockets still gets the hand', () => {
       'he takes what was in the hands, which is what his gunhand says he takes');
   } finally { clock.restore(); }
 });
+
+test('the man who reads either card as either can answer a ridge with a Missed!', () => {
+  const { room, clock } = seatedRoom('STAF');
+  try {
+    const all = [...room.players.values()].filter((p) => p.alive);
+    const a = all.find((p) => p.role !== 'sheriff');
+    const others = all.filter((p) => p !== a);
+    const janet = others[0];
+    for (const p of all) { p.gear = []; p.weaponCard = null; p.jailed = false; }
+    // Everybody else holds the card the ridge asks for; she holds the other
+    // one, which her whole gunhand says is the same card in her hands.
+    for (const p of others) { p.gunhand = null; p.duelHand = ['bang']; p.health = p.maxHealth; }
+    janet.gunhand = 'ambidexter';
+    janet.duelHand = ['missed'];
+    a.duelHand = ['indians'];
+    a.cardsThisTurn = 0;
+    room.turn = { kind: 'turn', holder: a.id, endsAt: Date.now() / 1000 + 1e6 };
+    const hp = janet.health;
+
+    room.onDuelCard(a, { card: 'indians' });
+
+    assert.equal(janet.health, hp,
+      'she was holding something she is allowed to fire and took the hit anyway');
+    assert.deepEqual(janet.duelHand, [], 'and it never left her hand');
+    assert.ok((janet.cardsPlayed || []).includes('missed'),
+      'she spent it and the account of the round never heard about it');
+  } finally { clock.restore(); }
+});
+
+test('and the same the other way round when the street opens up', () => {
+  const { room, clock } = seatedRoom('STAG');
+  try {
+    const all = [...room.players.values()].filter((p) => p.alive);
+    const a = all.find((p) => p.role !== 'sheriff');
+    const others = all.filter((p) => p !== a);
+    const janet = others[0];
+    for (const p of all) { p.gear = []; p.weaponCard = null; p.jailed = false; }
+    for (const p of others) { p.gunhand = null; p.duelHand = ['missed']; p.health = p.maxHealth; }
+    janet.gunhand = 'ambidexter';
+    janet.duelHand = ['bang'];
+    a.duelHand = ['gatling'];
+    a.cardsThisTurn = 0;
+    room.turn = { kind: 'turn', holder: a.id, endsAt: Date.now() / 1000 + 1e6 };
+    const hp = janet.health;
+
+    room.onDuelCard(a, { card: 'gatling' });
+
+    assert.equal(janet.health, hp, 'a Bang! is a Missed! in her hands and she took the hit');
+    assert.deepEqual(janet.duelHand, [], 'and it never left her hand');
+    assert.ok((janet.cardsPlayed || []).includes('bang'), 'and it is not on the account either');
+  } finally { clock.restore(); }
+});

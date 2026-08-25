@@ -1493,8 +1493,19 @@ export class Room {
           tell('duel.tell.indians', `${p.name} points at the ridge.`, 'bad', { name: p.name });
           for (const o of this.players.values()) {
             if (!o.alive || o.id === p.id) continue;
-            const bang = (o.duelHand || []).indexOf('bang');
-            if (bang >= 0) { o.duelHand.splice(bang, 1); this.pile.put('bang'); } else {
+            // What HE can shoot back with, not the literal word "bang". The
+            // gunhand whose whole ability is that nothing in his hand is dead
+            // was being made to take the hit while holding a Missed! he is
+            // allowed to fire - because this reached for the card id directly
+            // instead of asking what he can answer with.
+            const card = this.shotCard(o);
+            const at = card ? o.duelHand.indexOf(card) : -1;
+            if (at >= 0) {
+              o.duelHand.splice(at, 1);
+              this.pile.put(card);
+              o.cardsPlayed.push(card);       // spent on somebody else's go, but spent
+              this.checkEmptyHand(o);
+            } else {
               this.applyDamage(o, p, 1, 'indians', null);
             }
           }
@@ -1503,8 +1514,14 @@ export class Room {
           tell('duel.tell.gatling', `${p.name} opens up on the whole street.`, 'bad', { name: p.name });
           for (const o of this.players.values()) {
             if (!o.alive || o.id === p.id) continue;
-            const miss = (o.duelHand || []).indexOf('missed');
-            if (miss >= 0) { o.duelHand.splice(miss, 1); this.pile.put('missed'); } else {
+            const card = this.answerCard(o);
+            const at = card ? o.duelHand.indexOf(card) : -1;
+            if (at >= 0) {
+              o.duelHand.splice(at, 1);
+              this.pile.put(card);
+              o.cardsPlayed.push(card);
+              this.checkEmptyHand(o);
+            } else {
               this.applyDamage(o, p, 1, 'gatling', null);
             }
           }
@@ -1562,6 +1579,7 @@ export class Room {
       }
       turn.duelHand.splice(at, 1);
       this.pile.put(card);
+      turn.cardsPlayed.push(card);          // a called-out man's cards are cards played
       this.checkEmptyHand(turn);
       [turn, other] = [other, turn];
     }
