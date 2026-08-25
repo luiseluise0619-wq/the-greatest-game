@@ -246,3 +246,58 @@ test('a bot does not light a fuse that can end him before it reaches anybody', (
     assert.equal(bot.hasDynamite, true, 'he sat on it with room to spare');
   } finally { clock.restore(); }
 });
+
+test('the last two men at the table play the cards that point at the street', () => {
+  // Gatling and Indians! hit every OTHER man alive, so the more of the table
+  // is standing the more of your own side they catch - and with two left they
+  // catch nobody but the man you are trying to kill. The bots held both back
+  // until there were three men left, which is the beer rule ("nobody is
+  // pouring with two men left") copied onto two cards it does not apply to,
+  // and exactly backwards for them. A bot went into the last pair of a round
+  // holding the best card in the deck and never played it.
+  // A fresh table for each of the two: the first one fired can end the round,
+  // and a room in its aftermath has no bot in it thinking about anything.
+  for (const id of ['gatling', 'indians']) {
+    const { room, clock, bots, seats, feud, turn } = town();
+    try {
+      const [a, b] = bots();
+      // Two men, and nobody else standing.
+      for (const o of room.players.values()) if (o !== a && o !== b) o.alive = false;
+      seats(a, b);
+      feud(a, b);
+      a.duelHand = [id];
+      b.duelHand = [];
+      b.health = b.maxHealth;
+      turn(a);
+      a.brain.nextDuelActAt = 0;
+      secs(clock, room, 3);
+      assert.ok(!a.duelHand.includes(id),
+        `a bot alone with one other man sat on a ${DUEL_CARDS[id].name}`);
+      assert.ok(b.health < b.maxHealth,
+        `and the ${DUEL_CARDS[id].name} went off without touching the only other man standing`);
+    } finally { clock.restore(); }
+  }
+});
+
+test('and hold them while somebody they are guarding is on their last hit', () => {
+  // The same two cards catch every man alive, which includes the one this bot
+  // has decided to keep standing. Finishing him yourself is no way to win.
+  const { room, clock, bots, seats, feud, turn } = town();
+  try {
+    const living = bots();
+    const [a, b, ward] = living;
+    seats(a, b);
+    feud(a, b);
+    ward.alive = true;
+    ward.health = 1;
+    a.brain.protectee = ward.id;
+    a.brain.allies.add(ward.id);
+    a.duelHand = ['gatling'];
+    turn(a);
+    a.brain.nextDuelActAt = 0;
+    secs(clock, room, 3);
+    assert.ok(a.duelHand.includes('gatling'),
+      'it swept the street with its own man standing on one hit');
+    assert.ok(ward.alive, 'and killed him with it');
+  } finally { clock.restore(); }
+});

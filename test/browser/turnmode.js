@@ -419,6 +419,48 @@ try {
   check(keys.sent.length === 1 && keys.sent[0].card === 'store',
     `and zero reaches the tenth card (${keys.sent[0]?.card})`);
 
+  // Whether the trigger is still live this go. The server sends `bangs` on
+  // every hand packet and the HUD read none of it: the shot cards were greyed
+  // permanently, which reads as a dead card when it only ever meant "no key
+  // for this one". A man who had already taken his shot held the gun on
+  // somebody for a full second and it silently refused, with nothing on screen
+  // saying why.
+  const trigger = await A.evaluate(() => {
+    const g = window.game;
+    const wasTurn = g.turn; const wasDuel = g.duel;
+    const read = (bangs) => {
+      const held = { ...g.duel, hand: ['bang', 'missed', 'beer'], limit: 7, pile: 40, bangs,
+        weapon: null, table: g.duel.table || [] };
+      g.turn = { kind: 'turn', holder: g.selfId, left: 6 };
+      g.duel = held; g.hud.setDuel(held);
+      const first = document.querySelector('#duelHand .dCard');
+      return { live: first.classList.contains('live'),
+        grey: first.classList.contains('cannot'),
+        note: first.querySelector('em')?.textContent || '' };
+    };
+    const before = read(0);
+    const after = read(1);
+    // And once the go passes to somebody else, without a new hand packet.
+    g.turn = { kind: 'reposition', holder: null, left: 4 };
+    g.hud.setTurn(g.turn);
+    const walk = {
+      live: !!document.querySelector('#duelHand .dCard.live'),
+      lit: [...document.querySelectorAll('#duelHand .dCard')].filter((n) => !n.classList.contains('cannot')).length,
+    };
+    g.turn = wasTurn; g.duel = wasDuel; g.hud.setDuel(wasDuel);
+    return { before, after, walk };
+  });
+  check(trigger.before.live && !trigger.before.grey,
+    'the card the gun will answer is lit while the shot is still there');
+  check(trigger.before.note.length > 0,
+    `and says what to do with it (${trigger.before.note})`);
+  check(!trigger.after.live && trigger.after.grey,
+    'and goes out once the shot has been taken');
+  check(trigger.after.note !== trigger.before.note && trigger.after.note.length > 0,
+    `saying so rather than nothing (${trigger.after.note})`);
+  check(!trigger.walk.live && trigger.walk.lit === 0,
+    `the bell puts the whole hand out (${trigger.walk.lit} still lit)`);
+
   // The scoreboard's last column. It said "Kills" and printed a dash for the
   // living and an empty cell for the dead, because nothing on the client ever
   // counted anything - a header promising a number over a column that never

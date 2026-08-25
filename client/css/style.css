@@ -872,6 +872,8 @@ html[lang="ko"] {
 .dCard.reaction { background: linear-gradient(170deg, #dfe6ef, #bfcbdc); }
 .dCard.gear, .dCard.weapon, .dCard.curse { background: linear-gradient(170deg, #cfd9e8, #a9b8cd); }
 .dCard.cannot { filter: grayscale(.8) brightness(.72); }
+/* The one card in the hand the trigger will actually answer. */
+.dCard.live { box-shadow: 0 0 0 2px #c8442e, 0 0 12px rgba(200,68,46,.55); }
 .dCard b {
   display: flex; justify-content: space-between; align-items: baseline;
   font-size: 11.5px; letter-spacing: .02em; font-weight: bold;

@@ -387,6 +387,7 @@ export class HUD {
     if (!this.turn) {
       bar.classList.add('hidden');
       $('hud').classList.remove('rooted');
+      this.redrawHand();
       return;
     }
     const mine = this.turn.holder === this.game.selfId;
@@ -407,6 +408,18 @@ export class HUD {
 
     this.renderTurnOrder();
     this.tickTurnClock();
+    // Whose go it is decides what the hand looks like, and the two arrive in
+    // separate packets. At the end of a lap the last packet anybody gets is
+    // the hand, sent while the go was still theirs, and then the bell - so
+    // every card in front of the man who just finished stayed lit and
+    // pressable for the whole four seconds of the walk, and the keys did
+    // nothing. Redraw it against whose go it now is.
+    this.redrawHand();
+  }
+
+  /** The hand again, against the turn as it now stands. */
+  redrawHand() {
+    if (this.duel) this.setDuel(this.duel);
   }
 
   /**
@@ -546,6 +559,27 @@ export class HUD {
     return '';
   }
 
+  /**
+   * Which card in this hand the gun would actually fire, by the same rule the
+   * server uses: normally a Bang!, and for the man who reads either card as
+   * the other, whichever of the two he is holding first.
+   */
+  shotCardOf(msg) {
+    const swap = !!GUNHANDS[this.selfRole?.gunhand]?.swap;
+    const hand = msg.hand || [];
+    if (!swap) return hand.includes('bang') ? 'bang' : null;
+    for (const id of hand) if (id === 'bang' || id === 'missed') return id;
+    return null;
+  }
+
+  /** And whether the trigger is still live this go. One shot, unless not. */
+  shotLeft(msg) {
+    if (!this.shotCardOf(msg)) return false;
+    if (DUEL_CARDS[msg.weapon]?.unlimited) return true;
+    if (GUNHANDS[this.selfRole?.gunhand]?.unlimited) return true;
+    return (msg.bangs || 0) < 1;
+  }
+
   setDuel(msg) {
     const first = !this.duel;
     this.duel = msg;
@@ -554,18 +588,34 @@ export class HUD {
     if (first) this.renderRoleCards();
     const hand = $('duelHand');
     const yours = this.game.turn && this.game.turn.holder === this.game.selfId;
+    // Which card in this hand is the one that fires, and whether the trigger
+    // is still live. Both were known to the server and neither reached the
+    // screen: `bangs` was sent on every packet and printed nowhere, and the
+    // shot cards were greyed out permanently - which reads as "dead card"
+    // when it only ever meant "no key for this one". A man who had already
+    // taken his shot held the gun on somebody for a full second and it
+    // silently refused to go off, with nothing anywhere saying why.
+    const shot = this.shotCardOf(msg);
+    const live = this.shotLeft(msg);
     hand.classList.toggle('hidden', !msg.hand.length);
     hand.innerHTML = msg.hand.map((id, i) => {
       const c = DUEL_CARDS[id];
       if (!c) return '';
-      // Greyed when it cannot be played: not your go, or it is the card you
-      // fire with rather than press a key for.
-      const dead = !yours || c.kind === 'shot' || c.kind === 'reaction' || i > 9;
-      return `<div class="dCard ${c.kind}${dead ? ' cannot' : ''}">
+      const fires = id === shot;
+      // Greyed when it cannot be played: not your go, past the tenth key, a
+      // card you hold for somebody else's go, or a shot already taken.
+      const dead = !yours || i > 9
+        || (fires ? !live : (c.kind === 'shot' || c.kind === 'reaction'));
+      const note = !yours ? ''
+        : fires && live ? this.t('duel.aimToFire', 'aim and hold to fire it')
+        : fires ? this.t('duel.shotGone', 'you have had your shot this go')
+        : c.kind === 'reaction' ? this.t('duel.forTheirGo', 'spent on somebody else\'s go')
+        : c.kind === 'target' || c.kind === 'curse'
+          ? this.t('duel.aimFirst', 'aim at somebody first') : '';
+      return `<div class="dCard ${c.kind}${dead ? ' cannot' : ''}${fires && live ? ' live' : ''}">
         <b><span>${escapeHtml(this.t(`duel.${id}.name`, c.name))}</span><i>${this.handKey(i)}</i></b>
         <p>${escapeHtml(this.t(`duel.${id}.rules`, c.rules))}</p>
-        ${c.kind === 'target' || c.kind === 'curse'
-          ? `<em>${escapeHtml(this.t('duel.aimFirst', 'aim at somebody first'))}</em>` : ''}
+        ${note ? `<em>${escapeHtml(note)}</em>` : ''}
       </div>`;
     }).join('');
 

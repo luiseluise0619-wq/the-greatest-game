@@ -906,9 +906,29 @@ export class BotBrain {
       if (has('catbalou') && play('catbalou', mark)) return true;
       if (has('panic') && play('panic', mark)) return true;
     }
-    // The two that point at the whole street, worth it while the street is full.
-    if (has('gatling') && alive > 2 && play('gatling')) return true;
-    if (has('indians') && alive > 2 && play('indians')) return true;
+    // The two that point at the whole street. Both were held back until there
+    // were three men left, which is exactly backwards: they hit EVERY other
+    // man alive, so the more of the table is standing the more of your own
+    // side they catch, and with two left they hit nobody but the man you are
+    // trying to kill. The guard was the beer rule copied onto cards it does
+    // not apply to, and it meant a bot went into the last pair of the round
+    // holding the best card in the deck and never played it.
+    //
+    // What they are actually worth is a question about who else is standing:
+    // the man you are guarding takes one too, and finishing him yourself is
+    // no way to win a round.
+    const sweepSafe = () => {
+      if (alive <= 2) return true;
+      const ward = this.protectee ? room.players.get(this.protectee) : null;
+      if (ward && ward.alive && ward !== me && ward.health <= 1) return false;
+      for (const id of this.allies) {
+        const a = room.players.get(id);
+        if (a && a.alive && a !== me && a.health <= 1) return false;
+      }
+      return true;
+    };
+    if (has('gatling') && sweepSafe() && play('gatling')) return true;
+    if (has('indians') && sweepSafe() && play('indians')) return true;
     return false;
   }
 
