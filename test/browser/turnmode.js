@@ -56,6 +56,12 @@ if (process.env.CHROMIUM_PATH) launch.executablePath = process.env.CHROMIUM_PATH
 const browser = await chromium.launch(launch);
 
 const problems = [];
+// Page errors and console errors kept apart from failed checks. They used to
+// share one list, and the check at the bottom decided which was which by
+// looking for a colon in the string - so a check whose LABEL contained a
+// colon reported itself as a page error. A label is prose; this is not a
+// thing to infer from punctuation.
+const pageErrors = [];
 const check = (ok, label) => {
   console.log(`${ok ? '  ok  ' : ' FAIL '} ${label}`);
   if (!ok) problems.push(label);
@@ -64,9 +70,12 @@ const check = (ok, label) => {
 async function open(url, name) {
   const ctx = await browser.newContext({ viewport: { width: VW || 1280, height: VH || 760 } });
   const page = await ctx.newPage();
-  page.on('pageerror', (e) => problems.push(`${name}: ${e.message}`));
+  page.on('pageerror', (e) => { pageErrors.push(`${name}: ${e.message}`); problems.push(`${name}: ${e.message}`); });
   page.on('console', (m) => {
-    if (m.type() === 'error' && !m.text().includes('favicon')) problems.push(`${name} console: ${m.text()}`);
+    if (m.type() === 'error' && !m.text().includes('favicon')) {
+      pageErrors.push(`${name} console: ${m.text()}`);
+      problems.push(`${name} console: ${m.text()}`);
+    }
   });
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
@@ -386,13 +395,16 @@ try {
   const downAlready = await A.evaluate(() => window.game?.self?.alive === false);
   await A.reload({ waitUntil: 'domcontentloaded' });
   const resumed = await A.waitForFunction(
+    // A dead man gets his round back, not his hand: he has none, and the round
+    // may well have finished while the page was reloading. What has to come
+    // back is who he was and the game he was in.
     (down) => (down
-      ? !!window.game?.turn?.kind && window.game?.inGame
+      ? !!window.game?.selfRole && (window.game?.inGame || window.game?.phase === 'results')
       : window.game?.duel?.hand?.length > 0 && !!window.game?.turn?.kind),
     downAlready, { timeout: 30000 },
   ).then(() => true).catch(() => false);
   check(resumed, downAlready
-    ? 'a refresh hands a dead man his round back (no hand: he has none)'
+    ? 'a refresh hands a dead man his round back - he holds no cards to hand him'
     : 'a refresh mid-lap hands the game back rather than an empty screen');
   if (resumed && !downAlready) {
     const back = await A.evaluate(() => ({
@@ -450,7 +462,7 @@ try {
 
   check(DUEL.drawTime > 0 && !!B, 'two players, one town');
   check(serverErrors.length === 0, `server stayed quiet${serverErrors.length ? `: ${serverErrors[0]}` : ''}`);
-  check(problems.length === 0 || problems.every((p) => !p.includes('console') && !p.includes(':')), 'no page errors');
+  check(pageErrors.length === 0, `no page errors${pageErrors.length ? `: ${pageErrors[0]}` : ''}`);
 } finally {
   await browser.close();
   server.kill();

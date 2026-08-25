@@ -78,6 +78,11 @@ if (process.env.CHROMIUM_PATH) launch.executablePath = process.env.CHROMIUM_PATH
 const browser = await chromium.launch(launch);
 
 const problems = [];
+// Real page and console errors, kept apart from failed checks. These used to
+// share one list and the check at the bottom told them apart by looking for a
+// colon in the string, so any failing check whose LABEL happened to contain
+// one reported itself as a page error as well. A label is prose.
+const pageErrors = [];
 const check = (ok, label) => {
   console.log(`${ok ? '  ok  ' : ' FAIL '} ${label}`);
   if (!ok) problems.push(label);
@@ -86,9 +91,12 @@ const check = (ok, label) => {
 async function open(url, name) {
   const ctx = await browser.newContext({ viewport: { width: VW || 1280, height: VH || 760 } });
   const page = await ctx.newPage();
-  page.on('pageerror', (e) => problems.push(`${name}: ${e.message}`));
+  page.on('pageerror', (e) => { pageErrors.push(`${name}: ${e.message}`); problems.push(`${name}: ${e.message}`); });
   page.on('console', (m) => {
-    if (m.type() === 'error' && !m.text().includes('favicon')) problems.push(`${name} console: ${m.text()}`);
+    if (m.type() === 'error' && !m.text().includes('favicon')) {
+      pageErrors.push(`${name} console: ${m.text()}`);
+      problems.push(`${name} console: ${m.text()}`);
+    }
   });
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
@@ -701,7 +709,7 @@ try {
   } finally { await blind.close(); }
 
   check(serverErrors.length === 0, `server stayed quiet${serverErrors.length ? `: ${serverErrors[0]}` : ''}`);
-  check(problems.length === 0 || problems.every((p) => !p.includes('console') && !p.includes(':')), 'no page errors');
+  check(pageErrors.length === 0, `no page errors${pageErrors.length ? `: ${pageErrors[0]}` : ''}`);
 } finally {
   await browser.close();
   server.kill();
