@@ -582,6 +582,19 @@ export class HUD {
 
   setDuel(msg) {
     const first = !this.duel;
+    // The mode where the cards ARE the ammunition was the one mode with no
+    // card sound in it. cardFlick and cardDeal existed and were wired only to
+    // the free-for-all's six, so drawing two at the top of a go, spending a
+    // Bang!, and having one taken off you across the table all happened in
+    // silence. The hand count is the honest signal for all three: it is the
+    // one number that moves whenever a card does.
+    const was = this.duelHandCount;
+    const held = (msg.hand || []).length;
+    if (was != null && held !== was) {
+      if (held > was) this.game.audio?.cardDeal(Math.min(4, held - was));
+      else this.game.audio?.cardFlick();
+    }
+    this.duelHandCount = held;
     this.duel = msg;
     // The role card is on screen when the first hand lands; it was drawn
     // before the deal reached us, so draw it again now there is something in it.

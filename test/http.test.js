@@ -145,3 +145,17 @@ test('/stats answers with the three numbers a playtest is read by', async () => 
     assert.ok(key in j, `/stats says nothing about "${key}" and DEPLOY.md tells people to read it`);
   }
 });
+
+test('a path that cannot be decoded is a 404 and not the end of the process', async () => {
+  // "/%" is not a valid escape, and decodeURIComponent throws a URIError on it
+  // rather than returning anything. Nothing caught that, so one request from
+  // anybody who can reach the port took the whole process down - and with it
+  // every round being played on it. A browser never sends these; curl does.
+  for (const path of ['/%', '/%E0%A4%A', '/%zz', '/client/%']) {
+    const res = await fetch(BASE + path);
+    assert.equal(res.status, 404, `${path} was answered with ${res.status}`);
+  }
+  // And the server is still there afterwards, which is the whole point.
+  const health = await fetch(`${BASE}/healthz`);
+  assert.equal(health.status, 200, 'a malformed path took the server with it');
+});

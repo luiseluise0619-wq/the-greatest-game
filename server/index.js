@@ -53,7 +53,15 @@ function resolveRequest(urlPath) {
     const full = path.join(ROOT, 'node_modules', 'three', 'examples', 'jsm', rel);
     return full.startsWith(path.join(ROOT, 'node_modules', 'three', 'examples', 'jsm')) ? full : null;
   }
-  const clean = path.normalize(decodeURIComponent(urlPath)).replace(/^(\.\.[/\\])+/, '');
+  // A path the browser never sends but anybody with curl can: "/%" is not a
+  // valid escape and decodeURIComponent throws a URIError on it. Nothing here
+  // caught it, so one malformed request took the process down and every round
+  // on it with it. A path that cannot be decoded is a path that does not
+  // resolve to a file, which is a 404 like any other.
+  let clean;
+  try {
+    clean = path.normalize(decodeURIComponent(urlPath)).replace(/^(\.\.[/\\])+/, '');
+  } catch { return null; }
   const rel = clean.replace(/^[/\\]+/, '');
   const top = rel.split(/[/\\]/)[0];
   if (ALLOW.includes(top)) {
@@ -101,7 +109,15 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  const file = resolveRequest(urlPath);
+  // And a belt to go with those braces. A static file server is the one part
+  // of this that anything on the network can reach without saying hello first,
+  // and a throw in here is not a bad response - it is the end of every round
+  // running on the process.
+  let file = null;
+  try { file = resolveRequest(urlPath); } catch (err) {
+    console.error('[http] bad path', err);
+    res.writeHead(400); res.end('bad request'); return;
+  }
   if (!file) { res.writeHead(404); res.end('not found'); return; }
   serve(file, res, true);
 });
