@@ -286,6 +286,8 @@ const KO = {
   'tl.left': '{who} — 마을을 떠남',
   'tl.killed': '{killer} — {where} {who} 사살',
   'tl.died': '{who} — {where} 사망',
+  'tl.killedOnGo': '{killer} — {name}의 차례에 {who} 사살',
+  'tl.diedOnGo': '{who} — {name}의 차례에 사망',
   'tl.card': '{who} — {card} 사용',
   'tl.cardSecret': '{who} — {card} 사용 (아무도 몰랐음)',
   'tl.cardOn': '{who} — {target}에게 {card} 사용',

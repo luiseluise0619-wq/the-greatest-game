@@ -1166,7 +1166,16 @@ export class HUD {
         else if (e.cause === 'left') body = this.t('tl.left', `${who} rode out`, { who });
         else if (e.killer) {
           const killer = `<b>${escapeHtml(e.killer)}</b>${tag(e.killerRole)}`;
-          body = this.t('tl.killed', `${killer} killed ${who} ${where}`, { killer, who, where });
+          // At a table there is only one place, so naming it on every line of
+          // the round's account tells the reader nothing they did not know
+          // before the bell. The go is the thing worth writing down.
+          body = e.onGo
+            ? this.t('tl.killedOnGo', `${killer} killed ${who} on ${escapeHtml(e.onGo)}'s go`,
+              { killer, who, name: `<b>${escapeHtml(e.onGo)}</b>` })
+            : this.t('tl.killed', `${killer} killed ${who} ${where}`, { killer, who, where });
+        } else if (e.onGo) {
+          body = this.t('tl.diedOnGo', `${who} died on ${escapeHtml(e.onGo)}'s go`,
+            { who, name: `<b>${escapeHtml(e.onGo)}</b>` });
         } else body = this.t('tl.died', `${who} died ${where}`, { who, where });
         li.className = 'death';
       } else if (e.type === 'card') {

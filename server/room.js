@@ -898,6 +898,10 @@ export class Room {
       killer: killer && killer !== victim ? killer.name : null,
       killerRole: killer && killer !== victim ? killer.role : null,
       cause, place,
+      // The same reason the kill feed carries it: at a table there is only
+      // one place, and every line of the round's account would name it.
+      onGo: this.duel && this.turnHolder
+        ? this.players.get(this.turnHolder)?.name || null : null,
     });
     if (!bought && killer && killer !== victim && !victim.bot && victim.client) {
       const replay = this.buildReplay(victim, killer, now());

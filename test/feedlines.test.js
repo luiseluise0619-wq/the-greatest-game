@@ -188,6 +188,17 @@ test('the lines a round might not reach on its own get reached', () => {
     text: `You went down on ${me.name}'s go.`,
     p: { name: me.name },
   });
+  // And the round's own account, written the same way for the same reason.
+  said.push({
+    t: 'feed', k: 'tl.killedOnGo',
+    text: `${me.name} killed ${them.name} on ${me.name}'s go`,
+    p: { killer: me.name, who: them.name, name: me.name },
+  });
+  said.push({
+    t: 'feed', k: 'tl.diedOnGo',
+    text: `${them.name} died on ${me.name}'s go`,
+    p: { who: them.name, name: me.name },
+  });
 
   // The round out of a man's back, and the two things that stop it. Neither
     // line is ever said by a round of bots that did not happen to gamble in
@@ -225,10 +236,10 @@ test('the lines a round might not reach on its own get reached', () => {
       'feed.neverEmpty', 'gun.nothingToPress', 'gun.notYourGo', 'gun.needTwoCards',
       'gun.twoForOne', 'feed.throughWood', 'feed.throughMissed', 'feed.squareOff',
       'feed.lightFingers', 'feed.lifted', 'feed.threeForTwo',
-      'kill.unseenOnGo', 'kill.youDiedOnGo']) {
+      'kill.unseenOnGo', 'kill.youDiedOnGo', 'tl.killedOnGo', 'tl.diedOnGo']) {
       assert.ok(keys.has(k), `${k} was never said, so nothing here checked its holes`);
     }
-    assert.ok(keys.size >= 34, `only ${keys.size} different lines were reached`);
+    assert.ok(keys.size >= 36, `only ${keys.size} different lines were reached`);
     check(said, 'the lines a round does not always reach');
   } finally { clock.restore(); }
 });
