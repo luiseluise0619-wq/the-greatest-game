@@ -1144,6 +1144,14 @@ class Game {
       return;
     }
     const card = DUEL_CARDS[id];
+    // For fifteen of the sixteen a Missed! is only ever for being shot at. For
+    // the one who fires either, the card sitting in his hand is lit and says
+    // "aim and hold to fire it" - and pressing its number told him it was for
+    // being shot at, which is the opposite of what the card itself said.
+    if (id === this.hud.shotCardOf(this.duel || {})) {
+      this.deny(['deny.shootIt', 'That one you fire.']);
+      return;
+    }
     if (card?.kind === 'shot') { this.deny(['deny.shootIt', 'That one you fire.']); return; }
     if (card?.kind === 'reaction') { this.deny(['deny.reactionCard', 'That one is for being shot at.']); return; }
     let target;

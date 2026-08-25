@@ -938,3 +938,37 @@ test('the horse in front of a man puts him out of arm\'s reach too', () => {
     assert.ok(!me.duelHand.includes('panic'), 'the glass did not answer the horse');
   } finally { clock.restore(); }
 });
+
+test('the hand that is never empty is not empty after playing its last card', () => {
+  // "The moment her hand runs out she draws another card. She is never holding
+  // nothing." That was checked after a Bang! was fired, after a shot was
+  // answered, after a duel and after the two cards that sweep the street - and
+  // not after a card was simply played off the number row, which is the
+  // commonest way in the game for a hand to reach zero. Nor after somebody
+  // reached across the table and took her last one, which is the cruellest.
+  const { room, clock } = seatedRoom('STEH');
+  try {
+    const all = [...room.players.values()].filter((p) => p.alive);
+    const [her, him] = all;
+    for (const p of all) { p.gear = []; p.weaponCard = null; p.gunhand = null; }
+    seatThem(room, [her, him, ...all.filter((p) => p !== her && p !== him)]);
+    room.phase = 'combat';
+    her.gunhand = 'emptyhand';
+    her.health = Math.max(1, her.maxHealth - 1);
+
+    // Her own go, her last card played off the number row.
+    room.turn = { kind: 'turn', holder: her.id, endsAt: Date.now() / 1000 + 1e6 };
+    her.duelHand = ['beer']; her.cardsThisTurn = 0;
+    room.onDuelCard(her, { card: 'beer' });
+    assert.equal(her.duelHand.length, 1,
+      'she played her last card and was left holding nothing');
+
+    // And somebody else's go, her last card taken off her across the table.
+    room.turn = { kind: 'turn', holder: him.id, endsAt: Date.now() / 1000 + 1e6 };
+    him.duelHand = ['catbalou']; him.cardsThisTurn = 0;
+    her.duelHand = ['beer']; her.gear = [];
+    room.onDuelCard(him, { card: 'catbalou', target: her.id });
+    assert.equal(her.duelHand.length, 1,
+      'somebody took her last card and she was left holding nothing');
+  } finally { clock.restore(); }
+});

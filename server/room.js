@@ -1609,6 +1609,13 @@ export class Room {
       default: return;
     }
 
+    // Her hand is empty and she is never holding nothing. This was checked
+    // after a Bang! was fired, after a shot was answered, after a duel and
+    // after the two cards that sweep the street - and not after a card was
+    // simply played off the number row, which is the commonest way in the
+    // game for a hand to reach zero. Nor after somebody reached across the
+    // table and took her last one, which is the cruellest.
+    this.checkEmptyHands();
     for (const o of this.players.values()) if (o.alive) this.pushSelf(o);
     this.pushDuelAll();
     this.checkVictory();
@@ -2587,6 +2594,9 @@ export class Room {
           t: S.FEED, k: 'feed.tookItBack', p: { name: attacker.name, n: got },
           text: `You take ${got} out of ${attacker.name}'s hand for it.`, tone: 'good',
         });
+        // The hand this came out of may now be empty, and one of the sixteen
+        // is never holding nothing.
+        this.checkEmptyHands();
         this.pushDuelAll();
       }
     }
@@ -2677,6 +2687,16 @@ export class Room {
   }
 
   /** Her hand is empty and she is never holding nothing. */
+  /**
+   * The same question of everybody at once, for the moves that can empty
+   * somebody else's hand: a card taken across the table, a shot answered, a
+   * street swept. Cheaper than working out which of them it was.
+   */
+  checkEmptyHands() {
+    if (!this.duel || !this.pile) return;
+    for (const p of this.players.values()) this.checkEmptyHand(p);
+  }
+
   checkEmptyHand(p) {
     if (!this.duel || !this.pile || !p.alive) return;
     if (p.gunhand !== 'emptyhand' || (p.duelHand || []).length) return;
