@@ -3,8 +3,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
-import { TIMING, PLAYER, VISION, SOCIAL, VOICE_LINES, MODES } from '../shared/constants.js';
+import {
+  TIMING, PLAYER, VISION, SOCIAL, VOICE_LINES, MODES, PHASE, MAX_PLAYERS,
+} from '../shared/constants.js';
 import MAP from '../shared/map.js';
+import { C } from '../shared/protocol.js';
 import { isBlocked } from '../shared/collision.js';
 
 const { Room } = await import('../server/room.js');
@@ -326,5 +329,60 @@ test('a shout carries across the street, not across the map', () => {
     // The dead hear everything - they have nothing better to do.
     listener.alive = false;
     assert.equal(shoutFrom(120), 1, 'the dead should hear the whole town');
+  } finally { clock.restore(); }
+});
+
+test('nothing a client can put on the wire gets past the door or breaks the room', () => {
+  // Two layers, and this checks both. The socket layer in server/index.js
+  // parses the frame, drops anything that is not an object with a string `t`,
+  // and wraps the call in a try - so a malformed message cannot reach the room
+  // and cannot take the process with it. The room itself then has to survive
+  // every SHAPE of nonsense that does have a string `t`.
+  //
+  // Written after finding that a shot with an unusable direction used to spend
+  // the card, a round out of the shared chamber and the magazine before the
+  // direction was so much as looked at.
+  const { room, clock, stub } = liveRoom();
+  try {
+    const before = room.players.size;
+
+    // The door. Exactly what server/index.js lets through.
+    const doorLets = (m) => !!m && typeof m.t === 'string';
+    for (const shut of [null, undefined, 0, '', [], {}, { t: null }, { t: 7 }, { t: {} }]) {
+      assert.equal(doorLets(shut), false, `the door let ${JSON.stringify(shut)} through`);
+    }
+
+    // And the room, for everything that does get through.
+    const junk = [
+      { t: 'nope' }, { t: '' },
+      { t: C.SHOOT }, { t: C.SHOOT, dir: 'north' }, { t: C.SHOOT, dir: [0, 0, -1] },
+      { t: C.SHOOT, dir: { x: 'a', y: 'b', z: 'c' } }, { t: C.SHOOT, dir: { x: NaN, y: 0, z: 1 } },
+      { t: C.CARD }, { t: C.CARD, card: null }, { t: C.CARD, card: 123 },
+      { t: C.CARD, card: 'nope' }, { t: C.CARD, card: 'panic', target: 99999 },
+      { t: C.INPUT }, { t: C.INPUT, pos: null }, { t: C.INPUT, pos: { x: 'a', y: 0, z: 0 } },
+      { t: C.INPUT, pos: { x: Infinity, y: 0, z: 0 } }, { t: C.INPUT, yaw: 'spin', pitch: {} },
+      { t: C.PICKUP }, { t: C.PICKUP, id: -1 }, { t: C.PICKUP, id: 'x' },
+      { t: C.ACCUSE }, { t: C.ACCUSE, target: null }, { t: C.ACCUSE, target: {} },
+      { t: C.VOICE }, { t: C.VOICE, line: 'nope' },
+      { t: C.CHAT }, { t: C.CHAT, text: null }, { t: C.CHAT, text: {} },
+      { t: C.CHAT, text: 'x'.repeat(100000) },
+      { t: C.THROW }, { t: C.THROW, dir: [1, 2, 3] },
+      { t: C.SELFSHOT }, { t: C.BRACE }, { t: C.ABILITY }, { t: C.BADGE }, { t: C.RELOAD },
+      { t: C.ADD_BOT, n: 'many' }, { t: C.ADD_BOT, n: -999 }, { t: C.ADD_BOT, n: 1e9 },
+      { t: C.START, mode: 'nope' }, { t: C.RESTART },
+      { t: 'join' }, { t: 'join', name: null }, { t: 'join', name: 'x'.repeat(10000) },
+      { t: 'join', token: {} },
+    ];
+    for (const m of junk) {
+      assert.ok(doorLets(m), `the door would have stopped ${JSON.stringify(m).slice(0, 40)}`);
+      room.handleMessage(stub.client, m);      // must not throw
+    }
+
+    // And the town is still a town afterwards.
+    assert.ok(room.players.size >= before, `the room lost ${before - room.players.size} people`);
+    assert.ok(room.players.size <= MAX_PLAYERS, `the room grew to ${room.players.size}`);
+    tick(clock, room, 200);
+    assert.ok([PHASE.PREP, PHASE.COMBAT, PHASE.ENDGAME, PHASE.RESULTS].includes(room.phase),
+      `the room ended up in ${room.phase}`);
   } finally { clock.restore(); }
 });
