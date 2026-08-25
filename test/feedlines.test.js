@@ -27,7 +27,14 @@ const HOLE = /\{[^{}]*\}/;
 /** Every keyed line this room says, whoever it says it to. */
 function listen(room) {
   const said = [];
-  const grab = (msg) => { if (msg && msg.t === 'feed' && msg.k) said.push(msg); };
+  // Chat as well as feed. The bots' chatter travels as a chat message and
+  // carries a key and holes exactly like a feed line does, and it was going
+  // out entirely unchecked - three of those lines take a {name} and one takes
+  // a {place}, and a Korean copy that spelled one of them differently would
+  // have shown a Korean player the word "{name}".
+  const grab = (msg) => {
+    if (msg && (msg.t === 'feed' || msg.t === 'chat') && msg.k) said.push(msg);
+  };
   const emit = room.emit.bind(room);
   const broadcast = room.broadcast.bind(room);
   room.emit = (p, msg) => { grab(msg); return emit(p, msg); };
