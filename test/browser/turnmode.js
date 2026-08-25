@@ -680,6 +680,37 @@ try {
     return { up, said, down: el.classList.contains('hidden') };
   });
   check(warned.up && warned.said.length > 5, `the warning says something (${warned.said.slice(0, 40)})`);
+
+  // And what it says about your hand has to be true of YOUR hand. It asked for
+  // the literal Missed!, so the one of the sixteen who answers with a Bang!
+  // was told he had nothing to answer with while he was holding the thing he
+  // answers with - in the one second he has to decide anything about it.
+  const answer = await A.evaluate(() => {
+    const g = window.game;
+    const wasDuel = g.duel; const wasRole = g.hud.selfRole;
+    const el = document.getElementById('aimedWarn');
+    const read = (hand, gunhand) => {
+      g.hud.selfRole = { ...(wasRole || {}), gunhand };
+      const d = { ...g.duel, hand, limit: 7, pile: 40, bangs: 0, weapon: null,
+        table: g.duel.table || [] };
+      g.duel = d; g.hud.setDuel(d);
+      g.hud.setAimed({ on: true, by: null });
+      return el.querySelector('b')?.textContent || '';
+    };
+    const out = {
+      missed: read(['missed'], null),
+      swap: read(['bang'], 'ambidexter'),
+      plain: read(['bang'], null),
+    };
+    g.hud.setAimed({ on: false });
+    g.hud.selfRole = wasRole;
+    g.duel = wasDuel; g.hud.setDuel(wasDuel);
+    return out;
+  });
+  check(answer.swap === answer.missed,
+    `the man who answers with a Bang! is told he can (${answer.swap})`);
+  check(answer.plain !== answer.missed,
+    `and anybody else holding one is told he cannot (${answer.plain})`);
   check(warned.down, 'and it goes away again when the barrel moves off');
 
   // Nobody can be reading HE HAS YOU under the words YOUR GO.

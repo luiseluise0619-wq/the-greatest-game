@@ -9,7 +9,9 @@ import { useDefs, cardUrl } from './cardart.js';
 import { placePhrase, placeParts, ZONES } from '../../shared/map.js';
 import { line } from '../../shared/i18n.js';
 import { GUNHANDS } from '../../shared/gunhands.js';
-import { DUEL_CARDS, DUEL_CARD_ORDER } from '../../shared/deck.js';
+import {
+  DUEL_CARDS, DUEL_CARD_ORDER, shotCardIn, answerCardIn, shotLeftIn,
+} from '../../shared/deck.js';
 import { duelCardUrl } from './duelart.js';
 
 useDefs(CARDS);
@@ -544,7 +546,11 @@ export class HUD {
     const el = $('aimedWarn');
     if (!msg.on) { el.classList.add('hidden'); return; }
     el.classList.remove('hidden');
-    const held = (this.duel?.hand || []).includes('missed');
+    // What THIS man can spend to not be there, which for one of the sixteen is
+    // not the card with Missed! printed on it. Asking the hand for the literal
+    // card told him he had nothing to answer with while he was holding the
+    // thing he answers with - in the one second he had to decide.
+    const held = !!this.answerCardOf(this.duel || {});
     el.innerHTML = `${escapeHtml(this.t('aim.onYou', 'HE HAS YOU'))}`
       + `<b>${escapeHtml(held
         ? this.t('aim.brace', 'SPACE — move, and spend the card')
@@ -575,22 +581,23 @@ export class HUD {
    * the other, whichever of the two he is holding first.
    */
   shotCardOf(msg) {
-    // The same order the server picks in, which is a Bang! first and the other
-    // card only if there is no Bang!. Reading the hand in the order it happens
-    // to be held instead would light the wrong card in front of the one man
-    // who can fire either.
-    const hand = msg.hand || [];
-    if (hand.includes('bang')) return 'bang';
-    if (GUNHANDS[this.selfRole?.gunhand]?.swap && hand.includes('missed')) return 'missed';
-    return null;
+    return shotCardIn(msg.hand, this.selfRole?.gunhand);
+  }
+
+  /**
+   * And the other way round: what he can spend to not be there. Missed! for
+   * fifteen of the sixteen, and a Bang! for the man who reads either as either.
+   */
+  answerCardOf(msg) {
+    return answerCardIn(msg.hand, this.selfRole?.gunhand);
   }
 
   /** And whether the trigger is still live this go. One shot, unless not. */
   shotLeft(msg) {
-    if (!this.shotCardOf(msg)) return false;
-    if (DUEL_CARDS[msg.weapon]?.unlimited) return true;
-    if (GUNHANDS[this.selfRole?.gunhand]?.unlimited) return true;
-    return (msg.bangs || 0) < 1;
+    return shotLeftIn({
+      hand: msg.hand, gunhand: this.selfRole?.gunhand,
+      weapon: msg.weapon, bangs: msg.bangs,
+    });
   }
 
   setDuel(msg) {

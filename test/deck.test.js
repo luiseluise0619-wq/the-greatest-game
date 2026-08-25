@@ -11,10 +11,10 @@ import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
 import { TIMING, MODES, DUEL } from '../shared/constants.js';
 import {
   DECK_SIZE, DISTANCE_UNIT, DUEL_CARDS, buildDeck, reachOf, reachSeats, coverSeats,
-  sightSeats, inReach,
+  sightSeats, inReach, shotCardIn, answerCardIn, shotLeftIn,
 } from '../shared/deck.js';
 import { Pile, handLimit } from '../server/deck.js';
-import { healthOf } from '../shared/gunhands.js';
+import { GUNHANDS, healthOf } from '../shared/gunhands.js';
 
 const { Room } = await import('../server/room.js');
 
@@ -444,4 +444,59 @@ test('a card reaches as far as the man counts, not as far as he sits', () => {
       }
     }
   }
+});
+
+test('one place decides what a hand can fire and what it can answer with', () => {
+  // These two questions are asked on both sides of the wire, and every time
+  // one side wrote its own copy the two drifted. The client checked for the
+  // literal Bang! before firing, before putting the gun to its own head, and
+  // before telling a man whether he had anything to answer with - three copies
+  // of a rule the server states once, and all three were wrong about the one
+  // man on the table who reads either card as the other.
+  const swap = Object.entries(GUNHANDS).find(([, g]) => g.swap)?.[0];
+  assert.ok(swap, 'nobody on the table reads either card as the other any more');
+
+  assert.equal(shotCardIn(['bang'], null), 'bang');
+  assert.equal(shotCardIn(['missed'], null), null, 'a Missed! fired for a man who cannot fire it');
+  assert.equal(shotCardIn(['missed'], swap), 'missed', 'and would not fire for the man who can');
+  assert.equal(shotCardIn(['missed', 'bang'], swap), 'bang',
+    'holding both, the one spent is not the Bang!');
+
+  assert.equal(answerCardIn(['missed'], null), 'missed');
+  assert.equal(answerCardIn(['bang'], null), null, 'a Bang! got somebody out of the way');
+  assert.equal(answerCardIn(['bang'], swap), 'bang', 'and would not for the man it should');
+  assert.equal(answerCardIn(['bang', 'missed'], swap), 'missed',
+    'holding both, the one spent is not the Missed!');
+
+  // Nothing in hand is nothing either way, whoever is holding it.
+  for (const g of [null, swap]) {
+    assert.equal(shotCardIn([], g), null);
+    assert.equal(answerCardIn(undefined, g), null);
+  }
+});
+
+test('and one place decides whether the trigger is still live this go', () => {
+  // One shot a turn, unless the gun in front of him or the hands he was dealt
+  // say otherwise. The client asks this to decide whether to predict a shot
+  // and which card to light for it; the server asks it to decide whether the
+  // trigger moves. When the two disagreed the client fired a gun that could
+  // not fire - a bang, a flash and a round off the counter for nothing.
+  const unlimitedHand = Object.entries(GUNHANDS).find(([, g]) => g.unlimited)?.[0];
+  const unlimitedGun = Object.values(DUEL_CARDS).find((c) => c.unlimited)?.id;
+  assert.ok(unlimitedHand && unlimitedGun, 'nothing in the game lifts the one-a-turn rule any more');
+
+  assert.equal(shotLeftIn({ hand: ['bang'], bangs: 0 }), true);
+  assert.equal(shotLeftIn({ hand: ['bang'], bangs: 1 }), false, 'a second shot in one go');
+  assert.equal(shotLeftIn({ hand: [], bangs: 0 }), false, 'an empty hand fired');
+  assert.equal(shotLeftIn({ hand: ['missed'], bangs: 0 }), false);
+
+  // The two things that lift it, each on its own.
+  assert.equal(shotLeftIn({ hand: ['bang'], bangs: 3, gunhand: unlimitedHand }), true,
+    `${unlimitedHand} was held to one a turn`);
+  assert.equal(shotLeftIn({ hand: ['bang'], bangs: 3, weapon: unlimitedGun }), true,
+    `${unlimitedGun} was held to one a turn`);
+  // But neither conjures a card out of nothing.
+  assert.equal(shotLeftIn({ hand: [], bangs: 0, gunhand: unlimitedHand }), false);
+  assert.equal(shotLeftIn({ hand: [], bangs: 0, weapon: unlimitedGun }), false);
+  assert.equal(shotLeftIn(), false, 'asked about nobody at all');
 });

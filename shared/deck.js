@@ -20,7 +20,7 @@
 // in your hand, and you may only play one on your go. Ammunition is cards.
 // Everything else on this list exists to bend that rule or to survive it.
 
-import { trait } from './gunhands.js';
+import { trait, GUNHANDS } from './gunhands.js';
 
 export const DISTANCE_UNIT = 22;        // metres per "seat" of the original
 
@@ -226,6 +226,49 @@ export function reachOf(player) {
 /** How far away this player counts as, in metres, whatever the tape says. */
 export function coverOf(player) {
   return coverSeats(player) * DISTANCE_UNIT;
+}
+
+/**
+ * Which card in a hand is a shot, and which card in a hand answers one.
+ *
+ * Both live here because both are asked on both sides of the wire, and every
+ * time one side wrote its own copy the two drifted. The client checked for the
+ * literal Bang! before firing, before putting the gun to its own head, and
+ * before telling a man whether he had anything to answer with - three separate
+ * copies of a rule the server states once, and all three were wrong about the
+ * one man on the table who reads either card as the other. One place, one
+ * answer, a hand and the man holding it.
+ */
+export function shotCardIn(hand, gunhand) {
+  const held = hand || [];
+  if (held.includes('bang')) return 'bang';
+  if (GUNHANDS[gunhand]?.swap && held.includes('missed')) return 'missed';
+  return null;
+}
+
+/** And the other way round: what he can spend to not be there. */
+export function answerCardIn(hand, gunhand) {
+  const held = hand || [];
+  if (held.includes('missed')) return 'missed';
+  if (GUNHANDS[gunhand]?.swap && held.includes('bang')) return 'bang';
+  return null;
+}
+
+/**
+ * Is there a shot left in this hand, and in this go? One a turn, unless the
+ * gun in front of him or the hands he was dealt say otherwise.
+ *
+ * Same reason as the two above: both sides ask it. The server decides whether
+ * the trigger moves and the client decides whether to predict a shot and which
+ * card to light for it, and when those two disagreed the client fired a gun
+ * that could not fire - a bang, a flash and a round off the counter for a
+ * trigger that never moved.
+ */
+export function shotLeftIn({ hand, gunhand, weapon, bangs } = {}) {
+  if (!shotCardIn(hand, gunhand)) return false;
+  if (DUEL_CARDS[weapon]?.unlimited) return true;
+  if (GUNHANDS[gunhand]?.unlimited) return true;
+  return (bangs || 0) < 1;
 }
 
 /**

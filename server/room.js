@@ -18,6 +18,7 @@ import { BotBrain, BOT_NAMES } from './bots.js';
 import { Pile, handLimit, drawCheck } from './deck.js';
 import {
   DUEL_CARDS, KIND, inReach, reachOf, reachSeats, sightSeats, DISTANCE_UNIT,
+  shotCardIn, answerCardIn, shotLeftIn,
 } from '../shared/deck.js';
 import { GUNHANDS, GUNHAND_ORDER, healthOf, trait } from '../shared/gunhands.js';
 import { telemetry } from './telemetry.js';
@@ -562,10 +563,10 @@ export class Room {
 
   /** Is there a shot left in this hand, and in this turn? */
   canBang(p) {
-    if (!this.shotCard(p)) return false;
-    const gun = p.weaponCard ? DUEL_CARDS[p.weaponCard] : null;
-    if (gun?.unlimited || trait(p, 'unlimited')) return true;
-    return (p.bangsThisTurn || 0) < 1;
+    return shotLeftIn({
+      hand: p.duelHand, gunhand: p.gunhand,
+      weapon: p.weaponCard, bangs: p.bangsThisTurn,
+    });
   }
 
   /**
@@ -574,18 +575,12 @@ export class Room {
    * the man as well as the hand.
    */
   shotCard(p) {
-    const hand = p.duelHand || [];
-    if (hand.includes('bang')) return 'bang';
-    if (trait(p, 'swap') && hand.includes('missed')) return 'missed';
-    return null;
+    return shotCardIn(p.duelHand, p.gunhand);
   }
 
   /** And the other way round: what he can spend to not be there. */
   answerCard(p) {
-    const hand = p.duelHand || [];
-    if (hand.includes('missed')) return 'missed';
-    if (trait(p, 'swap') && hand.includes('bang')) return 'bang';
-    return null;
+    return answerCardIn(p.duelHand, p.gunhand);
   }
 
   /** Spend one, face up, where the discard pile can see it. */
