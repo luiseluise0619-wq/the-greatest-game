@@ -965,7 +965,7 @@ Putting the table in fixed it as a game before it fixed it as a balance:
 | and with the deck not printing itself | 64% | 48% |
 | and the deputies watching the right man | 66% | 46% |
 | and the crosshair counting seats too | 68% | 47% |
-| **and nothing spent on a shot going nowhere** | **66–68%** | 46–48% |
+| **and nothing spent on a shot going nowhere** | **67–69%** | 46–48% |
 
 None of the rows below the second are tuning changes; every one of them is a
 bug the mode had been played around. The third: The deck was quietly growing: every
@@ -1032,9 +1032,9 @@ only fun for robots.
 
 The number that did move, and stayed moved, is the share of the Sheriff's
 killers who had actually picked him out: **62%** before any of this session's
-fixes, **90% and 94%** on the last two runs. He dies to somebody deciding now,
-not to crossfire, which is the difference between a deduction game and a
-shooting gallery.
+fixes, and **92%** over the two hundred — with individual runs of sixty since
+reading 94% and 100%. He dies to somebody deciding now, not to crossfire, which
+is the difference between a deduction game and a shooting gallery.
 
 ### Eight at the table
 
