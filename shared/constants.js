@@ -557,16 +557,42 @@ export const REPLAY = {
   camUp: 0.75,
 };
 
+/**
+ * The eight things you can shout with V. Five of them are true in either game.
+ * Three were written for a town you walk around - sticking with somebody,
+ * being pinned down, moving on from a place - and read as nonsense at a table
+ * where nobody has moved since the bell. Those three carry a second line, and
+ * `voiceLine` below picks.
+ */
 export const VOICE_LINES = [
   { id: 'friendly', text: 'Easy now - I ain\'t your problem.' },
-  { id: 'follow', text: 'Stick with me, we\'ll live longer.' },
+  {
+    id: 'follow',
+    text: 'Stick with me, we\'ll live longer.',
+    duel: 'Whatever you are holding, do not spend it on me.',
+  },
   { id: 'sawthat', text: 'I saw what you just did.' },
-  { id: 'help', text: 'They\'ve got me pinned! Anyone!' },
+  {
+    id: 'help',
+    text: 'They\'ve got me pinned! Anyone!',
+    duel: 'One more hit and I am out of it. Think about that.',
+  },
   { id: 'lawman', text: 'I ride with the law. Believe that or don\'t.' },
   { id: 'liar', text: 'That is a lie and you know it.' },
   { id: 'truce', text: 'Truce. For now.' },
-  { id: 'clear', text: 'Nothing over here. Moving on.' },
+  {
+    id: 'clear',
+    text: 'Nothing over here. Moving on.',
+    duel: 'Nothing in this hand worth spending on anybody.',
+  },
 ];
+
+/** The key and the English for a shout, in the game being played. */
+export function voiceLine(line, duel) {
+  return duel && line.duel
+    ? { key: `voice.${line.id}.duel`, text: line.duel }
+    : { key: `voice.${line.id}`, text: line.text };
+}
 
 // ---------------------------------------------------------------------------
 // Damage / feedback helpers

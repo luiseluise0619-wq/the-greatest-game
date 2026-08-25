@@ -7,7 +7,7 @@
 
 import {
   PLAYER, WEAPONS, DYNAMITE, WEAPON_ORDER, ROLES, PHASE, TIMING, ENDGAME,
-  SOCIAL, HITBOX, CHARACTERS, GAMBLER_BOONS, LOOT_RESPAWN, VOICE_LINES, VISION, REPLAY,
+  SOCIAL, HITBOX, CHARACTERS, GAMBLER_BOONS, LOOT_RESPAWN, VOICE_LINES, voiceLine, VISION, REPLAY,
   CARDS, CARD_ORDER, CARD_DEAL, DUEL, MODES, DEFAULT_MODE,
   MIN_PLAYERS, MAX_PLAYERS, rolesForPlayerCount, clamp, stepStamina, swapTime,
 } from '../shared/constants.js';
@@ -1306,9 +1306,12 @@ export class Room {
     // A shout carries as far as a shout carries. This is the whole difference
     // between the wheel and all-chat: T reaches the town, V reaches the street.
     // The dead hear everything, having nothing better to do.
+    // Three of the eight were written for a town you walk around, and read as
+    // nonsense at a table where nobody has moved since the bell.
+    const said = voiceLine(line, this.duel);
     const shout = {
       // Shouted, so it travels as a key too - a Korean town hears it in Korean.
-      t: S.CHAT, from: p.name, id: p.id, text: line.text, k: `voice.${line.id}`, voice: true,
+      t: S.CHAT, from: p.name, id: p.id, text: said.text, k: said.key, voice: true,
       x: r2(p.pos.x), y: r2(p.pos.y), z: r2(p.pos.z),
     };
     this.broadcast(shout, (o) => (

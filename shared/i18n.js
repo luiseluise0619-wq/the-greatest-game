@@ -641,12 +641,15 @@ const KO = {
   // ----------------------------------------------------------- voice wheel
   'voice.friendly': '진정해 — 난 당신 문제가 아니야.',
   'voice.follow': '나랑 붙어 다녀, 그래야 오래 산다.',
+  'voice.follow.duel': '손에 뭘 들고 있든, 나한테 쓰지는 마.',
   'voice.sawthat': '방금 네가 한 짓 봤다.',
   'voice.help': '나 잡혔어! 아무나!',
+  'voice.help.duel': '한 대만 더 맞으면 나는 끝이다. 생각들 좀 해봐.',
   'voice.lawman': '난 법 쪽이다. 믿든 말든.',
   'voice.liar': '거짓말이고, 너도 알잖아.',
   'voice.truce': '휴전. 일단은.',
   'voice.clear': '여긴 아무것도 없다. 이동한다.',
+  'voice.clear.duel': '이 패에는 누구한테 쓸 만한 게 없다.',
 };
 
 const TABLE = { ko: KO };

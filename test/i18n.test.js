@@ -21,6 +21,11 @@ const SRC = await Promise.all([
     .map((f) => readFile(new URL(`../client/${f}`, import.meta.url), 'utf8')),
   readFile(new URL('../server/room.js', import.meta.url), 'utf8'),
   readFile(new URL('../server/bots.js', import.meta.url), 'utf8'),
+  // A key can also be built where the thing it names is defined rather than
+  // where it is asked for: voiceLine() in constants.js picks between a shout's
+  // two versions and hands back the key with it, so the eight shouts are named
+  // nowhere else and read as dead the moment this file stopped being scanned.
+  readFile(new URL('../shared/constants.js', import.meta.url), 'utf8'),
 ]).then((all) => all.join('\n'));
 
 /** Every key the page asks for by attribute. */

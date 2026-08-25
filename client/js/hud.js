@@ -3,7 +3,7 @@
 // Roles are never on screen unless somebody has died or you asked to see yours.
 
 import {
-  CHARACTERS, CHARACTER_ORDER, ROLES, VOICE_LINES, WEAPONS, PHASE, CARDS, CARD_ORDER,
+  CHARACTERS, CHARACTER_ORDER, ROLES, VOICE_LINES, voiceLine, WEAPONS, PHASE, CARDS, CARD_ORDER,
 } from '../../shared/constants.js';
 import { useDefs, cardUrl } from './cardart.js';
 import { placePhrase, placeParts, ZONES } from '../../shared/map.js';
@@ -218,7 +218,8 @@ export class HUD {
       // the top and bottom of the ring are the ones that collide.
       el.style.left = `${350 + Math.cos(a) * 250}px`;
       el.style.top = `${215 + Math.sin(a) * 175}px`;
-      el.innerHTML = `<b>${i + 1}</b>${escapeHtml(this.t(`voice.${line.id}`, line.text))}`;
+      const said = voiceLine(line, !!this.game.duelMode);
+      el.innerHTML = `<b>${i + 1}</b>${escapeHtml(this.t(said.key, said.text))}`;
       inner.appendChild(el);
     });
   }
