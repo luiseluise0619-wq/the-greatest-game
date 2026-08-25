@@ -1022,8 +1022,16 @@ which is the largest sample in this repo.
 | | The Law | Outlaws | Renegade |
 |---|---|---|---|
 | 200 rounds at the table | **55%** | 40% | 6% |
+| 200 rounds again, after the sweep-card fix | **52%** | 43% | 6% |
 
-A fifteen-point lean to the law, where before this session's fixes the same
+The second row is the same two hundred re-run after the bots stopped holding
+Gatling and Indians! back to the last three men. A card that hits every OTHER
+man alive is at its best when there is only one other man, and they had the beer
+rule ("nobody is pouring with two men left") copied onto it. Three points, which
+at this sample size is inside the noise the six runs above measured; both rows
+are the same game, and the Sheriff-killer figure below did not move at all.
+
+A lean to the law either way, where before this session's fixes the same
 setting was a patch over an outlaw runaway. Seven is still the right number —
 six measured 58/35 the other way and there is nothing between them — and it is
 left there rather than reached for again, because the next knob would be tuned
@@ -1032,8 +1040,8 @@ only fun for robots.
 
 The number that did move, and stayed moved, is the share of the Sheriff's
 killers who had actually picked him out: **62%** before any of this session's
-fixes, and **92%** over the two hundred — with individual runs of sixty since
-reading 94% and 100%. He dies to somebody deciding now, not to crossfire, which
+fixes, and **92%** over the two hundred — the same 92% on the re-run, with
+individual runs of sixty since reading 94% and 100%. He dies to somebody deciding now, not to crossfire, which
 is the difference between a deduction game and a shooting gallery.
 
 ### Eight at the table
