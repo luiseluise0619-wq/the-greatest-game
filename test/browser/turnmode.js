@@ -330,7 +330,12 @@ try {
       'mustang', 'stagecoach', 'wells', 'store', 'panic', 'duel'];
     const held = { ...g.duel, hand: twelve, limit: 7, pile: 40, table: g.duel.table || [] };
     const wasTurn = g.turn;
+    const wasDuel = g.duel;
     g.turn = { kind: 'turn', holder: g.selfId, left: 6 };
+    // Both copies. setDuel puts the hand on the HUD; playDuelCard reads the
+    // one on the game, and stubbing only the first tested the printing and
+    // then asked the real hand for a tenth card it did not have.
+    g.duel = held;
     g.hud.setDuel(held);
     const printed = [...document.querySelectorAll('#duelHand .dCard b i')].map((n) => n.textContent);
     const grey = [...document.querySelectorAll('#duelHand .dCard')].map((n) => n.classList.contains('cannot'));
@@ -342,7 +347,8 @@ try {
     g.playDuelCard(9);
     g.send = realSend;
     g.turn = wasTurn;
-    g.hud.setDuel(g.duel);
+    g.duel = wasDuel;
+    g.hud.setDuel(wasDuel);
     return { printed, grey, sent };
   });
   check(keys.printed.slice(0, 10).join(',') === '1,2,3,4,5,6,7,8,9,0',
