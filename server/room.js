@@ -1290,7 +1290,14 @@ export class Room {
     };
     this.dynamites.push(d);
     this.pushSelf(p);
-    this.notifyBots('dynamite', { pos: d.pos, owner: p });
+    // Where it landed, and not whose hand it came out of. Nothing reads this
+    // event today, and that is exactly when a free name is worth taking out:
+    // the bots' whole information diet is what they could actually have seen,
+    // and the last round of fixes here was three places where it quietly was
+    // not. A stick lying in the road is a thing you can see. The man who threw
+    // it is not, and when it goes off the shot that carries the name goes
+    // through the same sight test everything else does.
+    this.notifyBots('dynamite', { pos: d.pos });
   }
 
   explode(d) {
@@ -1346,11 +1353,17 @@ export class Room {
       t: S.CHAT, from: p.name, id: p.id, text: said.text, k: said.key, voice: true,
       x: r2(p.pos.x), y: r2(p.pos.y), z: r2(p.pos.z),
     };
-    this.broadcast(shout, (o) => (
+    const inEarshot = (o) => (
       o.id === p.id || !o.alive
       || Math.hypot(o.pos.x - p.pos.x, o.pos.z - p.pos.z) <= SOCIAL.shoutRange
-    ));
-    this.notifyBots('voice', { from: p, line: line.id });
+    );
+    this.broadcast(shout, inEarshot);
+    // The same earshot. A shout is the one thing in this game that is
+    // deliberately NOT town-wide - T reaches the town, V reaches the street -
+    // and every bot in the map was being handed it anyway, so a man calling
+    // himself a lawman across the flats was heard, and held against him, by
+    // five men who could not possibly have heard it.
+    this.notifyBots('voice', { from: p, line: line.id }, inEarshot);
   }
 
   onAccuse(p, msg) {
@@ -1795,9 +1808,17 @@ export class Room {
     this.emit(p, { t: S.CARDS, hand: p.hand.slice(), armed: [...p.armed] });
   }
 
-  notifyBots(kind, data) {
+  /**
+   * Tell the bots something happened. `reach`, when given, is the same
+   * predicate the same event was broadcast to players with - because a bot
+   * that hears what a player in its place could not hear is a bot that knows
+   * something for free, and that is the whole of what makes this town unfair.
+   */
+  notifyBots(kind, data, reach = null) {
     for (const p of this.players.values()) {
-      if (p.bot && p.brain && p.alive) p.brain.onEvent(kind, data);
+      if (!p.bot || !p.brain || !p.alive) continue;
+      if (reach && !reach(p)) continue;
+      p.brain.onEvent(kind, data);
     }
   }
 
