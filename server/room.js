@@ -302,6 +302,14 @@ export class Room {
         this.send(client, this.welcomeMsg(bot.id, bot.token));
         this.sendRole(bot);
         this.pushCards(bot);
+        // The hand, the running order and the chamber, exactly as a
+        // reconnecting tab gets them. Without this a human walking into a
+        // turn-mode round in progress took over the body and got a screen
+        // with nothing on it: pushCards is the free-for-all's six-card deck
+        // and says nothing at all in a mode with eighty. The same bug was
+        // found and fixed on the refresh path and never on this one, because
+        // this one only happens when somebody turns up late.
+        this.resumeDuel(bot);
         this.pushSelf(bot);
         this.sendPhaseTo(client);
         this.pushLobby();

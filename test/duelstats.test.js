@@ -225,3 +225,31 @@ test('nothing in a snapshot tells anybody how hurt anybody else is', () => {
     }
   } finally { clock.restore(); }
 });
+
+test('a man who turns up late gets the hand as well as the body', () => {
+  const { room, clock } = seatedRoom('STA9');
+  try {
+    // The round is running and there are bots at the table. Somebody walks in.
+    room.phase = 'combat';
+    room.loadChamber();
+    const victimBot = [...room.players.values()].find((p) => p.bot && p.alive);
+    assert.ok(victimBot, 'no bot to take over');
+    victimBot.duelHand = ['bang', 'missed', 'beer'];
+    room.turn = { kind: 'turn', holder: victimBot.id, endsAt: Date.now() / 1000 + 5 };
+
+    const stub = stubClient();
+    room.addConnection(stub.client);
+    room.handleMessage(stub.client, { t: 'join', name: 'Latecomer' });
+
+    const hand = stub.last('duel');
+    const turn = stub.last('turn');
+    const cham = stub.last('chamber');
+    assert.ok(hand, 'he took the body and was sent no hand - a screen he cannot play');
+    assert.ok(hand.hand.length >= 3, `and the hand is empty (${hand.hand.length})`);
+    assert.ok(Array.isArray(hand.table) && hand.table.length >= 2,
+      'and nothing about what is in front of anybody');
+    assert.ok(turn && turn.kind, 'and no idea whose go it is');
+    assert.ok(Array.isArray(turn.order) && turn.order.length >= 2, 'and no running order');
+    assert.ok(cham && Number.isFinite(cham.left), 'and no count of the chamber everybody is sharing');
+  } finally { clock.restore(); }
+});
