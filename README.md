@@ -1009,7 +1009,7 @@ won by information. The knobs that control that balance, if you want to move it:
   star has, and how long a barrel must be steady before it fires.
   `HNH_MODE=duel npm run balance -- 60` sweeps them, and every one of them is
   overridable there (`HNH_REPOSITION`, `HNH_TURN`, `HNH_HEALTH`,
-  `HNH_SHERIFFHEALTH`, `HNH_LIVESHARE`, `HNH_DRAWTIME`).
+  `HNH_SHERIFFHEALTH`, `HNH_DRAWTIME`).
 
 ### The turn mode, over 60 rounds a setting
 
@@ -1114,8 +1114,33 @@ only fun for robots.
 The number that did move, and stayed moved, is the share of the Sheriff's
 killers who had actually picked him out: **62%** before any of this session's
 fixes, and **92%** over the two hundred — the same 92% on the re-run, with
-individual runs of sixty since reading 94% and 100%. He dies to somebody deciding now, not to crossfire, which
-is the difference between a deduction game and a shooting gallery.
+individual runs of sixty since reading 94% and 100%. He dies to somebody
+deciding now, not to crossfire, which is the difference between a deduction
+game and a shooting gallery.
+
+#### And then the blanks came out
+
+Every row above was measured with a shared cylinder in the game — a chamber the
+whole town counted, with blanks in it, so roughly a third of every shot fired
+came out as smoke and noise. That is gone (see [No chamber, and no
+blanks](#no-chamber-and-no-blanks)), and taking it out moved more than the win
+split did. Over **100 rounds** on the mode as it now stands:
+
+| | Before | After |
+|---|---|---|
+| shots that found somebody | 46% | **71%** |
+| a round, resolved by a kill | 331s | **273s** |
+| goes a round | 41.9 | **33.2** |
+| the win split (law / outlaw / renegade) | 52 / 43 / 6 | 59 / 33 / 8 |
+
+The first row is the whole argument for the change in one number. A `Bang!` now
+lands unless the man is out of reach or spent a card not to be there — those two
+are the only two answers, and both are decisions somebody made. Before, the
+commonest thing that happened to a shot was nothing at all.
+
+Rounds got a minute shorter for the same reason, and the win split moved about
+as far as two runs of the same build move anyway (the six runs above spread
+twenty-four points), so read that row as unchanged rather than as a law buff.
 
 ### Eight at the table
 
@@ -1139,7 +1164,8 @@ him one or two wins either way — so nothing here says anything about him yet.
 
 The other numbers to watch if the bots ever change: about **40 goes a round**,
 **shots finding somebody** — the rest split between a man out of range and a man
-who saw it coming and spent the card.
+who saw it coming and spent the card, which since the blanks came out are the
+only two things that can happen to a shot instead of a hit.
 
 ### The free-for-all, over 120 rounds
 
