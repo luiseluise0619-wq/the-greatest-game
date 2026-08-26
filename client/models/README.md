@@ -95,6 +95,27 @@ collapses. If you swap in models, keep hat profiles, coat lengths and colours as
 different from each other as the procedural set is — that is a gameplay
 requirement here, not an art preference.
 
+## Where to get models that fit
+
+Nothing is committed here and nothing is downloaded at build time. What you drop
+in is yours to have the right to. That said, this pipeline was written against
+what is actually out there:
+
+- **[Quaternius](https://quaternius.com)** (CC0) — the straightest fit. Rigged
+  low-poly humans plus a Western set of buildings, barrels and wagons. CC0 means
+  no attribution and no licence file to carry.
+- **[Kenney](https://kenney.nl/assets)** (CC0) — blocky characters and a big
+  Western kit. Simple silhouettes, which is a virtue here.
+- **[Mixamo](https://mixamo.com)** (free with an Adobe account) — not models so
+  much as *animation*. Upload any humanoid, download `idle`, `walk`, `run`,
+  `aim`, `hit`, `death` as clips. The `bones` map above is already written in
+  Mixamo's naming convention.
+- **[Poly Pizza](https://poly.pizza)** — the old Google Poly library. CC0 and
+  CC-BY are mixed together, so check each item.
+- **[glTF-Sample-Models](https://github.com/KhronosGroup/glTF-Sample-Models)** —
+  not a western, but the right place to *test the pipeline*. `CesiumMan` is
+  rigged with clips and will prove your config before you spend time on art.
+
 ## Licensing
 
 Only use models you have the right to redistribute. Nothing in this folder is

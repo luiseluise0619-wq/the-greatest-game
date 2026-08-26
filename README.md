@@ -458,7 +458,9 @@ Full schema in `client/models/README.md`.
 Two levels of support, so almost any rigged model works:
 
 - **The model carries animation clips** — name them (`idle`, `walk`, `run`,
-  `aim`, `death`) and an `AnimationMixer` drives them with crossfades.
+  `aim`, `death`, and optionally `hit` and `play`) and an `AnimationMixer`
+  drives them with crossfades. `aim` is held for as long as the man's gun is
+  up, which in the turn mode is his whole go rather than the instant he fires.
 - **It has no clips but has named bones** — map the bone names and the game
   drives that skeleton with the *same pose it computes for the procedural
   gunhand*, so you get the walk cycle, crouch, low-ready and death collapse for
@@ -473,6 +475,28 @@ Whatever rig you use, the game keeps ownership of everything that carries
 information — name tags, the Sheriff's star, the Lookout's reveal outline, the
 dust-cloud fade — so a custom model can never quietly break the deduction
 layer.
+
+#### Where to get models that fit
+
+Nothing is committed here and nothing is downloaded at build time, on purpose:
+this repo ships no art, and what you drop in is yours to have the right to. But
+the pipeline was written against what is actually available, so:
+
+| Source | Licence | What it is good for |
+|---|---|---|
+| [quaternius.com](https://quaternius.com) ([GitHub](https://github.com/quaternius)) | CC0 | The straightest fit. Low-poly rigged humans and a Western set — buildings, barrels, wagons, cacti. CC0 means no attribution and no licence file to carry around. |
+| [Kenney](https://kenney.nl/assets) ([GitHub](https://github.com/KenneyNL)) | CC0 | Blocky characters and a large Western kit. Silhouettes are simple, which is a virtue here: eight strangers have to be told apart at 40 metres. |
+| [Mixamo](https://mixamo.com) | free with an Adobe account | Not models so much as **animation**. Upload any humanoid and download `idle`, `walk`, `run`, `aim`, `hit`, `death` as clips. The bone map in `characters.json` is already written in Mixamo's naming convention. |
+| [Poly Pizza](https://poly.pizza) | CC0 / CC-BY | The old Google Poly library, searchable. Check each item — the two licences are mixed together. |
+| [glTF-Sample-Models](https://github.com/KhronosGroup/glTF-Sample-Models) | mixed, per-model | Not a western, but this is the right place to **test the pipeline**. `CesiumMan` and `Fox` are rigged with clips and will prove your config before you spend money or time on art. |
+
+Two things to check before you commit to a set. **The silhouettes have to
+differ** — hat profile, coat length, build — or the social layer collapses,
+which is a gameplay requirement here rather than an art preference. And **the
+idle matters more than the walk**: the default mode has nobody walking at all,
+so `idle`, `aim`, `hit` and `play` are the entire performance. If a pack's idle
+is a T-pose with a sway on it, use `bones` instead of `clips` and let the
+procedural pose drive the rig — it has breath and a weight change built in.
 
 ---
 
