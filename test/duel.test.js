@@ -260,8 +260,6 @@ test('a refresh mid-round hands the whole game back', () => {
     const token = p.token;
     const hand = [...p.duelHand];
     room.turn = { kind: 'turn', holder: p.id, endsAt: Date.now() / 1000 + 4 };
-    room.chamber = [true, false, true];
-    room.chamberMix = { live: 2, blank: 1 };
 
     // The tab goes away and a new one comes back with the same token.
     room.removeConnection(stub.client);
@@ -278,10 +276,6 @@ test('a refresh mid-round hands the whole game back', () => {
     assert.equal(turn.holder, p.id);
     assert.deepEqual(turn.order, room.turnOrder.filter((id) => room.players.get(id)?.alive));
 
-    const cham = back.last('chamber');
-    assert.ok(cham, 'nor what was left in the chamber');
-    assert.equal(cham.left, 3);
-    assert.equal(cham.live, 2, 'and not what went into it either');
   } finally { clock.restore(); }
 });
 
@@ -304,10 +298,9 @@ test('the free-for-all is still the free-for-all', () => {
 });
 
 test('a dead man does not hold the go for the rest of his six seconds', () => {
-  // The stick goes off in your hands, or you put the chamber to your own head
-  // and it was live. You are out, and the running order drops you the instant
-  // you fall - but the go was still yours, and it stayed yours until the clock
-  // ran out. Every screen at the table highlighted a name that was no longer
+  // The stick goes off in your hands at the top of your go. You are out, and
+  // the running order drops you the instant you fall - but the go was still
+  // yours, and it stayed yours until the clock ran out. Every screen at the table highlighted a name that was no longer
   // in the order, and nobody could take a turn for six seconds.
   TIMING.prep = 1; TIMING.combat = 900; TIMING.endgame = 60; TIMING.results = 5;
   const clock = fakeClock();

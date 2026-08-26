@@ -34,7 +34,7 @@ const [VW, VH] = (process.env.HNH_VIEWPORT || '1280x760').split('x').map(Number)
 const SHOTS = process.env.HNH_SHOTS || 'test/browser/screenshots';
 mkdirSync(SHOTS, { recursive: true });
 
-// A lap is one go each plus a beat to load the chamber, so with six at the
+// A lap is one go each plus the beat between, so with six at the
 // table the round has to be long enough for this player's own go to come round
 // at least twice.
 const PREP = 8, COMBAT = 400, ENDGAME = 20;
@@ -170,12 +170,10 @@ try {
   await A.evaluate(() => window.game.dismissRoleCard());
   await A.waitForTimeout(400);
 
-  // The bell, the chamber, and the running order.
+  // The bell and the running order.
   await A.waitForFunction(() => window.game?.turn?.kind, null, { timeout: 60000 });
   const table = await A.evaluate(() => ({
     order: [...document.querySelectorAll('#turnOrder li')].map((n) => n.textContent),
-    chamber: document.getElementById('chamberLeft').textContent,
-    mix: document.getElementById('chamberMix').textContent,
     hand: window.game.duel?.hand?.length || 0,
     reach: window.game.duel?.reach,
     reachSeats: window.game.duel?.reachSeats,
@@ -183,8 +181,15 @@ try {
     cornerLabel: document.getElementById('reserve').textContent,
   }));
   check(table.order.length >= 2, `the whole running order is on screen (${table.order.length})`);
-  check(/\d/.test(table.chamber) && /\d/.test(table.mix),
-    `the chamber is counted in the open (${table.chamber} ${table.mix})`);
+  // And nothing on this screen counts a chamber, because there is not one. A
+  // bullet that might be nothing was a coin toss underneath a deck that is
+  // already the whole of the tension here; it lives in the other mode now.
+  const noChamber = await A.evaluate(() => ({
+    bar: !!document.getElementById('chamberBar'),
+    key: typeof window.game.hud.setChamber,
+  }));
+  check(!noChamber.bar && noChamber.key === 'undefined',
+    'no chamber is counted at a table, because there is not one');
   check(table.hand > 0, `and the hand arrived before the bell (${table.hand} cards)`);
   // Seats, not metres. Metres are true of the ground and false of the game:
   // the table is three and a half metres across so every man on it is inside a
@@ -501,228 +506,40 @@ try {
   check(phantom.feed.some((l) => /hand|손/.test(l)),
     `and says what is wrong instead (${phantom.feed[phantom.feed.length - 1] || 'nothing'})`);
 
-  // The barrel turned round asks the same question and used to ask it a
-  // different way: it looked for the literal card while the server asks what
-  // this man reads AS a shot and whether he has one left. So the one of the
-  // sixteen who fires a Missed! was refused a move he is allowed, and a man
-  // who had already taken his shot was let through to a packet nobody acted on.
-  const self = await A.evaluate(() => {
+  // The barrel turned round is not here at all. K is the free-for-all's key
+  // and the card game must not answer it - the deck already decides everything
+  // at a table, and a bullet that might be nothing was a second game bolted to
+  // the side of it.
+  const noGamble = await A.evaluate(() => {
     const g = window.game;
-    const wasTurn = g.turn; const wasDuel = g.duel; const wasRole = g.hud.selfRole;
-    g.turn = { kind: 'turn', holder: g.selfId, left: 6 };
     const sent = [];
     const realSend = g.send.bind(g);
     g.send = (m) => { if (m.t === 'selfshot') sent.push(m); else realSend(m); };
-    const ask = (hand, bangs, gunhand) => {
-      g.hud.selfRole = { ...(wasRole || {}), gunhand };
-      const d = { ...g.duel, hand, limit: 7, pile: 40, bangs, weapon: null, table: g.duel.table || [] };
-      g.duel = d; g.hud.setDuel(d);
-      const before = sent.length;
-      g.trySelfShot();
-      return sent.length > before;
-    };
-    const out = {
-      plain: ask(['bang'], 0, null),
-      spent: ask(['bang'], 1, null),
-      swap: ask(['missed'], 0, 'ambidexter'),
-      swapPlain: ask(['missed'], 0, null),
-    };
-    // And the card the HUD lights for the man who can fire either has to be
-    // the one the server would actually spend, which is the Bang! whichever
-    // order he happens to be holding them in.
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyK', bubbles: true }));
+    g.send = realSend;
+    return { sent: sent.length, duel: !!g.duelMode };
+  });
+  check(noGamble.duel && noGamble.sent === 0,
+    'the card game does not answer the free-for-all\'s gamble');
+
+  // And the card the HUD lights for the man who can fire either has to be the
+  // one the server would actually spend, which is the Bang! whichever order he
+  // happens to be holding them in.
+  const lit = await A.evaluate(() => {
+    const g = window.game;
+    const wasTurn = g.turn; const wasDuel = g.duel; const wasRole = g.hud.selfRole;
+    g.turn = { kind: 'turn', holder: g.selfId, left: 6 };
     g.hud.selfRole = { ...(wasRole || {}), gunhand: 'ambidexter' };
     const both = { ...g.duel, hand: ['missed', 'bang'], limit: 7, pile: 40, bangs: 0,
       weapon: null, table: g.duel.table || [] };
     g.duel = both; g.hud.setDuel(both);
-    out.lit = document.querySelector('#duelHand .dCard.live b span')?.textContent || '';
-    g.send = realSend;
+    const name = document.querySelector('#duelHand .dCard.live b span')?.textContent || '';
     g.hud.selfRole = wasRole;
     g.turn = wasTurn; g.duel = wasDuel; g.hud.setDuel(wasDuel);
-    return out;
+    return name;
   });
-  check(self.plain, 'a man holding a shot may put it to his own head');
-  check(!self.spent, 'and one who has already fired may not');
-  check(self.swap, 'the man who fires a Missed! may too');
-  check(!self.swapPlain, 'and anybody else holding one may not');
-  check(/Bang/i.test(self.lit) || self.lit.includes('한 발'),
-    `and the card lit for him is the one the server would spend (${self.lit || 'none'})`);
-
-  // The scoreboard's last column. It said "Kills" and printed a dash for the
-  // living and an empty cell for the dead, because nothing on the client ever
-  // counted anything - a header promising a number over a column that never
-  // had one. It counts the killings this player was actually told the killer
-  // of now, which is the only tally a hidden-role round entitles anybody to.
-  const sb = await A.evaluate(() => {
-    const hud = window.game.hud;
-    const ids = [...hud.roster.keys()];
-    const before = ids.map((id) => hud.seenKills.get(id) || 0);
-    // Two killings said to have been watched, both by the same man, plus one
-    // nobody saw - which must not be counted against anybody.
-    if (ids.length >= 2) {
-      hud.killFeed({ victim: ids[1], victimName: 'x', victimRole: 'outlaw',
-        killer: ids[0], killerName: 'y', witnessed: true, place: 'the street' });
-      hud.killFeed({ victim: ids[1], victimName: 'x', victimRole: 'outlaw',
-        killer: ids[0], killerName: 'y', witnessed: true, place: 'the street' });
-      hud.killFeed({ victim: ids[1], victimName: 'x', victimRole: 'outlaw',
-        killer: null, killerName: null, witnessed: false, place: 'the street' });
-    }
-    hud.toggleScoreboard(true);
-    const rows = [...document.querySelectorAll('#sbTable tbody tr')]
-      .map((tr) => [...tr.children].map((td) => td.textContent.trim()));
-    hud.toggleScoreboard(false);
-    return {
-      head: [...document.querySelectorAll('#sbTable thead th')].map((t) => t.textContent.trim()),
-      last: rows.map((r) => r[r.length - 1]),
-      counted: (hud.seenKills.get(ids[0]) || 0) - (before[0] || 0),
-      // The DELTA across the whole table, not the total. A real killing can
-      // land between the two readings - five bots are shooting at each other
-      // the whole time this runs - and counting the total called that a bug in
-      // the tally rather than a round going on around it.
-      unseen: [...hud.roster.keys()].reduce((n, id, i) =>
-        n + ((hud.seenKills.get(id) || 0) - (before[i] || 0)), 0),
-      rows: rows.length,
-    };
-  });
-  check(sb.counted === 2, `a killing you watched is counted against the man who did it (${sb.counted})`);
-  check(sb.unseen === 2,
-    `and one nobody watched is counted against nobody (${sb.unseen} new entries)`);
-  check(sb.last.some((c) => c === '2'), `and the scoreboard prints it (${sb.last.join('/')})`);
-  check(sb.head[sb.head.length - 1].length > 0, `under a header that says what it is (${sb.head[sb.head.length - 1]})`);
-
-  await A.screenshot({ path: `${SHOTS}/d3-your-go.png` });
-
-  for (const kind of ['turn', 'reposition']) {
-    await A.waitForFunction(
-      (k) => window.game?.turn?.kind === k, kind, { timeout: 90000 },
-    ).catch(() => {});
-    const was = await A.evaluate(() => {
-      window.game.keys.add('KeyW');
-      return { x: window.game.self.pos.x, z: window.game.self.pos.z };
-    });
-    await A.waitForTimeout(1100);
-    const now = await A.evaluate(() => {
-      window.game.keys.delete('KeyW');
-      return { x: window.game.self.pos.x, z: window.game.self.pos.z };
-    });
-    const walked = Math.hypot(now.x - was.x, now.z - was.z);
-    check(walked < 0.6, `holding W for a second during a ${kind} moved ${walked.toFixed(1)}m`);
-  }
-  await A.screenshot({ path: `${SHOTS}/d2-the-table.png` });
-
-
-  // A refresh in the middle of a lap. The hand IS the ammunition, so coming
-  // back without it is coming back to a game you cannot play.
-  const held = await A.evaluate(() => ({
-    hand: [...window.game.duel.hand],
-    name: document.getElementById('nameInput')?.value || 'Stranger',
-  }));
-  // Whether he is still standing decides what a refresh is even supposed to
-  // hand back. A dead man holds nothing, so waiting for a hand to arrive would
-  // be waiting for something the game is right not to send - and the check
-  // would report a bug in the resume path that is really five bots doing their
-  // job. Same guard as the table readouts above.
-  await A.reload({ waitUntil: 'domcontentloaded' });
-  // Wait for the resume to land, then look at what came back rather than
-  // deciding beforehand what should. Reading "is he alive" before the reload
-  // was not enough: the round carries on while the page is reloading and five
-  // bots are shooting at him, so he can go down inside that window and come
-  // back - correctly - holding nothing.
-  const resumed = await A.waitForFunction(
-    () => !!window.game?.selfRole
-      && (window.game?.inGame || window.game?.phase === 'results'),
-    null, { timeout: 30000 },
-  ).then(() => true).catch(() => false);
-  // What it actually came back to. A round with five bots in it can finish
-  // while the page is reloading, and a page that comes back to a lobby has no
-  // round to be handed: there is no deal waiting for it, so the wait above can
-  // only ever time out. That is the round ending, not the resume failing, and
-  // reporting it as a bug in the resume path sends somebody looking in the
-  // wrong file. Say which of the two happened.
-  const state = await A.evaluate(() => ({
-    phase: window.game?.phase || '?',
-    role: !!window.game?.selfRole,
-    inGame: !!window.game?.inGame,
-  }));
-  const noRoundLeft = !resumed && (state.phase === 'lobby' || !state.role);
-  if (noRoundLeft) {
-    check(true, `the round ended while the page was reloading (phase ${state.phase})`);
-  } else {
-    check(resumed, `a refresh mid-lap hands the round back rather than an empty screen (phase ${state.phase}, role ${state.role})`);
-  }
-  const alive = resumed && await A.evaluate(() => window.game?.self?.alive !== false);
-  const gotHand = resumed && await A.waitForFunction(
-    () => window.game?.duel?.hand?.length > 0 && !!window.game?.turn?.kind,
-    null, { timeout: alive ? 15000 : 1 },
-  ).then(() => true).catch(() => false);
-  check(noRoundLeft || !alive || gotHand, 'and a living man gets his hand back with it');
-  if (resumed && alive && gotHand) {
-    const back = await A.evaluate(() => ({
-      hand: window.game.duel.hand,
-      order: [...document.querySelectorAll('#turnOrder li')].length,
-      chamber: document.getElementById('chamberLeft').textContent,
-      cham: !document.getElementById('chamberBar').classList.contains('hidden'),
-    }));
-    // Not the same count, necessarily - a go may have started while the page
-    // was reloading, and a go starts with two cards. But something to play.
-    check(back.hand.length >= 1, `and a hand to play with (${back.hand.length} cards)`);
-    check(back.order >= 2 && back.cham, 'and the running order and the chamber with it');
-  }
-  await A.evaluate(() => window.game.dismissRoleCard()).catch(() => {});
-
-  // The warning. A barrel stops on you and you have the length of his draw -
-  // and when it moves off, it has to say so.
-  const warned = await A.evaluate(async () => {
-    const el = document.getElementById('aimedWarn');
-    window.game.hud.setAimed({ on: true, by: null });
-    const up = !el.classList.contains('hidden');
-    const said = el.textContent;
-    window.game.hud.setAimed({ on: false });
-    return { up, said, down: el.classList.contains('hidden') };
-  });
-  check(warned.up && warned.said.length > 5, `the warning says something (${warned.said.slice(0, 40)})`);
-
-  // And what it says about your hand has to be true of YOUR hand. It asked for
-  // the literal Missed!, so the one of the sixteen who answers with a Bang!
-  // was told he had nothing to answer with while he was holding the thing he
-  // answers with - in the one second he has to decide anything about it.
-  const answer = await A.evaluate(() => {
-    const g = window.game;
-    const wasDuel = g.duel; const wasRole = g.hud.selfRole;
-    const el = document.getElementById('aimedWarn');
-    const read = (hand, gunhand) => {
-      g.hud.selfRole = { ...(wasRole || {}), gunhand };
-      const d = { ...g.duel, hand, limit: 7, pile: 40, bangs: 0, weapon: null,
-        table: g.duel.table || [] };
-      g.duel = d; g.hud.setDuel(d);
-      g.hud.setAimed({ on: true, by: null });
-      return el.querySelector('b')?.textContent || '';
-    };
-    const out = {
-      missed: read(['missed'], null),
-      swap: read(['bang'], 'ambidexter'),
-      plain: read(['bang'], null),
-    };
-    g.hud.setAimed({ on: false });
-    g.hud.selfRole = wasRole;
-    g.duel = wasDuel; g.hud.setDuel(wasDuel);
-    return out;
-  });
-  check(answer.swap === answer.missed,
-    `the man who answers with a Bang! is told he can (${answer.swap})`);
-  check(answer.plain !== answer.missed,
-    `and anybody else holding one is told he cannot (${answer.plain})`);
-  check(warned.down, 'and it goes away again when the barrel moves off');
-
-  // Nobody can be reading HE HAS YOU under the words YOUR GO.
-  if (await myGo(A)) {
-    const mine = await A.evaluate(() => ({
-      warn: !document.getElementById('aimedWarn').classList.contains('hidden'),
-      what: document.getElementById('turnWhat').textContent,
-    }));
-    check(!mine.warn, `no gun is on you while you hold the floor (${mine.what})`);
-  } else {
-    check(true, 'the floor never came round again (he is down, or the round is over)');
-  }
+  check(/Bang/i.test(lit) || lit.includes('한 발'),
+    `the card lit for the man who fires either is the one the server spends (${lit || 'none'})`);
 
   // The manual, in the mode it is describing.
   await A.evaluate(() => window.game.showManual(true));

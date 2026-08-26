@@ -229,26 +229,6 @@ test('the lines a round might not reach on its own get reached', () => {
     p: { who: them.name, name: me.name },
   });
 
-  // The round out of a man's back, and the two things that stop it. Neither
-    // line is ever said by a round of bots that did not happen to gamble in
-    // front of a man with a barrel.
-    // Nobody's gunhand in the way. If the shooter happened to be dealt the one
-    // it takes two Missed! to get out of the way of, a single card is worth
-    // nothing and the line is never said - which is a real rule and a flaky
-    // test, so this asks the question it means to ask.
-    me.gunhand = null;
-    them.gunhand = null;
-    them.gear = ['barrel'];
-    them.duelHand = ['missed', 'missed'];
-    them.bracedUntil = Date.now() / 1000 + 5;
-    const realDraw = room.drawFor.bind(room);
-    room.drawFor = () => true;
-    room.throughStopped(them, me);
-    room.drawFor = () => false;
-    room.throughStopped(them, me);
-    room.drawFor = realDraw;
-    them.gear = [];
-
     // Two lines that only a free-for-all reaches, and one only two humans do:
     // the poster's answer to the man who nailed it up, and the tally when
     // somebody presses RIDE AGAIN. Both went out with no key on them at all
@@ -269,6 +249,19 @@ test('the lines a round might not reach on its own get reached', () => {
       text: `${me.name} is ready to ride again (1/2).`,
       p: { name: me.name, n: 1, of: 2 },
     });
+    // The two the free-for-all's gamble says to the men who watched it. A room
+    // at a table never reaches them - there is no chamber here and nobody puts
+    // a gun to their own head - and both carry a name that declines.
+    said.push({
+      t: 'feed', k: 'feed.sawItClick',
+      text: `${them.name} put their own gun to their head in front of you, and it clicked.`,
+      p: { name: them.name },
+    });
+    said.push({
+      t: 'feed', k: 'feed.sawItFire',
+      text: `${them.name} put their own gun to their head in front of you, and it was loaded.`,
+      p: { name: them.name },
+    });
 
     // The one with a key to press, and every way it can be refused.
     room.turn = { kind: 'turn', holder: me.id, endsAt: 1e12 };
@@ -284,7 +277,7 @@ test('the lines a round might not reach on its own get reached', () => {
     const keys = new Set(said.map((m) => m.k));
     for (const k of ['feed.bleedsSlow', 'feed.takesItBack', 'feed.tookItBack',
       'feed.neverEmpty', 'gun.nothingToPress', 'gun.notYourGo', 'gun.needTwoCards',
-      'gun.twoForOne', 'feed.throughWood', 'feed.throughMissed', 'feed.squareOff',
+      'gun.twoForOne', 'feed.sawItClick', 'feed.sawItFire', 'feed.squareOff',
       'feed.lightFingers', 'feed.lifted', 'feed.threeForTwo',
       'kill.unseenOnGo', 'kill.youDiedOnGo', 'tl.killedOnGo', 'tl.diedOnGo',
       'feed.posterStar', 'feed.posterNoStar', 'feed.rideAgain']) {

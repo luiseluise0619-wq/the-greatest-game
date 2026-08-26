@@ -141,6 +141,10 @@ try {
   check(man.words > 150, `and there is something in it to read (${man.words} words)`);
   check(man.keys.some((k) => k.startsWith('Z X')) && !man.keys.some((k) => k.startsWith('1…9')),
     'the keys listed are this mode\'s keys');
+  // The one thing a man can say in this town that is not free. It is this
+  // mode's move, not the card game's, so this list is where it has to appear.
+  check(man.keys.some((k) => k.startsWith('K ')),
+    `and the gamble is one of them (${man.keys.filter((k) => k.startsWith('K ')).join('') || 'missing'})`);
   check(man.fits, 'the whole manual is on one screen at this size');
   await A.screenshot({ path: `${SHOTS}/01c-manual.png` });
   await A.keyboard.press('Escape');

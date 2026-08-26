@@ -271,7 +271,7 @@ test('a man who turns up late gets the hand as well as the body', () => {
   try {
     // The round is running and there are bots at the table. Somebody walks in.
     room.phase = 'combat';
-    room.loadChamber();
+
     const victimBot = [...room.players.values()].find((p) => p.bot && p.alive);
     assert.ok(victimBot, 'no bot to take over');
     victimBot.duelHand = ['bang', 'missed', 'beer'];
@@ -283,14 +283,12 @@ test('a man who turns up late gets the hand as well as the body', () => {
 
     const hand = stub.last('duel');
     const turn = stub.last('turn');
-    const cham = stub.last('chamber');
     assert.ok(hand, 'he took the body and was sent no hand - a screen he cannot play');
     assert.ok(hand.hand.length >= 3, `and the hand is empty (${hand.hand.length})`);
     assert.ok(Array.isArray(hand.table) && hand.table.length >= 2,
       'and nothing about what is in front of anybody');
     assert.ok(turn && turn.kind, 'and no idea whose go it is');
     assert.ok(Array.isArray(turn.order) && turn.order.length >= 2, 'and no running order');
-    assert.ok(cham && Number.isFinite(cham.left), 'and no count of the chamber everybody is sharing');
   } finally { clock.restore(); }
 });
 
@@ -529,58 +527,6 @@ test('and the same the other way round when the street opens up', () => {
     assert.equal(janet.health, hp, 'a Bang! is a Missed! in her hands and she took the hit');
     assert.deepEqual(janet.duelHand, [], 'and it never left her hand');
     assert.ok((janet.cardsPlayed || []).includes('bang'), 'and it is not on the account either');
-  } finally { clock.restore(); }
-});
-
-test('the round out of a man\'s back is a round like any other', () => {
-  const { room, clock } = seatedRoom('STAH');
-  try {
-    const all = [...room.players.values()].filter((p) => p.alive);
-    const [me, behind] = all;
-    for (const p of all) { p.gear = []; p.weaponCard = null; p.gunhand = null; p.duelHand = []; }
-    // Him directly out of my back, well inside the corridor.
-    me.pos = { x: 40, y: 0, z: 0 };
-    me.yaw = 0;                                   // facing -z, so behind is +z
-    behind.pos = { x: 40, y: 0, z: 3 };
-    for (const o of all) { if (o !== me && o !== behind) o.pos = { x: 200, y: 0, z: 200 }; }
-    assert.equal(room.linedUpBehind(me)?.id, behind.id, 'he is not in the corridor at all');
-
-    // A barrel behind you still stops it. The gunhand whose whole sentence is
-    // "every shot at him may find wood" had one shot in the eighty that could
-    // not, because 'selfshot' is not a weapon id and the gate that applies the
-    // barrel waves through anything that is not one.
-    behind.gunhand = 'cooper';                    // born behind one, so it is always there
-    behind.health = behind.maxHealth;
-    behind.bracedUntil = 0;
-    // The barrel is a draw rather than a wall, so asserting on a sample of it
-    // is asserting on a coin - and one run in a hundred of a fair coin looks
-    // like a bug. Force the draw both ways instead: what this is checking is
-    // that the wood is CONSULTED at all, which for a shot out of somebody's
-    // back it never used to be.
-    const realDraw = room.drawFor.bind(room);
-    const asked = [];
-    room.drawFor = (who, what) => { asked.push(what); return true; };
-    assert.equal(room.throughStopped(behind, me), true, 'the wood was never asked');
-    assert.ok(asked.includes('barrel'), `it asked for ${asked.join(',')} instead of the barrel`);
-    room.drawFor = () => false;
-    assert.equal(room.throughStopped(behind, me), false,
-      'the wood stopped it on a draw that did not come up - it is a draw, not a wall');
-    room.drawFor = realDraw;
-
-    // And a man who was already moving spends the card for it.
-    behind.gunhand = null;
-    behind.duelHand = ['missed'];
-    behind.bracedUntil = Date.now() / 1000 + 5;
-    assert.equal(room.throughStopped(behind, me), true, 'he braced and it found him anyway');
-    assert.deepEqual(behind.duelHand, [], 'and the card never left his hand');
-    assert.ok((behind.cardsPlayed || []).includes('missed'),
-      'and the account of the round never heard about it');
-
-    // Standing there with nothing is standing there with nothing.
-    behind.duelHand = [];
-    behind.bracedUntil = 0;
-    assert.equal(room.throughStopped(behind, me), false,
-      'nothing in front of him and nothing in his hand, and it still missed');
   } finally { clock.restore(); }
 });
 
@@ -869,21 +815,17 @@ test('a trigger pull that is not going anywhere costs nothing', () => {
     room.turn = { kind: 'turn', holder: me.id, endsAt: Date.now() / 1000 + 1e6 };
     me.bangsThisTurn = 0; me.firedThisTurn = false; me.nextFireAt = 0;
     me.aimDwell = DUEL.drawTime + 1; me.reloading = null;
-    room.chamber = [true, true, true];
     const mag = me.guns.revolver.mag;
 
     // A direction the server cannot use. This used to be read a dozen lines
-    // after the Bang! had left his hand, after a round had come out of the
-    // chamber the whole town counts, and after the magazine - so a packet
-    // that arrived without a usable direction cost a card, a round and a go,
-    // and quietly changed what everybody at the table believed was left in
-    // the chamber. Every shape a bad one can take.
+    // after the Bang! had left his hand and after the magazine, so a packet
+    // that arrived without a usable direction cost a card and a go. Every
+    // shape a bad one can take.
     for (const bad of [undefined, null, {}, { x: 0, y: 0, z: 0 }, [0, 0, -1], 'north',
       { x: NaN, y: 0, z: 1 }, { x: 0, y: 0 }]) {
       room.onShoot(me, { dir: bad });
     }
     assert.deepEqual(me.duelHand, ['bang'], 'a bad direction cost him the card in his hand');
-    assert.equal(room.chamber.length, 3, 'and took rounds out of the shared chamber');
     assert.equal(me.guns.revolver.mag, mag, 'and emptied his gun');
     assert.equal(me.bangsThisTurn, 0, 'and used up his one shot a turn');
     assert.equal(mark.health, mark.maxHealth, 'and somehow hit somebody');
@@ -894,9 +836,8 @@ test('a trigger pull that is not going anywhere costs nothing', () => {
     // asserting on the card being spent and none on the shot landing.
     room.onShoot(me, { dir: { x: 0, y: 0, z: 1 } });
     assert.deepEqual(me.duelHand, [], 'the Bang! never left his hand');
-    assert.equal(room.chamber.length, 2, 'and no round came out of the chamber');
     assert.ok(mark.health < mark.maxHealth,
-      `he fired at a man one seat away with a live round and missed (${mark.health})`);
+      `he fired at a man one seat away and missed (${mark.health})`);
   } finally { clock.restore(); }
 });
 

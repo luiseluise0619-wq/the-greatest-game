@@ -1,13 +1,8 @@
-// The chamber, the draw, and the barrel turned round.
+// The draw, and what a card in your hand is for.
 //
-// Three rules that between them decide what anybody is doing while it is not
+// Two rules that between them decide what anybody is doing while it is not
 // their go - which, in a mode where one gun is live at a time and six people
 // are standing still, is most of the round.
-//
-//   The chamber is the town's, not yours. It is loaded at the start of every
-//   walk and announced - so many live, so many blank, never the order - and
-//   every shot anybody fires draws the next one. Six people spend the lap
-//   counting the same six rounds.
 //
 //   A gun has to be steady on somebody before it will fire. That is the draw,
 //   and it is the only warning the man on the other end of it gets.
@@ -15,8 +10,12 @@
 //   Which is what makes the card in his hand a decision rather than a
 //   deduction: it only saves him if he saw it coming and moved.
 //
-// And the barrel turned round: a blank buys another go, a live round costs a
-// hit and carries on out of your back into whoever chose to stand behind you.
+// There is no chamber here and there are no blanks. A Bang! is a Bang!: it
+// costs a card, it is answered by a card, and if nothing answers it, it lands.
+// The revolver a man puts to his own head lives in the free-for-all instead -
+// see freeroulette.test.js - because that is a town where he has to make
+// somebody believe him, and a gamble taken in front of witnesses is worth
+// something there.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots, seatThem } from './helpers.js';
@@ -62,28 +61,6 @@ function town({ bots = 5 } = {}) {
     turn: (p) => { room.turn = { kind: 'turn', holder: p.id, endsAt: 1e12 }; p.bangsThisTurn = 0; },
   };
 }
-
-test('the chamber is loaded in the open and counted down by everybody', () => {
-  const { room, clock, stub } = town();
-  try {
-    const said = stub.last('chamber');
-    assert.ok(said, 'the town was never told what went into it');
-    assert.ok(said.live >= 1 && said.blank >= 1,
-      `${said.live} live and ${said.blank} blank leaves nothing worth counting`);
-    assert.equal(said.live + said.blank, room.chamber.length);
-    // One round for every man alive, so it comes back round to you empty.
-    assert.equal(room.chamber.length, [...room.players.values()].filter((p) => p.alive).length);
-
-    const before = room.chamber.length;
-    room.nextRound();
-    assert.equal(room.chamber.length, before - 1, 'a round was fired and the count did not move');
-    // And it is never left empty: the next lap loads it again rather than
-    // handing somebody a gun with nothing in it.
-    room.chamber = [];
-    assert.equal(typeof room.nextRound(), 'boolean');
-    assert.ok(room.chamber.length >= 1);
-  } finally { clock.restore(); }
-});
 
 test('a gun has to be steady before it will fire', () => {
   const { room, clock, all, turn } = town();
@@ -135,60 +112,6 @@ test('bracing is for somebody else\'s go, not your own', () => {
     assert.ok(!(a.bracedUntil > 0), 'the man holding the floor ducked on his own turn');
     room.onBrace(b);
     assert.ok(b.bracedUntil > 0);
-  } finally { clock.restore(); }
-});
-
-test('a blank is noise, and it still costs the card', () => {
-  const { room, clock, all, turn } = town();
-  try {
-    const [a, b] = all;
-    turn(a);
-    a.pos = { x: 40, y: 0, z: 0 };
-    b.pos = { x: 40, y: 0, z: 6 };
-    b.gear = []; b.duelHand = [];
-    a.roundIsLive = false;
-    const held = b.health;
-    room.applyDamage(b, a, 99, 'shot', null, 'head');
-    assert.equal(b.health, held, 'a blank took a hit off somebody');
-    a.roundIsLive = true;
-    room.applyDamage(b, a, 99, 'shot', null, 'head');
-    assert.equal(b.health, held - 1, 'and a live round did not');
-  } finally { clock.restore(); }
-});
-
-test('the barrel turned round: a click buys another go', () => {
-  const { room, clock, all, turn } = town();
-  try {
-    const [a, b] = all;
-    turn(a);
-    a.duelHand = ['bang', 'bang'];
-    a.pos = { x: 40, y: 0, z: 0 }; a.yaw = 0;
-    b.pos = { x: 40, y: 0, z: 4 };
-    const [hpA, hpB] = [a.health, b.health];
-
-    room.chamber = [false];
-    room.onSelfShot(a);
-    assert.equal(a.health, hpA, 'a blank took a hit');
-    assert.equal(b.health, hpB, 'and reached the man behind him');
-    assert.equal(room.turnHolder, a.id, 'a click did not buy another go');
-    assert.equal(a.duelHand.length, 1, 'and it was free');
-  } finally { clock.restore(); }
-});
-
-test('and a live one goes through you into whoever stood behind', () => {
-  const { room, clock, all, turn } = town();
-  try {
-    const [a, b] = all;
-    turn(a);
-    a.duelHand = ['bang'];
-    a.pos = { x: 40, y: 0, z: 0 }; a.yaw = 0;      // facing -z, so the back is +z
-    b.pos = { x: 40, y: 0, z: 4 };
-    const [hpA, hpB] = [a.health, b.health];
-
-    room.chamber = [true];
-    room.onSelfShot(a);
-    assert.equal(a.health, hpA - 1, 'it went off and missed the man holding it');
-    assert.equal(b.health, hpB - 1, 'and stopped before the man lined up behind him');
   } finally { clock.restore(); }
 });
 
@@ -272,8 +195,8 @@ test('a barrel comes off you when the go it belonged to ends', () => {
 test('the rules apply to a fired gun, not only to the word for one', () => {
   // Every rule in this file hangs off one branch, and that branch was reading
   // the word "shot". Nothing that ever comes out of a gun says "shot": it says
-  // "revolver". So the chamber, the range, the barrel and the card in his hand
-  // all applied to the tests and to nothing else.
+  // "revolver". So the range, the barrel and the card in his hand all applied
+  // to the tests and to nothing else.
   const { room, clock, all, turn, seats } = town();
   try {
     const [a, b] = all;
@@ -281,16 +204,10 @@ test('the rules apply to a fired gun, not only to the word for one', () => {
     a.pos = { x: 40, y: 0, z: 0 };
     b.pos = { x: 40, y: 0, z: 6 };
     b.gear = []; b.duelHand = [];
-
-    a.roundIsLive = false;
     const held = b.health;
-    a.shotSerial = 1; a.shotSpent = null;
-    room.applyDamage(b, a, 40, 'revolver', null, 'head');
-    assert.equal(b.health, held, 'a blank out of a real gun took a hit off somebody');
 
-    // And out of range is out of range for a real gun too - which at a table
-    // means three seats away with the iron everybody starts holding.
-    a.roundIsLive = true;
+    // Out of range is out of range for a real gun too - which at a table means
+    // three seats away with the iron everybody starts holding.
     seats(a, b, 3);
     a.shotSerial = 2; a.shotSpent = null;
     room.applyDamage(b, a, 40, 'revolver', null, 'head');
@@ -330,26 +247,3 @@ test('one card, one shot, one man - however many pellets came out', () => {
   } finally { clock.restore(); }
 });
 
-test('standing out of the line is the whole of not being shot through', () => {
-  const { room, clock, all } = town();
-  try {
-    const [a, b] = all;
-    a.pos = { x: 40, y: 0, z: 0 }; a.yaw = 0;
-    for (const p of all.slice(2)) p.pos = { x: 900, y: 0, z: 900 };
-
-    b.pos = { x: 40, y: 0, z: 4 };
-    assert.equal(room.linedUpBehind(a)?.id, b.id, 'directly behind and not found');
-    b.pos = { x: 40 + DUEL.selfShot.corridor + 1.5, y: 0, z: 4 };
-    assert.equal(room.linedUpBehind(a), null, 'a step to one side was still in the line');
-    b.pos = { x: 40, y: 0, z: DUEL.selfShot.reach + 10 };
-    assert.equal(room.linedUpBehind(a), null, 'the round carried further than it should');
-    b.pos = { x: 40, y: 0, z: -6 };
-    assert.equal(room.linedUpBehind(a), null, 'the man in front was shot in the back');
-
-    // Nearest first: a round that has been through one man does not find a second.
-    b.pos = { x: 40, y: 0, z: 4 };
-    const third = all[2];
-    third.pos = { x: 40, y: 0, z: 9 };
-    assert.equal(room.linedUpBehind(a)?.id, b.id, 'it reached past the first man in the line');
-  } finally { clock.restore(); }
-});

@@ -40,7 +40,7 @@ for (const key of ['reposition', 'turn', 'health', 'sheriffHealth', 'liveShare',
 
 const stat = {
   wins: {}, durations: [], deaths: 0, shot: 0, storm: 0, left: 0, friendly: 0,
-  accusations: 0, badges: 0, cards: 0,
+  accusations: 0, badges: 0, cards: 0, gambles: 0, gamblesLost: 0,
   sheriffDeaths: 0, sheriffByOutlaw: 0, sheriffTargeted: 0, sheriffAt: [],
   // The turn mode's own numbers. A round of it is a number of goes rather than
   // a number of minutes, and the thing worth arguing about is how many of those
@@ -143,6 +143,7 @@ for (let run = 0; run < ROUNDS; run++) {
   for (const e of room.timeline) {
     if (e.type === 'accuse') stat.accusations += 1;
     if (e.type === 'badge') stat.badges += 1;
+    if (e.type === 'roulette') { stat.gambles += 1; if (e.live) stat.gamblesLost += 1; }
     if (e.type === 'card') stat.cards += 1;
   }
   const winner = room.results?.winner || 'none';
@@ -173,6 +174,13 @@ console.log('  the Sheriff    ', `died in ${stat.sheriffDeaths}/${ROUNDS} rounds
 console.log('  per round      ', `${(stat.accusations / ROUNDS).toFixed(1)} accusations`,
   `· ${(stat.badges / ROUNDS).toFixed(2)} stars pinned on`,
   ...(MODE === MODES.DUEL ? [] : [`· ${(stat.cards / ROUNDS).toFixed(1)} cards played`]));
+// The free-for-all's one expensive sentence. If nobody ever says it, it is not
+// a mechanic, it is a key nobody presses.
+if (MODE !== MODES.DUEL) {
+  console.log('  the gamble     ',
+    `${(stat.gambles / ROUNDS).toFixed(2)} a round`,
+    `· ${stat.gamblesLost} of ${stat.gambles} came up loaded`);
+}
 
 if (MODE === MODES.DUEL) {
   // The one number the whole mode turns on: what share of the goes anybody

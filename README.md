@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 242 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 244 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -121,7 +121,7 @@ decision and buys real armour.
 | | Length | What happens |
 |---|---|---|
 | **A go** | 6s each | One man at a time, in an order the whole table was shown. You can turn your head; that is all |
-| **The beat between** | 4s | The chamber is loaded in the open and everybody counts what went into it |
+| **The beat between** | 4s | The lap is over. Everybody takes stock of what everybody else spent |
 
 ### What it takes to fire
 
@@ -144,19 +144,23 @@ saw it coming and pressed **Space**, and it spends a `Missed!` out of his hand t
 do it. Nobody spends it for him. It is the only move anybody makes on somebody
 else's go.
 
-### The chamber
+### No chamber, and no blanks
 
-There is **one chamber for the whole town**. It is loaded at the start of every
-lap and announced in the open — so many live, so many blank, never the order —
-and **every shot anybody fires draws the next round**. Six people spend the lap
-counting the same six rounds. A blank is smoke and noise and it still costs the
-card.
+A `Bang!` is a `Bang!`. It costs a card, it is answered by a card, and if
+nothing answers it, it lands.
 
-On your own go you may put the barrel against your own head with **Q**. A blank
-buys you another go on the spot. A live round costs you a hit and **carries on
-out of your back** into whoever is standing in line behind you — which at a round
-table is the man on your other side. Turn to face your left-hand neighbour and it
-is your right-hand one who catches it.
+There was for a while a shared cylinder here with blanks in it, so that every
+shot anybody fired might come out as smoke and noise. It is gone. The deck is
+already the whole of the tension in this mode — what is in your hand, what is in
+his, what came off the top of the pile at the start of his go — and putting a
+coin toss underneath all of it did not add a second layer of doubt, it took the
+first one away. A man who spent his `Bang!` and his go and hit nothing had
+learned nothing about anybody, which is the one thing a round here is for.
+
+The revolver a man puts to his own head lives in **the free-for-all** instead.
+That is a town where nobody can prove anything about anybody and talk is free,
+so a gamble taken in front of witnesses buys something real there — see
+[the barrel turned round](#the-barrel-turned-round) below.
 
 ### The sixteen
 
@@ -297,6 +301,32 @@ integration, the bots, and the server validating your movement — one rule, in
 
 **You can call somebody out** (`F` while looking at them). It broadcasts to
 everyone, and the bots weigh it by how much they already trust you.
+
+### The barrel turned round
+
+Everything above makes this a town where **nobody can prove anything about
+anybody**, and where talk is free. So there is exactly one thing you can say that
+is not free. Press `K` with men watching and you put **your own gun to your own
+head** and pull.
+
+Five times in six it clicks — and every man who *actually saw it* has to think
+again, because an outlaw with a plan would be mad to have done that. The sixth
+time it is a real round and it takes most of your life; survivable at full
+health, not at half, which is what makes it a bet rather than a button.
+
+Three rules carry it:
+
+- **It has to be seen**, by the same three questions a witnessed kill asks —
+  close enough, facing you, nothing solid in the way. Doing it alone in an alley
+  buys nothing and costs you a sixth of your life for it, so the server refuses
+  it outright rather than letting you throw the bet away.
+- **Only the men who watched are told.** The whole value of the thing is that
+  they watched it; it can never buy anybody anything through a wall.
+- **Once a round.** It is something you spend, not something you grind.
+
+It does not exist in the turn mode. That is a table where the deck already
+decides everything and the star is the one role that is not a secret — there is
+nothing there for a public act of nerve to buy.
 
 Other channels: all-chat (`T`) reaches the whole town; the **shout wheel** (`V`,
 then a number) reaches about 38m and arrives with a voice and a direction, so you
@@ -658,7 +688,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 242 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 244 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -756,22 +786,26 @@ They are grouped by what they protect:
   turn doing nothing and not even costing ammunition, a corpse being passed
   over rather than waited six seconds for, and the free-for-all still being the
   free-for-all when a room asks for it.
-- **`test/roulette.test.js`** — the chamber, the draw and the barrel turned
-  round: that the chamber is the town's rather than yours and is loaded in the
-  open so everybody spends the lap counting the same rounds, that a gun will
-  not fire until it has been steady long enough for the man on the other end
-  to have seen it, that the card in his hand only saves him if he saw it and
-  moved, and that pointing it at your own head buys another go on a click and
-  costs two men a hit on a live round — you, and whoever chose to stand in the
-  line behind you. Two of these were passing against a game that was not
+- **`test/roulette.test.js`** — the draw and the card that answers it: that a
+  gun will not fire until it has been steady long enough for the man on the
+  other end to have seen it, and that the card in his hand only saves him if he
+  saw it and moved. Two of these were passing against a game that was not
   applying them: nothing that comes out of a gun says "shot" — it says
-  "revolver" — so the chamber, the range, the barrel and the card in his hand
-  applied to the tests and to nothing else; and a coach gun's nine pellets took
-  nine hits off one man for the single Bang! that paid for them. A third: the
+  "revolver" — so the range, the barrel and the card in his hand applied to the
+  tests and to nothing else; and a coach gun's nine pellets took nine hits off
+  one man for the single Bang! that paid for them. A third: the
   warning coming *off* somebody when the go it belonged to ended, which the room
   decided by comparing the new holder's target with his own last one rather than
   with the room's — two men in a row pointing at the same third man and the
   third man was never told, so he could read HE HAS YOU under the words YOUR GO.
+- **`test/freeroulette.test.js`** — the barrel turned round, in the town it
+  belongs to. That a gamble nobody watched is refused rather than taken, that
+  only the men who could actually see it are told and a wall is a wall, that it
+  is once a round and a fresh round hands it back, that it is not on offer
+  before the bell — and that the table has neither a chamber nor a way to reach
+  this at all. That last one is the point of the file: a bullet that might be
+  nothing was a coin toss underneath a deck that is already the whole of the
+  tension, and this is the check that stops it growing back.
 - **`test/deck.test.js`** — the eighty cards: that the deck is printed in the
   right proportions, that a hand is dealt the size of your health and shrinks
   with it, that ammunition is cards and one of them is a turn, that a gun
@@ -862,9 +896,16 @@ They are grouped by what they protect:
   of them stopped sending is exactly as dead as the other's. Plus: an
   untranslated key falls through to the English it was handed rather than to a
   hole, a Korean browser gets Korean without being asked, no Korean entry is
-  secretly still in English, and a name in a Korean sentence takes the particle
-  that name takes — which for Hangul is arithmetic and for a Latin name is not
-  answerable at all, so the strings are written round it rather than into it.
+  secretly still in English, and **no Korean sentence puts a particle after
+  anybody's name**. That last one is the rule this file had always described and
+  had never checked. Half of Korean's particles are chosen by whether the word
+  before them ends in a consonant, and a Latin name's Korean *reading* is not in
+  its spelling — Kessler is 케슬러 and takes 가, Vane is 베인 and takes 이, and
+  they end in the same two letters. Every name in this game is Latin, so a
+  particle after one is wrong for most of the roster every time: nine strings
+  were printing "Dutch Kessler**이** 별을 답니다". A hole may only take a
+  particle if what goes into it is a word this project chose and wrote in Korean
+  itself — a card, a role, a place — and those are listed by name in the test.
 - **`test/fuzz.test.js`** — every shape of message a socket can send that a real
   client never would: numbers where objects go, `NaN` and `Infinity` where
   coordinates go, five-thousand-character strings, `__proto__` as a card name.
@@ -899,8 +940,8 @@ watching for console errors and server noise the whole way.
 
 `turnmode.js` is the mode a town plays by default, which until it existed had no
 browser coverage at all: that the lobby offers the right game, that a gunhand is
-dealt with the role and printed on the card, that the chamber is counted in the
-open, that the feet really are nailed to the mark you were dealt for the whole
+dealt with the role and printed on the card, that the card the trigger will
+answer is lit and goes out with the shot, that the feet really are nailed to the mark you were dealt for the whole
 round, that a number key spends the card printed on it and the table sees where
 it went, that a refresh mid-lap hands the whole game back, and that nobody is
 ever reading HE HAS YOU under the words YOUR GO. It also reads back what the
@@ -940,8 +981,8 @@ won by information. The knobs that control that balance, if you want to move it:
   (or the `HNH_*` env overrides: `HNH_PREP`, `HNH_COMBAT`, `HNH_ENDGAME`,
   `HNH_RESULTS`, `HNH_LOBBYCOUNTDOWN`).
 - `DUEL` in `shared/constants.js` — the turn mode's own numbers: the beat
-  between laps while the chamber is loaded, the length of a go, how many hits everybody has and how many the star has, how much
-  of the chamber is live, and how long a barrel must be steady before it fires.
+  between laps, the length of a go, how many hits everybody has and how many the
+  star has, and how long a barrel must be steady before it fires.
   `HNH_MODE=duel npm run balance -- 60` sweeps them, and every one of them is
   overridable there (`HNH_REPOSITION`, `HNH_TURN`, `HNH_HEALTH`,
   `HNH_SHERIFFHEALTH`, `HNH_LIVESHARE`, `HNH_DRAWTIME`).
@@ -1073,9 +1114,8 @@ and 16% across these runs, and at one player in seven a 60-round sample gives
 him one or two wins either way — so nothing here says anything about him yet.
 
 The other numbers to watch if the bots ever change: about **40 goes a round**,
-**46% of shots finding somebody** — the rest split between a blank out of the
-shared chamber, a man out of range, and a man who saw it coming and spent the
-card — and about **one man a round** putting the gun to his own head.
+**shots finding somebody** — the rest split between a man out of range and a man
+who saw it coming and spent the card.
 
 ### The free-for-all, over 120 rounds
 

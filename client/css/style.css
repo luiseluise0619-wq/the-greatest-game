@@ -730,7 +730,6 @@ html[lang="ko"] #manual h3,
 html[lang="ko"] #turnWhat,
 html[lang="ko"] #turnClock,
 html[lang="ko"] #turnOrder li,
-html[lang="ko"] #chamberBar,
 html[lang="ko"] #aimedWarn,
 html[lang="ko"] #aimedWarn b,
 html[lang="ko"] .dCard b,
@@ -812,19 +811,6 @@ html[lang="ko"] {
 #turnOrder li.gone { opacity: .3; text-decoration: line-through; }
 /* Rooted: the crosshair says the feet are not going anywhere. */
 #hud.rooted #crosshair { opacity: .55; }
-
-/* --------------------------------------------------------- THE CHAMBER
-   One chamber for the whole town, loaded in the open. The number left is the
-   thing everybody is counting, so it sits where the eye already is. */
-#chamberBar {
-  margin-top: 5px;
-  display: flex; gap: 10px; align-items: baseline; justify-content: center;
-  pointer-events: none;
-  font-size: 11px; letter-spacing: .16em;
-  text-shadow: 0 1px 3px rgba(0,0,0,.9), 0 0 9px rgba(0,0,0,.6);
-}
-#chamberLeft { color: var(--gold); font-size: 13px; }
-#chamberMix { color: rgba(232,217,189,.6); }
 
 /* A barrel has stopped on you, and you have eight tenths of a second. */
 #aimedWarn {

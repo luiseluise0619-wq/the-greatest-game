@@ -546,9 +546,6 @@ class Game {
         this.duel = msg;
         this.hud.setDuel(msg);
         break;
-      case S.CHAMBER:
-        this.hud.setChamber(msg);
-        break;
       case S.AIMED:
         this.aimedOn = !!msg.on;
         this.hud.setAimed(msg);
@@ -1031,11 +1028,20 @@ class Game {
         case 'Digit1': this.swapTo('revolver'); break;
         case 'Digit2': this.swapTo('shotgun'); break;
         case 'Digit3': this.swapTo('rifle'); break;
+        // The ability, in both games. At a table it is the gunhand you were
+        // dealt, which G also reaches and which the manual names G for; here
+        // it is the character you picked.
         case 'KeyQ':
-          // The barrel turned round. A blank buys another go; a live round
-          // costs you a hit and whoever is stood in line behind you.
-          if (this.duel) { this.trySelfShot(); break; }
+          if (this.duel) { this.send({ t: C.ABILITY }); break; }
           this.tryAbility();
+          break;
+        // The barrel turned round. Only in the free-for-all: this is a town
+        // where nobody can prove anything about anybody and talk is free, so
+        // the one thing a man can say that costs him something is worth a key
+        // of its own. At a table the deck already decides everything and a
+        // bullet that might be nothing was a second game bolted to the side.
+        case 'KeyK':
+          if (!this.duel) this.trySelfShot();
           break;
         case 'KeyE': this.tryPickup(); break;
         case 'KeyG': this.tryThrow(); break;
@@ -1163,20 +1169,16 @@ class Game {
     this.send({ t: C.CARD, card: id, target });
   }
 
+  /**
+   * The free-for-all's gamble. Everything about whether it is allowed is the
+   * server's - who is watching, whether the bet is already spent, what came up
+   * - because all three are things this browser must not be able to decide.
+   * What is checked here is only what would waste a packet.
+   */
   trySelfShot() {
-    if (!this.turn || this.turn.holder !== this.selfId) {
-      this.deny(['deny.notYourTurn', 'Not your go. Wait to be called.']);
-      return;
-    }
-    // The same question the server asks, asked the same way. This looked for
-    // the literal card, and the server asks what this man reads AS a shot and
-    // whether he has one left this go - so the one of the sixteen who fires a
-    // Missed! was refused a move he is allowed, and a man who had already
-    // taken his shot was let through to a packet that was silently dropped.
-    if (!this.hud.shotLeft(this.duel || {})) {
-      this.deny(this.hud.shotCardOf(this.duel || {})
-        ? ['deny.shotSpent', 'You have had your shot this go.']
-        : ['deny.noBang', 'Nothing in your hand to fire.']);
+    if (!this.self.alive) { this.deny(DEAD_LINE); return; }
+    if (this.self.mag <= 0) {
+      this.deny(['deny.nothingToSpin', 'Nothing in the cylinder to spin.']);
       return;
     }
     this.send({ t: C.SELFSHOT });

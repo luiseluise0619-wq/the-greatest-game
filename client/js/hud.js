@@ -64,7 +64,6 @@ export class HUD {
     if (this.duel) { this.renderRoleCards(); this.setDuel(this.duel); }
     if (this.turn) this.setTurn(this.turn);
     this.buildManualKeys(this.game.duelMode);
-    if (this.chamberLeft != null) this.setChamber({ left: this.chamberLeft, ...(this.chamberMix || {}) });
   }
 
   /**
@@ -91,11 +90,8 @@ export class HUD {
       ['man.key.cards', '1…9 0', 'play a card'],
       ['man.key.brace', 'Space', 'get out of the way'],
       ['man.key.look', 'mouse', 'turn your head — the feet stay put'],
-      ['man.key.self', 'Q', 'turn it on yourself'],
       // One of the sixteen has something to press, and the corner of the
-      // screen puts a G next to his ability when he is dealt it. The key list
-      // did not have a G on it at all, so the only key in the mode that has to
-      // be found rather than guessed was the one the manual left out.
+      // screen puts a Q next to his ability when he is dealt it.
       ['man.key.gunhand', 'G', 'your gunhand, if it is one you press'],
     ];
     const freeKeys = [
@@ -111,6 +107,8 @@ export class HUD {
       ['key.guns', '1 2 3', 'guns'],
       ['key.dynamite', 'G', 'dynamite'],
       ['key.card', 'Z X', 'play a card'],
+      // The one thing a man can say in this town that is not free.
+      ['man.key.self', 'K', 'your own gun to your own head'],
       // Only in the free-for-all. In the turn mode the star is dealt face up
       // and pinned on at the bell, so B has nothing left to do - and a key
       // list is a promise. It printed "B pin the star" in a game where the
@@ -410,12 +408,12 @@ export class HUD {
     $('hud').classList.toggle('rooted', !walk);
 
     $('turnWhat').textContent = walk
-      ? this.t('turn.between', 'THE CHAMBER IS LOADED')
+      ? this.t('turn.between', 'THE TABLE GOES ROUND')
       : mine ? this.t('turn.yours', 'YOUR GO')
         : this.t('turn.theirs', `${this.nameOf(this.turn.holder)} HAS THE FLOOR`,
           { name: this.nameOf(this.turn.holder) });
     $('turnClock').textContent = walk
-      ? this.t('turn.betweenHint', 'count what went into it')
+      ? this.t('turn.betweenHint', 'the lap is over — count what everybody spent')
       : this.t('turn.rootedHint', 'nobody may move');
 
     this.renderTurnOrder();
@@ -508,23 +506,6 @@ export class HUD {
     return this.t(`place.${parts.kind}`, english, { p: here });
   }
 
-  // ------------------------------------------------------------ the chamber
-  /** How many rounds are left in the chamber the whole town is counting. */
-  setChamber(msg) {
-    if (msg.live != null) this.chamberMix = { live: msg.live, blank: msg.blank };
-    this.chamberLeft = msg.left;
-    const bar = $('chamberBar');
-    if (this.chamberLeft == null) { bar.classList.add('hidden'); return; }
-    bar.classList.remove('hidden');
-    $('chamberLeft').textContent = this.t('cham.left', `${this.chamberLeft} IN THE CHAMBER`,
-      { n: this.chamberLeft });
-    $('chamberMix').textContent = this.chamberMix
-      ? this.t('cham.mix', `loaded ${this.chamberMix.live} live, ${this.chamberMix.blank} blank`,
-        { live: this.chamberMix.live, blank: this.chamberMix.blank })
-      : '';
-  }
-
-  /** Somebody's barrel has stopped on you, and you have a moment to move. */
   setAimed(msg) {
     // The other half of the same packet: whoever this player is looking at
     // that his gun does not reach. Reach is seats, and the whole table is

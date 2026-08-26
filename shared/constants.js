@@ -498,33 +498,44 @@ export const DUEL = {
   // worth - which is the rule the card game runs on.
   damagePerHit: 1,
 
-  // ---------------------------------------------------------- the chamber
+  // There is no shared chamber here and there are no blanks. A Bang! is a
+  // Bang!: it costs a card, it is answered by a card, and if nothing answers
+  // it, it lands. The card game runs on cards and nothing else, and a bullet
+  // that might be nothing turned every go into a coin toss underneath a deck
+  // that is already the whole of the tension.
   //
-  // One chamber for the whole town, loaded at the start of every walk and
-  // announced: four live and two blank, or whatever it came to. Nobody is told
-  // the order. Every shot anybody fires draws the next one, so six people
-  // spend the lap counting the same six rounds - which is the whole of it.
-  //
-  // `liveShare` is how much of the chamber is live before rounding, and the
-  // loader guarantees at least one of each so that counting is always worth
-  // doing.
-  liveShare: 0.65,
-  // Pointing it at yourself. A blank buys you another go; a live round costs
-  // you a hit and does not stop there - it carries on through and takes
-  // whoever is standing in line behind you. Nobody walks any more, so the man
-  // who catches it is the one you turned your back on: which way you face is
-  // the whole of the decision, and the manual says so.
-  //
-  // It is still a bullet once it is out of you. A barrel behind you stops it
-  // and so does a man who was already moving - see Room.throughStopped, and
-  // the round it used to be that no card in the eighty could stop.
-  selfShot: {
-    corridor: 2.2,      // metres either side of the line out of your back
-    reach: 30,          // how far the round carries once it is through you
-  },
+  // The revolver you put to your own head lives in the free-for-all instead -
+  // see ROULETTE below. That is a town where you walk up to a man and have to
+  // make him believe you, and a gamble taken in front of witnesses is worth
+  // something there. At a table where every role but one is already a secret
+  // and the deck decides everything, it was a second game bolted to the side.
+
   // How long the barrel has to be steady on somebody before it will fire, and
   // how long they have known about it by then.
   drawTime: 0.8,
+};
+
+/**
+ * The barrel turned round, in the free-for-all.
+ *
+ * This is a town where nobody can prove anything about anybody, and the only
+ * currency is whether the men watching believe you. So the gamble is public and
+ * the payoff is public: you spin your own cylinder in front of whoever is
+ * looking and pull. Five times in six it clicks, and every man who SAW it now
+ * has something about you that an outlaw with a plan would be mad to have
+ * given them. The sixth time it is a real round and it is most of your life.
+ *
+ * Once a round, so it is a thing you spend rather than a thing you grind, and
+ * only where somebody can see you - a gamble nobody witnessed bought nothing
+ * and cost a sixth of your life for it, which is not a mechanic, it is a trap.
+ */
+export const ROULETTE = {
+  chambers: 6,          // one round in the cylinder, five empty
+  damage: 55,           // of a hundred: survivable at full health, not at half
+  trustGain: 0.75,      // what a man who watched you do it thinks afterwards
+  susDrop: 0.6,         // and how much of what he already suspected goes
+  cooldown: 0,          // no cooldown - it is once a round, see oncePerLife
+  oncePerLife: true,
 };
 
 export const MODES = { FREE: 'free', DUEL: 'duel' };

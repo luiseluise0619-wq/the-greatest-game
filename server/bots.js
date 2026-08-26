@@ -6,7 +6,8 @@
 // Everything below is built around a per-bot suspicion table plus a faction goal.
 
 import {
-  PLAYER, WEAPONS, CHARACTERS, CARDS, PHASE, VISION, DUEL, clamp, stepStamina, canSprint,
+  PLAYER, WEAPONS, CHARACTERS, CARDS, PHASE, VISION, DUEL, ROULETTE,
+  clamp, stepStamina, canSprint,
 } from '../shared/constants.js';
 import { DUEL_CARDS, DISTANCE_UNIT, inReach, reachOf, coverOf } from '../shared/deck.js';
 import { trait } from '../shared/gunhands.js';
@@ -392,6 +393,7 @@ export class BotBrain {
 
       case 'damaged': {
         if (data.victim === me && data.attacker) {
+          this.shotAtCount = (this.shotAtCount || 0) + 1;   // and the other one
           this.suspect(data.attacker.id, 0.6);
           this.allies.delete(data.attacker.id);
           this.knownFriends.delete(data.attacker.id);
@@ -484,6 +486,9 @@ export class BotBrain {
       case 'accuse': {
         const weight = 0.1 + 0.15 * (this.trust.get(data.from.id) || 0);
         if (data.target.id === me.id) {
+          // Being named in front of the town is one of the two things a man can
+          // notice about his own standing without being told anything.
+          this.accusedOfCount = (this.accusedOfCount || 0) + 1;
           this.suspect(data.from.id, 0.2 * this.paranoia);
         } else {
           this.suspect(data.target.id, weight * this.paranoia);
@@ -503,6 +508,25 @@ export class BotBrain {
       case 'voice': {
         if (data.line === 'friendly' || data.line === 'truce') this.trustUp(data.from.id, 0.08);
         if (data.line === 'lawman' && me.role === 'outlaw') this.suspect(data.from.id, 0.25);
+        break;
+      }
+      case 'roulette': {
+        // He put his own gun to his head where this bot could see it. Nothing
+        // else in the game costs a man that much to say, and it is the only
+        // claim in the mode that cannot be made for free - which is exactly
+        // why it moves a needle that words do not.
+        //
+        // This only ever arrives from somebody who was actually watched, so
+        // there is nothing to check here: the room already asked who could see.
+        if (data.who.id === me.id) break;
+        this.trustUp(data.who.id, ROULETTE.trustGain);
+        const had = this.suspicion.get(data.who.id);
+        if (had != null) this.suspicion.set(data.who.id, clamp(had * (1 - ROULETTE.susDrop), 0, 1));
+        // And a man who took it and lost is a man who is now easy to kill,
+        // which the ones who did not believe him will have noticed.
+        if (data.live) this.lastSeen.set(data.who.id, {
+          x: data.who.pos.x, y: data.who.pos.y, z: data.who.pos.z, t,
+        });
         break;
       }
     }
@@ -812,42 +836,7 @@ export class BotBrain {
     }
     if (t < this.nextDuelActAt) return;
     if (this.duelPlayCard(t, quarry)) { this.nextDuelActAt = t + rnd(0.3, 0.9); return; }
-    if (!quarry && !this.gambled) {
-      this.gambled = true;
-      if (this.duelGamble(t)) { this.nextDuelActAt = t + 0.8; return; }
-    }
     this.duelShoot(t, quarry);
-  }
-
-  /**
-   * The barrel turned round. A go with nobody in reach is a go worth nothing,
-   * and the gamble is the one thing that can still be done with it: a click
-   * buys another, and a live round costs a hit but does not stop at you.
-   *
-   * So the sum is a real one. Take it when the go is dead anyway, when the
-   * chamber has been counted down to mostly blanks, and when whoever chose to
-   * stand in the line behind you is somebody you would not mind finding.
-   */
-  duelGamble(t) {
-    const me = this.self;
-    const room = this.room;
-    if (!room.canBang(me)) return false;
-    const left = (room.chamber || []).length;
-    if (!left) return false;
-    // What is left in it, from what the town was told and has been counting.
-    const blanks = room.chamber.filter((live) => !live).length;
-    const odds = blanks / left;
-    const behind = room.linedUpBehind(me);
-    // A man behind you is a reason to do it or a reason not to, and which one
-    // is the whole of what standing in that line means.
-    const wants = behind ? this.wantsDead(behind) : 0;
-    if (behind && wants <= 0) return false;
-    let want = odds * (0.35 + this.aggression * 0.5);
-    if (behind && wants > 1) want += 0.45;
-    if (me.health <= 1 && !behind) want *= 0.15;      // one hit left and no upside
-    if (Math.random() > want) return false;
-    room.onSelfShot(me);
-    return true;
   }
 
   /**
@@ -980,6 +969,41 @@ export class BotBrain {
     if (this.braceAt && t >= this.braceAt) { this.braceAt = 0; this.room.onBrace(me); }
   }
 
+  /**
+   * The barrel turned round, in the town where it means something.
+   *
+   * A man who puts his own gun to his own head in front of you has said the one
+   * thing in this game that cannot be said for free, so it is worth doing - and
+   * worth doing MORE the more the town already has against him. A bot cannot
+   * read its own suspicion off anybody, and must not: what it can see is that
+   * somebody accused it, or shot at it, and that is the honest trigger.
+   *
+   * It is not a faction tell. If only the law ever took the bet, watching who
+   * gambles would be a free role read, and the whole point of the move is that
+   * it is expensive rather than conclusive. Everybody takes it sometimes; the
+   * law takes it more often, and an outlaw doing it is a bluff that cost him a
+   * sixth of his life - which is exactly the shape the bet is meant to have.
+   */
+  maybeGamble(t) {
+    const me = this.self;
+    if (me.rouletteSpent) return;
+    if (t < (this.gambleRolledAt || 0)) return;
+    this.gambleRolledAt = t + 6;                  // one roll every six seconds
+
+    // Only worth it while somebody has an eye on him, and the room is the only
+    // thing that knows who does - the same answer a witnessed kill gets.
+    if (!this.room.watchers(me).size) return;
+    // Not mid-fight. This is a thing you do to a room, not to a gunfight.
+    if (t - (me.lastHitAt || -99) < 6) return;
+    if (me.health / me.maxHealth < 0.75) return;  // it costs most of a life
+
+    // What the town has actually done to him, rather than what it thinks.
+    const heat = Math.min(1, (this.accusedOfCount || 0) * 0.5 + (this.shotAtCount || 0) * 0.25);
+    const lean = me.faction === 'law' ? 0.55 : 0.2;
+    if (Math.random() > (0.16 + heat * 0.6) * lean * (1 + this.paranoia)) return;
+    this.room.onSelfShot(me);
+  }
+
   think(t, target, visibleTarget) {
     const me = this.self;
     if (this.room.phase === PHASE.PREP) {
@@ -1000,6 +1024,7 @@ export class BotBrain {
     }
 
     if (me.role === 'outlaw' && !this.sheriffCertain && t >= this.nextProbeAt) this.pickPrimeSuspect(t);
+    this.maybeGamble(t);
 
     // Breaking off a losing fight is what keeps most engagements from ending in
     // a body, which is what keeps the round long enough to think in.

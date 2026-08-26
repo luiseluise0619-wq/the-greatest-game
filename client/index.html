@@ -40,15 +40,9 @@
     <div id="standing"><b>8</b> STILL STANDING</div>
     <div id="objective">Find a gun. Work out who you are dealing with.</div>
 
-    <!-- The chamber the whole town is counting down, and whose go it is: the
-         table, in a game with no table. Both live in the flow under the round
-         clock rather than at a fixed height, because the objective line above
-         them is a sentence and sentences wrap. -->
-    <div id="chamberBar" class="hidden">
-      <span id="chamberLeft"></span>
-      <span id="chamberMix"></span>
-    </div>
-
+    <!-- Whose go it is: the table, in a game with no table. It lives in the
+         flow under the round clock rather than at a fixed height, because the
+         objective line above it is a sentence and sentences wrap. -->
     <div id="turnBar" class="hidden">
       <div id="turnWhat"></div>
       <div id="turnClock"></div>
@@ -209,8 +203,7 @@
             <li class="duelOnly" data-i18n-html="rules.turns"><b>You take it in turns, standing at a table.</b> Nobody walks: one man
             at a time gets six seconds with the only live gun in town, and distance is how many seats away you are.</li>
             <li class="duelOnly" data-i18n-html="rules.ammo"><b>Ammunition is cards.</b> You cannot fire without a Bang! in your
-            hand, your gun reaches exactly as far as the card in front of you says, and the chamber the
-            whole town is drawing from has blanks in it.</li>
+            hand, and your gun reaches exactly as far as the card in front of you says.</li>
           </ul>
           <p class="duelOnly manLead" data-i18n-html="ui.manLead">All of it is written out properly under
           <b>HOW THIS IS PLAYED</b>, and <b>F1</b> opens it again once the round has started.</p>
@@ -283,8 +276,7 @@
         <h3 class="duelOnly" data-i18n="man.lapTitle">A LAP</h3>
         <p class="duelOnly" data-i18n-html="man.lap"><b>One man at a time gets his go</b>, six seconds
         each, in an order the whole table was shown at the start. Between one lap and the next there is
-        a beat while <b>the chamber is loaded in the open</b> and everybody counts what went into it.
-        You can turn your head whenever you like. On somebody else's go that is all you can do — and
+        a beat to take stock of what everybody spent. You can turn your head whenever you like. On somebody else's go that is all you can do — and
         it is enough, because the only warning anybody gets is watching him level it.</p>
 
         <h3 class="duelOnly" data-i18n="man.fireTitle">WHAT IT TAKES TO FIRE</h3>
@@ -302,26 +294,11 @@
       </section>
 
       <section class="manCol">
-        <h3 class="duelOnly" data-i18n="man.chamberTitle">THE CHAMBER</h3>
-        <p class="duelOnly" data-i18n-html="man.chamber">There is <b>one chamber for the whole town</b>. It is
-        loaded at the start of every lap and announced out loud — so many live, so many
-        blank, never the order — and <b>every shot anybody fires draws the next round</b>.
-        Six people spend the lap counting the same six rounds. A blank is smoke and noise,
-        and it still costs the card.</p>
-
         <h3 class="duelOnly" data-i18n="man.aimedTitle">WHEN IT STOPS ON YOU</h3>
         <p class="duelOnly" data-i18n-html="man.aimed">The screen tells you a barrel has settled on you and
         you have the length of his draw. Press <b>Space</b> and you are not standing where he
         thought — but it spends a <b>Missed!</b> out of your hand, and only works if you had one.
         Nobody spends it for you. It is the only move anybody makes on somebody else's go.</p>
-
-        <h3 class="duelOnly" data-i18n="man.selfTitle">THE BARREL TURNED ROUND</h3>
-        <p class="duelOnly" data-i18n-html="man.self">On your own go you may put it against your own head
-        with <b>Q</b>. A blank buys you another go on the spot. A live round costs you a hit and
-        <b>carries on out of your back</b> into whoever is standing in line behind you — which at a
-        round table means the man on your other side. Turn to face your left-hand neighbour and it is
-        your right-hand one who catches it. It is a round like any other once it is out of you:
-        <b>a barrel behind you still stops it</b>, and so does a man who happened to be moving.</p>
 
         <h3 class="duelOnly" data-i18n="man.handTitle">THE MAN YOU WERE DEALT</h3>
         <p class="duelOnly" data-i18n-html="man.hand">As well as a role you are dealt one of
@@ -356,6 +333,15 @@
         <p class="freeOnly" data-i18n-html="man.star">The Sheriff may pin it on at any time with <b>B</b>. It is real armour
         and a permanent target, and it cannot be taken off again. Staying a stranger is the
         other half of the job.</p>
+
+        <h3 class="freeOnly" data-i18n="man.selfTitle">THE BARREL TURNED ROUND</h3>
+        <p class="freeOnly" data-i18n-html="man.self">Nobody in this town can prove anything about
+        anybody, and talk is free. So there is one thing you can say that is not: press <b>K</b>
+        with men watching and you <b>put your own gun to your own head and pull</b>. Five times in
+        six it clicks, and every man who actually saw it — close enough, facing you, nothing in the
+        way — has to think again, because an outlaw with a plan would be mad to have done that. The
+        sixth time it is a real round and it is most of your life.
+        <b>Once a round</b>, and only where somebody can see you: doing it alone buys nothing.</p>
 
         <h3 class="duelOnly" data-i18n="man.starTitle">THE STAR</h3>
         <p class="duelOnly" data-i18n-html="man.starDuel">The Sheriff wears it from the first bell —

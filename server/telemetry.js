@@ -36,6 +36,7 @@ class Telemetry {
       chats: 0,
       abilities: 0,
       badgeReveals: 0,
+      gambles: 0,
       cardsDealt: 0,
       cardsPlayed: 0,
       // The turn mode is the default one, and until these existed /stats knew
@@ -222,6 +223,9 @@ class Telemetry {
     if (kind === 'chat') { this.agg.chats += 1; if (s) s.chats += 1; }
     if (kind === 'ability') { this.agg.abilities += 1; if (s) s.abilities += 1; }
     if (kind === 'badge') this.agg.badgeReveals += 1;
+    // The free-for-all's one expensive sentence, so it can be seen whether
+    // anybody actually says it.
+    if (kind === 'roulette') this.agg.gambles += 1;
   }
 
   sessionEnd(player, seconds) {
@@ -251,6 +255,7 @@ class Telemetry {
       chatsPerMatch: per(a.chats, a.matches),
       abilitiesPerMatch: per(a.abilities, a.matches),
       badgeRevealRate: per(a.badgeReveals, a.matches),
+      gamblesPerMatch: per(a.gambles, a.matches),
       cardsPerMatch: per(a.cardsPlayed, a.matches),
       // Below about half and the deck is decoration; at 1.0 nobody is ever
       // holding anything back, which is its own problem.

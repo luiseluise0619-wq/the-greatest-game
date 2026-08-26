@@ -177,3 +177,41 @@ test('no Korean string is left as English by accident', () => {
   });
   assert.deepEqual(suspects, [], `these Korean entries have no Korean in them:\n  ${suspects.join('\n  ')}`);
 });
+
+test('no Korean sentence puts a particle after anybody\'s name', () => {
+  // Half of Korean's particles are chosen by whether the word before them ends
+  // in a consonant, and a Latin name's Korean *reading* is not in its spelling:
+  // Kessler is 케슬러 and takes 가, Vane is 베인 and takes 이, and they end in
+  // the same two letters. `closed()` says so in as many words and falls through
+  // to the closed form for anything that is not Hangul — which is a decision
+  // about the machinery, not a fix.
+  //
+  // Every name in this game is Latin. So a sentence with a particle after a
+  // player's name is wrong for most of the roster, every time, and it reads
+  // wrong: "Dutch Kessler이 별을 답니다". The file has always SAID it is
+  // written round this. Nine strings were not, and nothing checked.
+  //
+  // A hole is only safe if what goes into it is a word this project chose and
+  // wrote in Korean itself — a card, a role, a place. Those are listed. Every
+  // other hole must be bare.
+  const OURS = {
+    card: 'a card name, translated before the sentence is filled',
+    role: 'a role name, ours',
+    where: 'a place phrase, already Korean',
+    p: 'a place name, ours',
+    n: 'a number', live: 'a number', blank: 'a number', limit: 'a number', of: 'a number',
+  };
+  // The one sentence whose a and b really are our own words: two place names.
+  const EXCEPT = new Set(['place.between']);
+
+  const bad = [];
+  for (const key of keys('ko')) {
+    if (EXCEPT.has(key)) continue;
+    for (const m of String(t('ko', key, '')).matchAll(/\{(\w+):([^{}/]+)\/([^{}]+)\}/g)) {
+      if (OURS[m[1]]) continue;
+      bad.push(`${key}: {${m[1]}} is filled with somebody's name and takes ${m[2]}/${m[3]}`);
+    }
+  }
+  assert.deepEqual(bad, [],
+    `these read wrong for every Latin name in the game:\n  ${bad.join('\n  ')}`);
+});

@@ -8,7 +8,7 @@
 import {
   PLAYER, WEAPONS, DYNAMITE, WEAPON_ORDER, ROLES, PHASE, TIMING, ENDGAME,
   SOCIAL, HITBOX, CHARACTERS, GAMBLER_BOONS, LOOT_RESPAWN, VOICE_LINES, voiceLine, VISION, REPLAY,
-  CARDS, CARD_ORDER, CARD_DEAL, DUEL, MODES, DEFAULT_MODE,
+  CARDS, CARD_ORDER, CARD_DEAL, DUEL, MODES, DEFAULT_MODE, ROULETTE,
   MIN_PLAYERS, MAX_PLAYERS, rolesForPlayerCount, clamp, stepStamina, swapTime,
 } from '../shared/constants.js';
 import MAP, { zoneAt, SPAWNS, LOOT_SPAWNS, seatAt, seatsApart } from '../shared/map.js';
@@ -323,8 +323,8 @@ export class Room {
         this.send(client, this.welcomeMsg(bot.id, bot.token));
         this.sendRole(bot);
         this.pushCards(bot);
-        // The hand, the running order and the chamber, exactly as a
-        // reconnecting tab gets them. Without this a human walking into a
+        // The hand and the running order, exactly as a reconnecting tab gets
+        // them. Without this a human walking into a
         // turn-mode round in progress took over the body and got a screen
         // with nothing on it: pushCards is the free-for-all's six-card deck
         // and says nothing at all in a mode with eighty. The same bug was
@@ -591,12 +591,9 @@ export class Room {
     p.duelHand.splice(at, 1);
     this.pile.put(card);
     p.bangsThisTurn = (p.bangsThisTurn || 0) + 1;
-    // Two different questions. bangsThisTurn is the RULE - one shot a go, and
-    // a blank out of the barrel turned round buys the go back and zeroes it.
-    // These two are the RECORD, and nothing gives them back: the round went
-    // off, whatever the chamber had in it. Reading the rule for the record
-    // meant a go spent putting the gun to your own head and hearing a click
-    // was written down as a go where nothing happened at all.
+    // Two different questions. bangsThisTurn is the RULE - one shot a go.
+    // These two are the RECORD, and nothing gives them back: the card left his
+    // hand and the trigger moved, whatever it found.
     p.firedThisTurn = true;
     p.cardsThisTurn = (p.cardsThisTurn || 0) + 1;
     // A Bang! is fired rather than played, but it is still a card that left
@@ -625,7 +622,6 @@ export class Room {
       // else's go.
       if ((p.aimDwell || 0) < DUEL.drawTime) return;
       if (!this.spendBang(p)) return;
-      p.roundIsLive = this.nextRound();
       // A number for this pull of the trigger, so that however many pellets
       // come out of the barrel only the first one to find anybody counts.
       p.shotSerial = (p.shotSerial || 0) + 1;
@@ -936,7 +932,7 @@ export class Room {
     this.checkVictory();
 
     // A dead man does not get the rest of his go. The stick that went off in
-    // his hands, or the chamber he put to his own head, used to leave the
+    // his hands used to leave the
     // table watching a corpse hold the gun for the remaining seconds - the
     // running order had already dropped him, so every screen highlighted
     // nobody and nobody could do a thing. Move it on the moment he falls.
@@ -951,17 +947,10 @@ export class Room {
    */
   duelShotLands(victim, attacker, cause) {
     // Anything a trigger sent. The cause a fired gun carries is the gun's own
-    // name rather than the word "shot", which is how the chamber, the range,
-    // the barrel and the card in his hand all quietly stopped applying to
-    // actual gunfire and only ever applied to the tests.
+    // name rather than the word "shot", which is how the range, the barrel and
+    // the card in his hand all quietly stopped applying to actual gunfire and
+    // only ever applied to the tests.
     if (cause !== 'shot' && !WEAPONS[cause]) return true;
-    // The chamber is shared and nobody knows the order. A blank is a bang and
-    // a puff of smoke and nothing else, and it still cost a card.
-    if (attacker.roundIsLive === false) {
-      this.emit(attacker, { t: S.FEED, k: 'feed.blankMine', text: 'A blank. Smoke and noise.', tone: 'bad' });
-      this.emit(victim, { t: S.FEED, k: 'feed.blankAtYou', text: 'A blank, aimed at you.', tone: 'good' });
-      return false;
-    }
     // Out of range is out of range, whatever the bullet did.
     const d = Math.hypot(victim.pos.x - attacker.pos.x, victim.pos.z - attacker.pos.z);
     if (!inReach(attacker, victim, d, this.seatsBetween(attacker, victim))) {
@@ -1900,6 +1889,7 @@ export class Room {
       p.shotSerial = 0;
       p.shotSpent = null;
       p.dmgCarry = 0;
+      p.rouletteSpent = false;   // the free-for-all's gamble is once a round
       p.noPrintsUntil = 0;
       p.glassUntil = 0;
       p.glassMarks = new Map();
@@ -2134,7 +2124,6 @@ export class Room {
       // Straight into a walk: nobody has chosen where to stand yet.
       this.turnPtr = -1;
       this.setTurn({ kind: 'reposition', holder: null, endsAt: now() + DUEL.reposition });
-      this.loadChamber();
     }
     if (phase !== PHASE.COMBAT && phase !== PHASE.ENDGAME) this.turn = null;
     if (phase === PHASE.COMBAT) {
@@ -2332,14 +2321,6 @@ export class Room {
   resumeDuel(p) {
     if (!this.duel || !p.client) return;
     this.send(p.client, this.turnMsg());
-    if (this.chamber) {
-      this.send(p.client, {
-        t: S.CHAMBER,
-        live: this.chamberMix ? this.chamberMix.live : undefined,
-        blank: this.chamberMix ? this.chamberMix.blank : undefined,
-        left: this.chamber.length,
-      });
-    }
     this.pushDuel(p);
   }
 
@@ -2364,7 +2345,6 @@ export class Room {
         this.turnPtr = -1;
         this.setTurn({ kind: 'reposition', holder: null, endsAt: t + DUEL.reposition });
         this.broadcast({ t: S.SOUND, sound: 'bell' });
-        this.loadChamber();
         return;
       }
       const p = this.players.get(this.turnOrder[this.turnPtr]);
@@ -2753,33 +2733,6 @@ export class Room {
     this.pushDuel(p);
   }
 
-  // ------------------------------------------------------------- the chamber
-  /**
-   * Load the chamber for a lap and tell the town what went into it - how many
-   * live and how many blank, never the order. One round per man alive, so by
-   * the time it comes back round to you everybody has been counting.
-   */
-  loadChamber() {
-    const living = [...this.players.values()].filter((p) => p.alive).length;
-    const rounds = Math.max(2, living);
-    // At least one of each, or there is nothing to count and nothing to gamble.
-    const live = Math.min(rounds - 1, Math.max(1, Math.round(rounds * DUEL.liveShare)));
-    this.chamber = shuffle([
-      ...Array(live).fill(true),
-      ...Array(rounds - live).fill(false),
-    ]);
-    // What went in, kept - so somebody who reloads mid-lap is told the same
-    // thing everybody else was told rather than a bare number left.
-    this.chamberMix = { live, blank: rounds - live };
-    this.broadcast({ t: S.CHAMBER, live, blank: rounds - live, left: this.chamber.length });
-    this.broadcast({
-      t: S.FEED,
-      k: 'feed.chamberLoaded', p: { live, blank: rounds - live },
-      text: `The chamber is loaded: ${live} live, ${rounds - live} blank. Nobody is told the order.`,
-      tone: 'system',
-    });
-  }
-
   /**
    * Getting ready to not be there. Costs nothing if no shot comes; spends the
    * card in your hand if one does. The only move anybody makes on somebody
@@ -2855,138 +2808,132 @@ export class Room {
     this.send(target.client, { t: S.AIMED, on, by: by ? by.id : null });
   }
 
-  /** The next round out of the shared chamber. Reloaded rather than run dry. */
-  nextRound() {
-    if (!this.chamber || !this.chamber.length) this.loadChamber();
-    const live = this.chamber.pop();
-    this.broadcast({ t: S.CHAMBER, left: this.chamber.length });
-    return live;
-  }
-
   /**
-   * The barrel turned round. A blank buys another go; a live round is a hit,
-   * and it does not stop at you - it carries on out of your back and takes
-   * whoever chose to stand in line behind you.
+   * The barrel turned round, and this is the free-for-all's move rather than
+   * the table's.
+   *
+   * This town has no shared chamber and no blanks in it - a Bang! at a table is
+   * a Bang! - but it does have the problem the whole mode is about: nobody can
+   * prove anything about anybody, and the only currency is whether the men
+   * watching believe you. So the gamble is public and so is the payoff. You
+   * spin your own cylinder in front of whoever is looking and pull. Five times
+   * in six it clicks, and every man who SAW it now has something about you that
+   * an outlaw with a plan would be mad to have given them. The sixth time it is
+   * a real round and it is most of your life.
+   *
+   * Once a round. It is a thing you spend, not a thing you grind - and it has
+   * to be seen, because a gamble nobody witnessed buys nothing and costs a
+   * sixth of your life for it, which is not a mechanic, it is a trap.
    */
   onSelfShot(p) {
-    if (!this.duel || !p.alive) return;
-    if (this.turnHolder !== p.id) return;
-    if (!this.canBang(p)) return;
-    if (!this.spendBang(p)) return;
-
-    const live = this.nextRound();
-    this.broadcast({ t: S.SOUND, sound: 'gunshot', pos: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z)] });
-    if (!live) {
-      this.broadcast({
-        t: S.FEED, k: 'feed.selfClick', p: { name: p.name },
-        text: `${p.name} puts it to their own head. It clicks.`, tone: 'good',
+    if (this.duel || !p.alive) return;
+    if (this.phase !== PHASE.COMBAT && this.phase !== PHASE.ENDGAME) {
+      this.emit(p, {
+        t: S.FEED, k: 'feed.notYet', text: 'Not before the bell.', tone: 'bad', deny: true,
       });
-      // A blank costs you a card and nothing else - and the floor is yours again.
-      this.setTurn({ kind: 'turn', holder: p.id, endsAt: now() + DUEL.turn });
-      p.bangsThisTurn = 0;
-      this.pushDuelAll();
+      return;
+    }
+    if (p.rouletteSpent) {
+      this.emit(p, {
+        t: S.FEED, k: 'feed.oneGambleOnly',
+        text: 'You have already made that bet this round.', tone: 'bad', deny: true,
+      });
+      return;
+    }
+    const g = p.guns.revolver;
+    if (!g || g.mag <= 0) {
+      this.emit(p, {
+        t: S.FEED, k: 'feed.nothingToSpin',
+        text: 'Nothing in the cylinder to spin.', tone: 'bad', deny: true,
+      });
+      return;
+    }
+    // Who is watching. The same eyes-on test a kill uses, so this can never
+    // buy a man anything through a wall.
+    const watching = this.watchers(p);
+    if (!watching.size) {
+      this.emit(p, {
+        t: S.FEED, k: 'feed.nobodyWatching',
+        text: 'Nobody is looking. There is no point doing that alone.', tone: 'bad', deny: true,
+      });
       return;
     }
 
-    this.broadcast({
-      t: S.FEED, k: 'feed.selfLive', p: { name: p.name },
-      text: `${p.name} puts it to their own head. It was not a blank.`, tone: 'bad',
+    p.rouletteSpent = true;
+    g.mag -= 1;
+    this.broadcast({ t: S.SOUND, sound: 'gunshot', pos: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z)] });
+    const live = Math.random() < 1 / ROULETTE.chambers;
+    telemetry.social(this, 'roulette');
+
+    // Only the men who watched it hear about it, because the whole value of
+    // the thing is that they watched it.
+    const tellWatchers = (msg) => {
+      for (const o of this.players.values()) {
+        if (o.id === p.id || !watching.has(o.id)) continue;
+        this.emit(o, msg);
+      }
+    };
+
+    if (!live) {
+      this.emit(p, {
+        t: S.FEED, k: 'feed.itClicked',
+        text: 'It clicks. Every man who saw that has to think again about you.',
+        tone: 'good',
+      });
+      tellWatchers({
+        t: S.FEED, k: 'feed.sawItClick', p: { name: p.name },
+        text: `${p.name} put their own gun to their head in front of you, and it clicked.`,
+        tone: 'badge',
+      });
+      this.timeline.push({
+        at: Math.max(0, Math.round(now() - (this.stats?.started || now()))),
+        type: 'roulette', who: p.name, live: false,
+      });
+      // What it actually buys: the men who watched believe you a little, and
+      // stop believing what they had against you.
+      this.notifyBots('roulette', { who: p, live: false }, (o) => watching.has(o.id));
+      this.pushSelf(p);
+      return;
+    }
+
+    this.emit(p, {
+      t: S.FEED, k: 'feed.itWasLoaded', text: 'It was the loaded one.', tone: 'bad',
     });
-    const behind = this.linedUpBehind(p);
-    this.applyDamage(p, p, 1, 'selfshot', null);
-    if (behind) {
-      // The round out of your back is still a round. It used to be the one
-      // thing in the game no card could stop - not a barrel, not a Missed! -
-      // because 'selfshot' is not a weapon id and duelShotLands waves anything
-      // that is not through without looking. So the gunhand whose whole
-      // sentence is "every shot at him may find wood" had one shot in the
-      // eighty that could not, and turning on your heel was a guaranteed hit
-      // on any man at the table for the price of one of your own.
-      //
-      // Reach is deliberately not checked: the corridor out of your back is
-      // its own measure and the manual says so. What a man gets is what he
-      // has in front of him and what he did about it.
-      if (this.throughStopped(behind, p)) {
-        this.pushDuelAll();
-        return;
-      }
-      this.broadcast({
-        t: S.FEED,
-        k: 'feed.throughInto', p: { name: behind.name },
-        text: `It goes straight through and finds ${behind.name} stood behind them.`,
-        tone: 'bad',
-      });
-      this.applyDamage(behind, p, 1, 'selfshot', null);
-    }
-    this.pushDuelAll();
+    tellWatchers({
+      t: S.FEED, k: 'feed.sawItFire', p: { name: p.name },
+      text: `${p.name} put their own gun to their head in front of you, and it was loaded.`,
+      tone: 'bad',
+    });
+    this.timeline.push({
+      at: Math.max(0, Math.round(now() - (this.stats?.started || now()))),
+      type: 'roulette', who: p.name, live: true,
+    });
+    this.notifyBots('roulette', { who: p, live: true }, (o) => watching.has(o.id));
+    this.applyDamage(p, p, ROULETTE.damage, 'roulette', null);
+    if (p.alive) this.pushSelf(p);
   }
 
   /**
-   * The two things that stop a bullet nobody warned you about: wood in front
-   * of you, and having already got out of the way. Range is not one of them -
-   * the corridor out of a man's back is its own measure - and neither is the
-   * draw, because there was no barrel levelled at anybody to see.
+   * Everybody who can actually see this player right now: close enough, facing
+   * them, and nothing solid in between. The same three questions a witnessed
+   * kill asks, kept in one place so that "who saw that" only ever has one
+   * answer in this file.
    */
-  throughStopped(victim, shooter) {
-    if ((victim.gear || []).includes('barrel') || trait(victim, 'barrel')) {
-      if (this.drawFor(victim, 'barrel')) {
-        this.broadcast({
-          t: S.FEED, k: 'feed.throughWood', p: { name: victim.name },
-          text: `It comes out of his back and buries itself in ${victim.name}'s barrel.`,
-          tone: 'system',
-        });
-        return true;
-      }
-    }
-    const need = trait(shooter, 'needsTwo') ? 2 : 1;
-    const answers = [];
-    for (const card of ['missed', 'bang']) {
-      if (card === 'bang' && !trait(victim, 'swap')) continue;
-      for (const c of (victim.duelHand || [])) if (c === card) answers.push(card);
-    }
-    if (answers.length >= need && (victim.bracedUntil || 0) > now()) {
-      victim.bracedUntil = 0;
-      for (let i = 0; i < need; i += 1) {
-        const at = victim.duelHand.indexOf(answers[i]);
-        if (at >= 0) {
-          victim.duelHand.splice(at, 1);
-          this.pile.put(answers[i]);
-          victim.cardsPlayed.push(answers[i]);
-        }
-      }
-      this.broadcast({
-        t: S.FEED, k: 'feed.throughMissed', p: { name: victim.name },
-        text: `It comes out of his back and ${victim.name} is not there any more.`,
-        tone: 'system',
-      });
-      this.checkEmptyHand(victim);
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Whoever is standing in the corridor out of this player's back. Nearest
-   * first: a round that has already been through one man does not go through
-   * a second.
-   */
-  linedUpBehind(p) {
-    const back = forwardOf(p);
-    let best = null;
-    let bestD = DUEL.selfShot.reach;
+  watchers(p) {
+    const seen = new Set();
+    const chest = chestOf(p);
     for (const o of this.players.values()) {
-      if (o === p || !o.alive) continue;
-      const dx = o.pos.x - p.pos.x;
-      const dz = o.pos.z - p.pos.z;
-      // Behind means the wrong side of them, so the sign is flipped.
-      const along = -(dx * back.x + dz * back.z);
-      if (along <= 0 || along > bestD) continue;
-      const off = Math.abs(dx * -back.z + dz * back.x);
-      if (off > DUEL.selfShot.corridor) continue;
-      best = o;
-      bestD = along;
+      if (o.id === p.id || !o.alive) continue;
+      const eye = eyeOf(o);
+      const d = Math.hypot(chest.x - eye.x, chest.y - eye.y, chest.z - eye.z);
+      if (d > SOCIAL.witnessRange) continue;
+      const to = { x: (chest.x - eye.x) / d, y: (chest.y - eye.y) / d, z: (chest.z - eye.z) / d };
+      const fwd = forwardOf(o);
+      if (to.x * fwd.x + to.y * fwd.y + to.z * fwd.z < SOCIAL.witnessFov) continue;
+      if (!lineOfSight(eye, chest, MAP.solids)) continue;
+      seen.add(o.id);
     }
-    return best;
+    return seen;
   }
 
   /** Whoever is next in the running order and still breathing. */
