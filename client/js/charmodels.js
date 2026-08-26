@@ -115,6 +115,10 @@ export function makeModelRig(character) {
       if (!clip) { console.warn(`[models] ${character}: no clip named "${clipName}"`); continue; }
       const action = rig.mixer.clipAction(clip);
       if (state === 'death') { action.loop = THREE.LoopOnce; action.clampWhenFinished = true; }
+      // A stagger and a card going down are moments, not states: they play
+      // once and hand the body back rather than looping until something else
+      // interrupts them.
+      if (state === 'hit' || state === 'play') { action.loop = THREE.LoopOnce; }
       rig.actions[state] = action;
     }
     if (!Object.keys(rig.actions).length) {

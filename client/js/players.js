@@ -61,6 +61,19 @@ const LOOK = {
 // Geometry cache - eight players share one set of shapes.
 // ---------------------------------------------------------------------------
 const geoCache = new Map();
+/** Everything computePose carries between frames, for one man. */
+export function poseState(seed = Math.random() * 100) {
+  return {
+    walkPhase: seed % 6,
+    aimBlend: 0,
+    crouchBlend: 0,
+    floorBlend: 0,
+    hitAt: -99, drewAt: -99, playedAt: -99,
+    idleSeed: seed,
+    shiftAt: 0, shift: 0, shiftTo: 0,
+  };
+}
+
 function cached(key, make) {
   let g = geoCache.get(key);
   if (!g) { g = make(); geoCache.set(key, g); }
@@ -170,6 +183,147 @@ function gunMesh() {
 }
 
 // ---------------------------------------------------------------------------
+/**
+ * Where every joint should be this frame.
+ *
+ * A free function over an explicit state object rather than a method, for two
+ * reasons. It is rig-independent on purpose - the same numbers drive the
+ * procedural gunhand and a bone-mapped glTF model - and it is the most
+ * intricate maths in the client, which in this repo means it is tested on plain
+ * node like everything else rather than looked at.
+ *
+ * `a` is the avatar's own carried state (walk phase, blends, when he was last
+ * hit); `f` is this frame's facts.
+ */
+export function computePose(a, f, dt) {
+  const {
+    crouch, moving, sprint, firing, pitch, renderTime, dying,
+    sinceHit = 99, sinceDraw = 99, sincePlayed = 99, onFloor = false, gunUp = false,
+  } = f;
+
+  a.crouchBlend = lerp(a.crouchBlend, crouch ? 1 : 0, Math.min(1, dt * 11));
+  const cb = a.crouchBlend;
+
+  const cadence = sprint ? 10.5 : 6.6;
+  a.walkPhase += dt * cadence * (moving ? 1 : 0);
+  const stride = moving ? (sprint ? 0.72 : 0.46) * (1 - cb * 0.55) : 0;
+
+  // Standing still is not standing frozen. In the mode this game is played in
+  // most, nobody walks for the whole round - so this, and not the walk cycle
+  // below it, is what a player actually watches for four minutes. Breath, a
+  // slow weight change from one foot to the other, and a small amount of him
+  // that is never quite still.
+  const seed = a.idleSeed;
+  const breath = Math.sin(renderTime * 1.35 + seed) * 0.014
+    + Math.sin(renderTime * 2.9 + seed * 1.7) * 0.004;
+  if (renderTime > a.shiftAt) {
+    a.shiftAt = renderTime + 3.5 + Math.random() * 5;
+    a.shiftTo = (Math.random() < 0.5 ? -1 : 1) * (0.4 + Math.random() * 0.6);
+  }
+  a.shift = lerp(a.shift, moving ? 0 : (a.shiftTo || 0), Math.min(1, dt * 1.6));
+  const idle = breath;
+
+  // The draw. This used to be a blend from one number to another, which is a
+  // gun that fades into position - and the draw is the ONE warning anybody at
+  // a table gets, so it has to be a movement with a beginning and an end. It
+  // overshoots and settles, the way a hand does.
+  const rising = gunUp || firing;
+  const want = rising ? 1 : (sprint && moving ? 0 : 0.22);
+  a.aimBlend = lerp(a.aimBlend, want, Math.min(1, dt * (rising ? 16 : 7)));
+  // A quarter second of settle on top, so the barrel arrives rather than
+  // appearing. Only on the way up: nobody snaps a gun back down.
+  const settle = sinceDraw < 0.45 && rising
+    ? Math.sin(sinceDraw * 22) * Math.max(0, 1 - sinceDraw / 0.45) * 0.09 : 0;
+  const ab = Math.min(1.06, a.aimBlend + settle);
+
+  // A hit landed. Two tenths of a second of a man losing the argument with
+  // it: the shoulder goes back, the head snaps, the knees give a little.
+  const flinch = sinceHit < 0.34
+    ? Math.sin((sinceHit / 0.34) * Math.PI) * (1 - sinceHit / 0.34) * 1.6 : 0;
+
+  // A card going down on the table. Public, and until now silent.
+  const play = sincePlayed < 0.5
+    ? Math.sin((sincePlayed / 0.5) * Math.PI) : 0;
+
+  // The floor is his. Squared up over it, weight forward, rather than the
+  // same idle as the seven men watching him.
+  a.floorBlend = lerp(a.floorBlend, onFloor ? 1 : 0, Math.min(1, dt * 4));
+  const fb = a.floorBlend;
+
+  const swingA = Math.sin(a.walkPhase) * stride * 0.55;
+
+  const leg = (phaseOffset, side) => {
+    const p = a.walkPhase + phaseOffset;
+    const swing = Math.sin(p) * stride;
+    const knee = Math.max(0, -Math.sin(p + 0.9)) * stride * 1.5 + cb * 1.55;
+    // Standing: the weight is on one foot and it changes every few seconds,
+    // which is the difference between a man waiting and a fencepost. The
+    // loaded leg straightens and the other takes a little bend.
+    const load = moving ? 0 : a.shift * side;
+    return {
+      hip: swing + cb * 0.95 - load * 0.05 + fb * 0.06,
+      knee: knee + (moving ? 0 : Math.max(0, -load) * 0.16 + fb * 0.10) + flinch * 0.18,
+      ankle: -knee * 0.35 - swing * 0.25 - cb * 0.5,
+      drop: cb * 0.33 + (moving ? 0 : Math.max(0, load) * 0.012) + flinch * 0.03,
+    };
+  };
+
+  const bob = moving ? Math.abs(Math.sin(a.walkPhase)) * (sprint ? 0.035 : 0.018) : idle;
+
+  const pose = {
+    crouch: cb,
+    dying: dying || 0,
+    rootY: -cb * 0.42 + bob - flinch * 0.04,
+    spine: {
+      // Forward over the gun while the floor is his; back and away from the
+      // hit that just landed.
+      x: (sprint && moving ? 0.22 : 0.04) + cb * 0.28 + fb * 0.07 - flinch * 0.20,
+      // The weight change reads on the hips more than anywhere else.
+      z: (moving ? Math.sin(a.walkPhase) * 0.045 : a.shift * 0.035)
+        + flinch * 0.09,
+    },
+    neck: { x: 0 },
+    legL: leg(0, 1),
+    legR: leg(Math.PI, -1),
+    armR: {
+      shoulder: lerp(-swingA - 0.02, -1.42 - pitch * 0.85, ab) - flinch * 0.30,
+      elbow: lerp(-0.42, -0.22, ab) - flinch * 0.22,
+      z: lerp(0.10, -0.10, ab),
+    },
+    armL: {
+      // The off hand is the one that puts a card down, so the gesture lives
+      // here and never fights the arm holding the gun.
+      shoulder: lerp(swingA - 0.02, -1.18 - pitch * 0.8, ab) - play * 0.85 - flinch * 0.18,
+      elbow: lerp(-0.42, -0.66, ab) + play * 0.55,
+      z: lerp(-0.10, 0.36, ab) - play * 0.30,
+    },
+    coatSway: (moving ? Math.sin(a.walkPhase * 2) * 0.03 : a.shift * 0.02)
+      - flinch * 0.05,
+  };
+  // The head goes with the hit rather than staying level through it, and a
+  // small amount of it is never quite still.
+  pose.neck.x = -pitch * 0.55 - pose.spine.x * 0.6 + flinch * 0.42
+    + (moving ? 0 : Math.sin(renderTime * 0.9 + seed * 2.3) * 0.02);
+
+  if (pose.dying > 0) {
+    const e = pose.dying;
+    pose.spine.x = lerp(pose.spine.x, -Math.PI / 2, e);
+    pose.spine.z = lerp(pose.spine.z, 0.25, e);
+    pose.rootY = lerp(pose.rootY, -0.72, e);
+    for (const l of [pose.legL, pose.legR]) {
+      l.hip = lerp(l.hip, -1.3, e);
+      l.knee = lerp(l.knee, 0.9, e);
+      l.ankle = lerp(l.ankle, 0, e);
+      l.drop = lerp(l.drop, 0.78, e);
+    }
+    pose.armL.shoulder = lerp(pose.armL.shoulder, 0.6, e);
+    pose.armL.z = lerp(pose.armL.z, -0.8, e);
+    pose.armR.shoulder = lerp(pose.armR.shoulder, 0.4, e);
+    pose.armR.z = lerp(pose.armR.z, 0.9, e);
+  }
+  return pose;
+}
+
 export class PlayerView {
   constructor(scene, id, name, character) {
     this.id = id;
@@ -178,10 +332,16 @@ export class PlayerView {
     this.buffer = [];
     this.alive = true;
     this.deadAt = 0;
-    this.walkPhase = Math.random() * 6;
-    this.aimBlend = 0;
-    this.crouchBlend = 0;
     this.mats = [];
+    // Everything the pose carries between frames, in one place, so the maths
+    // that reads it can live outside this class and be tested. All of it is
+    // body language rather than position, and all of it exists because of the
+    // mode this game is played in most: nobody walks at a table, so the walk
+    // cycle that is most of this file never runs there, and for four minutes
+    // eight men stood perfectly still while the round they were in happened
+    // entirely on a HUD.
+    Object.assign(this, poseState(Math.random() * 100));
+    this.gunUp = false;
 
     const ch = CHARACTERS[character] || CHARACTERS.gunslinger;
     const look = LOOK[character] || LOOK.gunslinger;
@@ -448,79 +608,7 @@ export class PlayerView {
   }
 
   // ----------------------------------------------------------------- pose
-  /**
-   * Where every joint should be this frame. Rig-independent, so the same maths
-   * drives the procedural gunhand and a bone-mapped glTF model.
-   */
-  computePose(f, dt) {
-    const { crouch, moving, sprint, firing, pitch, renderTime, dying } = f;
-
-    this.crouchBlend = lerp(this.crouchBlend, crouch ? 1 : 0, Math.min(1, dt * 11));
-    const cb = this.crouchBlend;
-
-    const cadence = sprint ? 10.5 : 6.6;
-    this.walkPhase += dt * cadence * (moving ? 1 : 0);
-    const stride = moving ? (sprint ? 0.72 : 0.46) * (1 - cb * 0.55) : 0;
-    const idle = Math.sin(renderTime * 1.5 + this.id) * 0.02;
-
-    // Low ready when idle, gun up when actually shooting. Anyone who has raised
-    // their piece at you is worth noticing across the street.
-    this.aimBlend = lerp(this.aimBlend, firing ? 1 : (sprint && moving ? 0 : 0.22), Math.min(1, dt * 8));
-    const ab = this.aimBlend;
-    const swingA = Math.sin(this.walkPhase) * stride * 0.55;
-
-    const leg = (phaseOffset) => {
-      const p = this.walkPhase + phaseOffset;
-      const swing = Math.sin(p) * stride;
-      const knee = Math.max(0, -Math.sin(p + 0.9)) * stride * 1.5 + cb * 1.55;
-      return { hip: swing + cb * 0.95, knee, ankle: -knee * 0.35 - swing * 0.25 - cb * 0.5, drop: cb * 0.33 };
-    };
-
-    const bob = moving ? Math.abs(Math.sin(this.walkPhase)) * (sprint ? 0.035 : 0.018) : idle;
-
-    const pose = {
-      crouch: cb,
-      dying: dying || 0,
-      rootY: -cb * 0.42 + bob,
-      spine: {
-        x: (sprint && moving ? 0.22 : 0.04) + cb * 0.28,
-        z: moving ? Math.sin(this.walkPhase) * 0.045 : 0,
-      },
-      neck: { x: 0 },
-      legL: leg(0),
-      legR: leg(Math.PI),
-      armR: {
-        shoulder: lerp(-swingA - 0.02, -1.42 - pitch * 0.85, ab),
-        elbow: lerp(-0.42, -0.22, ab),
-        z: lerp(0.10, -0.10, ab),
-      },
-      armL: {
-        shoulder: lerp(swingA - 0.02, -1.18 - pitch * 0.8, ab),
-        elbow: lerp(-0.42, -0.66, ab),
-        z: lerp(-0.10, 0.36, ab),
-      },
-      coatSway: moving ? Math.sin(this.walkPhase * 2) * 0.03 : 0,
-    };
-    pose.neck.x = -pitch * 0.55 - pose.spine.x * 0.6;
-
-    if (pose.dying > 0) {
-      const e = pose.dying;
-      pose.spine.x = lerp(pose.spine.x, -Math.PI / 2, e);
-      pose.spine.z = lerp(pose.spine.z, 0.25, e);
-      pose.rootY = lerp(pose.rootY, -0.72, e);
-      for (const l of [pose.legL, pose.legR]) {
-        l.hip = lerp(l.hip, -1.3, e);
-        l.knee = lerp(l.knee, 0.9, e);
-        l.ankle = lerp(l.ankle, 0, e);
-        l.drop = lerp(l.drop, 0.78, e);
-      }
-      pose.armL.shoulder = lerp(pose.armL.shoulder, 0.6, e);
-      pose.armL.z = lerp(pose.armL.z, -0.8, e);
-      pose.armR.shoulder = lerp(pose.armR.shoulder, 0.4, e);
-      pose.armR.z = lerp(pose.armR.z, 0.9, e);
-    }
-    return pose;
-  }
+    computePose(f, dt) { return computePose(this, f, dt); }
 
   applyProcedural(pose) {
     for (const l of [{ g: this.legs[0], p: pose.legL }, { g: this.legs[1], p: pose.legR }]) {
@@ -542,9 +630,16 @@ export class PlayerView {
   applyModel(pose, dt, f) {
     const rig = this.modelRig;
     if (rig.mixer) {
+      // A hit and a card are moments, so they win while they last; then the gun
+      // being UP, which at a table is the whole of a man's go and used to be
+      // read off `firing` - a bit that is true for an eighth of a second after
+      // a trigger. A configured model spent the round in `idle` for the same
+      // reason the procedural rig did.
       const state = f.dying ? 'death'
+        : (f.sinceHit < 0.34 && rig.actions.hit) ? 'hit'
+        : (f.sincePlayed < 0.5 && rig.actions.play) ? 'play'
         : f.moving ? (f.sprint ? 'run' : 'walk')
-        : (f.firing && rig.actions.aim) ? 'aim' : 'idle';
+        : ((f.gunUp || f.firing) && rig.actions.aim) ? 'aim' : 'idle';
       playState(rig, state);
       rig.mixer.update(dt);
     } else if (rig.bones) {
@@ -585,7 +680,12 @@ export class PlayerView {
     const sprint = !!(c.st & 2);
     const dusty = !!(c.st & 8);
     const firing = !!(c.st & 64);
+    const hit = !!(c.st & 128);
     this.star.visible = !!(c.st & 16);
+    // A hit is a moment, and the bit stays up for a quarter of a second, so
+    // the flinch is fired on the EDGE rather than held down for the whole of it.
+    if (hit && !this.wasHit) this.hitAt = renderTime;
+    this.wasHit = hit;
 
     this.root.position.set(x, y, z);
     this.body.rotation.set(0, yaw, 0);
@@ -595,7 +695,18 @@ export class PlayerView {
     const dyingRaw = this.alive ? 0 : Math.min(1, (renderTime - this.deadAt) / 0.5);
     const dying = dyingRaw > 0 ? 1 - (1 - dyingRaw) * (1 - dyingRaw) : 0;
 
-    const flags = { crouch, moving: moving && this.alive, sprint, firing: firing && this.alive, pitch, renderTime, dying };
+    const flags = {
+      crouch, moving: moving && this.alive, sprint, firing: firing && this.alive,
+      pitch, renderTime, dying,
+      // How long since the three things a man's body should say out loud.
+      sinceHit: renderTime - this.hitAt,
+      sinceDraw: renderTime - this.drewAt,
+      sincePlayed: renderTime - this.playedAt,
+      // The floor is his, so he is squared up over it rather than idling.
+      onFloor: !!this.onFloor,
+      // And the gun is up, which at a table is the only warning anybody gets.
+      gunUp: !!this.gunUp,
+    };
     const pose = this.computePose(flags, dt);
     if (this.modelRig) this.applyModel(pose, dt, flags);
     else this.applyProcedural(pose);
@@ -624,6 +735,33 @@ export class PlayerView {
   }
 
   setRevealed(on) { this.outline.visible = on && this.alive; }
+
+  /**
+   * Whose go it is, and whether his gun is up.
+   *
+   * Neither of these is in the snapshot, and neither needs to be: the turn
+   * packet already tells every screen whose floor it is, and at a table a man
+   * with the floor is holding the only live gun in town. Sending it again as a
+   * bit would be the same fact on the wire twice, and the second copy is the
+   * one that goes out of date.
+   */
+  setFloor(mine, gunUp) {
+    if (gunUp && !this.gunUp) this.drewAt = performance.now() / 1000;
+    this.onFloor = mine;
+    this.gunUp = gunUp;
+  }
+
+  /**
+   * A card left this man's hand. The table readout says how many everybody is
+   * holding, so a count that went down is a card played - which is public, and
+   * was the one thing in the whole mode that happened with nobody moving.
+   */
+  cardsNow(n) {
+    if (this.cardCount != null && n < this.cardCount) {
+      this.playedAt = performance.now() / 1000;
+    }
+    this.cardCount = n;
+  }
 
   dispose(scene) {
     scene.remove(this.root);

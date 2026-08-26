@@ -793,10 +793,14 @@ export class Room {
     if (dmg <= 0) return;
 
     victim.health -= dmg;
+    // When he was last hit, whoever or whatever did it. A stick going off in
+    // his hands staggers a man exactly as much as a bullet does, and this used
+    // to be set only when there was somebody to blame - so the two hits in the
+    // game that have no attacker were the two nobody could see land.
+    victim.lastHitAt = now();
     if (attacker && attacker !== victim) {
       attacker.damageDealt += dmg;
       victim.lastHitBy = attacker.id;
-      victim.lastHitAt = now();
       // What this shooter knows he has put into that man. A bot picking off
       // the wounded used to read the victim's health straight off the server,
       // and nothing puts another man's health in a snapshot - so the bots knew
@@ -3229,9 +3233,16 @@ export class Room {
         n: p.name,
         x: r2(p.pos.x), y: r2(p.pos.y), z: r2(p.pos.z),
         yw: r2(p.yaw), pt: r2(p.pitch),
+        // 128 is a hit that just landed on him, and it is the one thing in
+        // here a bystander learns rather than the man himself. It is honest:
+        // this whole packet is already culled to what a viewer can see, and a
+        // man staggering is a thing you can see. Without it the only body
+        // language in the game for the thing the game is ABOUT was none at
+        // all - eight men stood perfectly still while somebody bled.
         st: (p.crouch ? 1 : 0) | (p.sprint ? 2 : 0) | (p.moving ? 4 : 0) |
             (p.buffs.dust ? 8 : 0) | (p.badge ? 16 : 0) | (p.alive ? 0 : 32) |
-            (t - p.firedAt < 0.12 ? 64 : 0),
+            (t - p.firedAt < 0.12 ? 64 : 0) |
+            (t - (p.lastHitAt || -99) < 0.28 ? 128 : 0),
         w: p.slot,
         ch: p.character,
       });

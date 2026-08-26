@@ -29,8 +29,14 @@ character at a time.
       "idle":  "Idle",
       "walk":  "Walk",
       "run":   "Run",
-      "aim":   "Aim",      // played while firing
-      "death": "Death"     // played once, then held
+      "aim":   "Aim",      // held while his gun is up - which in the turn mode
+                           // is the whole of his go, not the moment he fires
+      "death": "Death",    // played once, then held
+
+      // Both optional, both played once and handed back. In the turn mode
+      // nobody walks, so these two and "aim" are most of what anybody sees.
+      "hit":   "HitReact", // a hit landed on him
+      "play":  "Interact"  // a card left his hand
     },
 
     // OPTION B - no clips, but the rig has named bones. The game will drive
@@ -61,6 +67,14 @@ character at a time.
 
 Provide `clips` **or** `bones` — clips win if both are present. A model with
 neither still renders; it simply will not animate.
+
+`idle` matters more here than in most games. The mode this is played in by
+default has **nobody walking**: everyone stands on a dealt mark for the whole
+round, so `walk` and `run` never play there and `idle`, `aim`, `hit` and `play`
+are the entire performance. A stiff idle reads as a diorama. The procedural rig
+answers this with breath and a weight change from one foot to the other every
+few seconds; if your `idle` clip is a T-pose with a sway on it, prefer `bones`
+and let the procedural pose drive your rig instead.
 
 ## What the game still controls
 

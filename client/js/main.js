@@ -545,6 +545,7 @@ class Game {
       case S.DUEL:
         this.duel = msg;
         this.hud.setDuel(msg);
+        this.pushBodyLanguage();
         break;
       case S.AIMED:
         this.aimedOn = !!msg.on;
@@ -555,6 +556,7 @@ class Game {
         this.turn = msg.kind ? msg : null;
         this.turnDeadline = performance.now() / 1000 + (msg.left || 0);
         this.hud.setTurn(this.turn);
+        this.pushBodyLanguage();
         break;
       case S.PHASE:
         this.phase = msg.phase;
@@ -684,6 +686,33 @@ class Game {
     }
   }
 
+  /**
+   * The two things a man's body says that are not in the snapshot.
+   *
+   * Whose floor it is, and how many cards everybody is holding, both already
+   * reach this browser - on the turn packet and on the hand packet - and both
+   * are public. Sending them a second time as bits on a position would be the
+   * same fact on the wire twice, and the second copy is the one that goes out
+   * of date. So the avatars are told from what is already here.
+   *
+   * At a table this is most of what there is to watch. Nobody walks, so the
+   * walk cycle never runs: without this, a round of the mode people play by
+   * default is eight men standing perfectly still for four minutes while the
+   * game happens entirely on a HUD.
+   */
+  pushBodyLanguage() {
+    if (!this.duelMode) return;
+    const holder = this.turn && this.turn.kind === 'turn' ? this.turn.holder : null;
+    const counts = new Map((this.duel?.table || []).map((o) => [o.id, o.cards]));
+    for (const [id, v] of this.views) {
+      // His gun is up if the floor is his. At a table that IS the warning, and
+      // it is the same thing everybody else can see.
+      v.setFloor(id === holder, id === holder);
+      const n = counts.get(id);
+      if (Number.isFinite(n)) v.cardsNow(n);
+    }
+  }
+
   onSnapshot(msg) {
     const now = performance.now() / 1000;
     this.phaseLeft = msg.left;
@@ -713,6 +742,7 @@ class Game {
 
     const revealed = new Set(msg.reveal || []);
     for (const [id, v] of this.views) v.setRevealed(revealed.has(id));
+    this.pushBodyLanguage();
 
     if (msg.ring > 0) {
       this.ringMesh.scale.set(msg.ring, 1, msg.ring);
