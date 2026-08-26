@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 250 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 254 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -461,10 +461,20 @@ Two levels of support, so almost any rigged model works:
   `aim`, `death`, and optionally `hit` and `play`) and an `AnimationMixer`
   drives them with crossfades. `aim` is held for as long as the man's gun is
   up, which in the turn mode is his whole go rather than the instant he fires.
+  A clip can be given by **index** as well as by name (`"idle": 0`), which is
+  the only way to address an unnamed one — and plenty of real exports have
+  those. If nothing matches, the console lists every clip the file has with its
+  index; if the file has exactly one clip, it is used rather than wasted.
 - **It has no clips but has named bones** — map the bone names and the game
   drives that skeleton with the *same pose it computes for the procedural
   gunhand*, so you get the walk cycle, crouch, low-ready and death collapse for
   free.
+
+Each model is measured once on load and the console says what it found — a
+character that came out 0.31m tall is told so, along with the exact `scale` that
+would fix it, and feet that do not sit at zero get the `offset` that puts them
+on the ground. Neither of those looks like a number being wrong on screen; they
+look like your character is a dot, or a wall.
 
 Per-character, per-model, and failure-tolerant: anything not listed, or that
 fails to load, silently keeps the procedural gunhand, so you can convert one
@@ -712,7 +722,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 250 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 254 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,

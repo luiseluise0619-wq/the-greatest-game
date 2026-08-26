@@ -210,3 +210,67 @@ test('every joint stays a number, whatever happens at once', () => {
     for (const n of flat) assert.ok(Number.isFinite(n), `a joint came out ${n}`);
   }
 });
+
+// ------------------------------------------------------------ dropped-in models
+//
+// The one thing in the glTF path that is arithmetic rather than plumbing: how
+// tall the model somebody dropped in actually came out. The console prints it
+// and suggests the `scale` that would fix it, and a confidently wrong
+// suggestion is worse than no suggestion at all.
+//
+// The obvious implementation — Box3.setFromObject — is the wrong one. On a
+// skinned mesh that follows the live skeleton, so it answers a different
+// question depending on what pose the shared skeleton happens to be holding:
+// measured across four scales of the same file it returned 1.8, 1.25, 10.4 and
+// 31.2 metres. Not a measurement, just a number. This reads the authored
+// geometry in bind pose instead, where skinning cannot reach it.
+const { measureForTest } = await import('../client/js/charmodels.js');
+const THREE = await import('three');
+
+/** A man-shaped thing, feet on the floor, at a given scale. */
+function dummy(scale = 1, { feetAt = 0, height = 1.8, rot = 0 } = {}) {
+  const root = new THREE.Group();
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, height, 0.3));
+  mesh.position.y = feetAt + height / 2;
+  mesh.rotation.y = rot;
+  root.add(mesh);
+  root.scale.setScalar(scale);
+  return root;
+}
+
+test('a dropped-in model is measured in metres, and the number tracks scale', () => {
+  // Relative, because a geometry's bounding box is single-precision floats and
+  // a hundredfold scale carries that error up with it. What is being checked
+  // is that the number tracks, not that it is exact to the micron.
+  for (const s of [0.01, 1, 2, 5, 100]) {
+    const box = measureForTest(dummy(s));
+    const h = box.max.y - box.min.y;
+    assert.ok(Math.abs(h - 1.8 * s) < 1.8 * s * 1e-5,
+      `at scale ${s} a 1.8m man measured ${h} — the suggestion built on this would be wrong`);
+    assert.ok(Math.abs(box.min.y) < 1e-5 * Math.max(1, s), `and his feet were at ${box.min.y}`);
+  }
+});
+
+test('and it says where the feet are, which is what offset is for', () => {
+  const box = measureForTest(dummy(1, { feetAt: -0.6 }));
+  assert.ok(Math.abs(box.min.y + 0.6) < 1e-6, `feet measured at ${box.min.y}, not -0.6`);
+  assert.ok(Math.abs((box.max.y - box.min.y) - 1.8) < 1e-6, 'and the height moved with them');
+});
+
+test('a rotation on the way down cannot shrink the man', () => {
+  // The box is built corner by corner rather than from min/max directly, so a
+  // model whose mesh is turned inside its own hierarchy still measures 1.8m
+  // rather than something narrower.
+  const h = (rot) => {
+    const box = measureForTest(dummy(1, { rot }));
+    return box.max.y - box.min.y;
+  };
+  for (const rot of [0, Math.PI / 4, Math.PI / 2, 1.1]) {
+    assert.ok(Math.abs(h(rot) - 1.8) < 1e-6, `turned ${rot} radians he measured ${h(rot)}m`);
+  }
+});
+
+test('nothing to measure is answered with nothing, not with a guess', () => {
+  assert.equal(measureForTest(new THREE.Group()), null,
+    'an empty model produced a measurement, and a suggestion would follow it');
+});

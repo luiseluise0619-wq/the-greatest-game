@@ -10,3 +10,8 @@ test/browser/screenshots/
 # and one of them once rode into a commit on a `git add -A`.
 /*.mjs
 !/tools/*.mjs
+
+# Test models pulled in from elsewhere. CC-BY and not ours to ship.
+client/models/*.glb
+client/models/*.gltf
+client/models/*.bin
