@@ -103,18 +103,22 @@ what is actually out there:
 
 - **[Quaternius](https://quaternius.com)** (CC0) — the straightest fit. Rigged
   low-poly humans plus a Western set of buildings, barrels and wagons. CC0 means
-  no attribution and no licence file to carry.
+  no attribution and no licence file to carry. Download from the site; his
+  GitHub account is not where the packs live.
 - **[Kenney](https://kenney.nl/assets)** (CC0) — blocky characters and a big
-  Western kit. Simple silhouettes, which is a virtue here.
-- **[Mixamo](https://mixamo.com)** (free with an Adobe account) — not models so
-  much as *animation*. Upload any humanoid, download `idle`, `walk`, `run`,
+  Western kit. Simple silhouettes, which is a virtue here. Same caveat: the
+  packs are on the site, and the GitHub account is Godot starter kits.
+- **[Mixamo](https://www.mixamo.com)** (free with an Adobe account) — not models
+  so much as *animation*. Upload any humanoid, download `idle`, `walk`, `run`,
   `aim`, `hit`, `death` as clips. The `bones` map above is already written in
   Mixamo's naming convention.
 - **[Poly Pizza](https://poly.pizza)** — the old Google Poly library. CC0 and
   CC-BY are mixed together, so check each item.
-- **[glTF-Sample-Models](https://github.com/KhronosGroup/glTF-Sample-Models)** —
-  not a western, but the right place to *test the pipeline*. `CesiumMan` is
-  rigged with clips and will prove your config before you spend time on art.
+- **[glTF-Sample-Assets](https://github.com/KhronosGroup/glTF-Sample-Assets)** —
+  not a western, but the right place to *test the pipeline*: `CesiumMan` under
+  `Models/` is rigged with clips and will prove your config before you spend
+  time on art. (The older `glTF-Sample-Models` repo is archived — this is the
+  one that is still maintained.)
 
 ## Licensing
 

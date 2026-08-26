@@ -484,11 +484,11 @@ the pipeline was written against what is actually available, so:
 
 | Source | Licence | What it is good for |
 |---|---|---|
-| [quaternius.com](https://quaternius.com) ([GitHub](https://github.com/quaternius)) | CC0 | The straightest fit. Low-poly rigged humans and a Western set — buildings, barrels, wagons, cacti. CC0 means no attribution and no licence file to carry around. |
-| [Kenney](https://kenney.nl/assets) ([GitHub](https://github.com/KenneyNL)) | CC0 | Blocky characters and a large Western kit. Silhouettes are simple, which is a virtue here: eight strangers have to be told apart at 40 metres. |
-| [Mixamo](https://mixamo.com) | free with an Adobe account | Not models so much as **animation**. Upload any humanoid and download `idle`, `walk`, `run`, `aim`, `hit`, `death` as clips. The bone map in `characters.json` is already written in Mixamo's naming convention. |
+| [quaternius.com](https://quaternius.com) | CC0 | The straightest fit. Low-poly rigged humans and a Western set — buildings, barrels, wagons, cacti. CC0 means no attribution and no licence file to carry around. Download from the site: the GitHub account of the same name is not where the packs live. |
+| [kenney.nl/assets](https://kenney.nl/assets) | CC0 | Blocky characters and a large Western kit. Silhouettes are simple, which is a virtue here: eight strangers have to be told apart at 40 metres. Same caveat — the packs are on the site, and the GitHub account is Godot starter kits. |
+| [Mixamo](https://www.mixamo.com) | free with an Adobe account | Not models so much as **animation**. Upload any humanoid and download `idle`, `walk`, `run`, `aim`, `hit`, `death` as clips. The bone map in `characters.json` is already written in Mixamo's naming convention. |
 | [Poly Pizza](https://poly.pizza) | CC0 / CC-BY | The old Google Poly library, searchable. Check each item — the two licences are mixed together. |
-| [glTF-Sample-Models](https://github.com/KhronosGroup/glTF-Sample-Models) | mixed, per-model | Not a western, but this is the right place to **test the pipeline**. `CesiumMan` and `Fox` are rigged with clips and will prove your config before you spend money or time on art. |
+| [glTF-Sample-Assets](https://github.com/KhronosGroup/glTF-Sample-Assets) | mixed, per-model | Not a western, but the right place to **test the pipeline**: `CesiumMan` under `Models/` is rigged with clips and will prove your config before you spend money or time on art. The older `glTF-Sample-Models` repo is archived; this is the maintained one. |
 
 Two things to check before you commit to a set. **The silhouettes have to
 differ** — hat profile, coat length, build — or the social layer collapses,
