@@ -207,9 +207,18 @@ test('no Korean sentence puts a particle after anybody\'s name', () => {
   const bad = [];
   for (const key of keys('ko')) {
     if (EXCEPT.has(key)) continue;
-    for (const m of String(t('ko', key, '')).matchAll(/\{(\w+):([^{}/]+)\/([^{}]+)\}/g)) {
+    const ko = String(t('ko', key, ''));
+    for (const m of ko.matchAll(/\{(\w+):([^{}/]+)\/([^{}]+)\}/g)) {
       if (OURS[m[1]]) continue;
       bad.push(`${key}: {${m[1]}} is filled with somebody's name and takes ${m[2]}/${m[3]}`);
+    }
+    // And the same mistake made by hand rather than with the machinery: a
+    // particle simply typed against the closing brace. That is worse, because
+    // it does not even pretend to choose - "{name}가" is wrong for every name
+    // in the game that ends in a consonant, which is half of them.
+    for (const m of ko.matchAll(/\{(\w+)\}(이|가|은|는|을|를|와|과)(?![가-힣])/g)) {
+      if (OURS[m[1]]) continue;
+      bad.push(`${key}: {${m[1]}} has "${m[2]}" typed against it and never chooses`);
     }
   }
   assert.deepEqual(bad, [],
