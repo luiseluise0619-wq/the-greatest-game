@@ -1217,10 +1217,19 @@ export class BotBrain {
 
   tryLoot(t) {
     const me = this.self;
+    // A bot standing on a crate it cannot use asked for it again every tick.
+    // Most of those asks are refused - a full reserve, a health pack he does
+    // not need - and there were about five hundred of them a round, each one
+    // walking the whole loot table first. Once refused, leave that one alone
+    // for a few seconds: it is the same answer until something changes.
+    if (!this.lootSnubbed) this.lootSnubbed = new Map();
     for (const l of this.room.loot) {
       if (!l.active) continue;
+      if (t < (this.lootSnubbed.get(l.id) || 0)) continue;
       const d = Math.hypot(l.x - me.pos.x, l.z - me.pos.z);
-      if (d < 2.0 && Math.abs(l.y - me.pos.y) < 3) this.room.onPickup(me, { id: l.id });
+      if (d >= 2.0 || Math.abs(l.y - me.pos.y) >= 3) continue;
+      this.room.onPickup(me, { id: l.id });
+      if (l.active) this.lootSnubbed.set(l.id, t + 4);   // still there: he was refused
     }
   }
 
