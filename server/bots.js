@@ -730,10 +730,49 @@ export class BotBrain {
     this.social(t, dt);
 
     // Sheriff bots deciding to go public is the map's biggest event.
-    if (me.role === 'sheriff' && !me.badge && this.room.phase === PHASE.COMBAT) {
-      this.badgeTimer = (this.badgeTimer || 0) + dt;
-      if (this.badgeTimer > this.wantBadgeAt) this.room.onBadge(me);
-    }
+    this.maybeBadge(t, dt);
+  }
+
+  /**
+   * Whether to pin the star on, which is the strongest thing a Sheriff can do
+   * and was very nearly never done.
+   *
+   * It was on a clock alone - somewhere between thirty seconds and three
+   * minutes into the round, for the six Sheriffs in ten willing to do it at
+   * all. Rounds average under four minutes and the Sheriff dies in two of
+   * every three, so most of them died before their number came up: the harness
+   * measured **0.27 stars a round**, meaning three rounds in four had nobody
+   * wearing one. A mechanic that fires a quarter of the time is not a mechanic
+   * anybody is balancing around.
+   *
+   * And it is not just armour. `onBadge` sets health to the NEW maximum, so
+   * pinning it on is +45 max health AND a full heal in one keypress. A Sheriff
+   * on his last legs has a lifeline in his pocket and the bots were dying with
+   * it unused, which is a bot playing badly rather than a game being hard.
+   *
+   * So: a clock still, but a man also goes loud when the round gives him a
+   * reason - when he is being taken apart, or when the town has just put his
+   * name up. Both are things he can see happening to him. The four in ten who
+   * decided to stay a stranger still do, right up until the point where staying
+   * a stranger loses the round anyway.
+   */
+  maybeBadge(t, dt) {
+    const me = this.self;
+    if (me.role !== 'sheriff' || me.badge) return;
+    if (this.room.phase !== PHASE.COMBAT && this.room.phase !== PHASE.ENDGAME) return;
+    this.badgeTimer = (this.badgeTimer || 0) + dt;
+
+    const hurt = me.health / me.maxHealth;
+    const willing = Number.isFinite(this.wantBadgeAt);
+    // Named in front of the whole town. Hiding has stopped working.
+    const named = (this.accusedOfCount || 0) > 0;
+
+    const go = this.badgeTimer > this.wantBadgeAt
+      || (willing && (hurt < 0.45 || named))
+      // The last extremity. It is a full heal, and a Sheriff who dies holding
+      // it has kept a secret nobody will ever ask him about.
+      || hurt < 0.25;
+    if (go) this.room.onBadge(me);
   }
 
   // -------------------------------------------------------------------------
@@ -774,10 +813,7 @@ export class BotBrain {
     // fork used to be above the line that does it - so in the turn mode no
     // Sheriff had ever pinned one on. Forty rounds of the harness and the
     // number sat at 0.00 the whole time.
-    if (me.role === 'sheriff' && !me.badge && room.phase === PHASE.COMBAT) {
-      this.badgeTimer = (this.badgeTimer || 0) + dt;
-      if (this.badgeTimer > this.wantBadgeAt) room.onBadge(me);
-    }
+    this.maybeBadge(t, dt);
   }
 
   /** Whoever this bot would most like to see face down, at any distance. */

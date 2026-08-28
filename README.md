@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 257 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 261 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -722,7 +722,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 257 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 261 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -746,6 +746,15 @@ They are grouped by what they protect:
   riding again waits for the room rather than one player, and a refresh reclaims
   the same body — including when the reload's new socket beats the old one's close, which
   is what actually happens about half the time.
+- **`test/badge.test.js`** — the star, and when a Sheriff decides to wear it.
+  Pinning it on is the strongest single thing he can do in the free-for-all —
+  +45 max health *and a full heal*, in one keypress — and the bots very nearly
+  never did it, because the decision was a clock alone and most Sheriffs died
+  before their number came up. The checks are that a Sheriff being taken apart
+  reaches for it, that one the town has just named does too, that the four in
+  ten who chose to stay a stranger still do right up until staying hidden loses
+  the round anyway, and that the turn mode is untouched — the star is on at the
+  bell there and is not armour at all.
 - **`test/cards.test.js`** — the deck, and the footstep channel it sits next to:
   a step is heard nearby, never carries a name, lands a little off where the
   walker really is, does not carry across town, dies when they crouch, and comes
@@ -1199,19 +1208,45 @@ bot-only rounds** (`npm run balance -- 120`) sits at:
 
 | | Outlaws | The Law | Renegade |
 |---|---|---|---|
-| win share | **63–68%** | 27–31% | 6% |
+| before the Sheriff learned to use the star | **63–68%** | 27–31% | 6% |
+| after, over **200 rounds** | **51%** | 44% | 6% |
 
-Two runs of 120 on the same build read 63 / 31 / 6 and 68 / 27 / 6, an earlier
-one read 59 / 34 / 7, and a 60 taken beside them read 75 / 18 / 7. A range
-rather than a number, because the noise floor below is not a hedge — it is the
-measurement. The outlaw lean is the real signal in all four.
+Four runs at the old number read 63 / 31 / 6, 68 / 27 / 6, 59 / 34 / 7 and
+75 / 18 / 7 — a range rather than a number, because the noise floor below is
+not a hedge, it is the measurement. But the outlaw lean was the real signal in
+all four, and it turned out not to be a tuning problem at all.
 
-with 98% of rounds resolving on a kill rather than running out on the storm, and
-those averaging about **five minutes**. The Sheriff dies in about two rounds in
-three, and a little over half of the players who killed one had actually picked
-them out first — the rest is crossfire, which is the number to watch: if it goes
-much higher the round is being decided by chaos rather than by anybody working
-anything out.
+#### The Sheriff was dying with the lifeline in his pocket
+
+Pinning the star on is the strongest single thing a Sheriff can do here: `+45`
+max health **and a full heal**, in one keypress, because `onBadge` sets health
+to the new maximum. The bots almost never did it. The decision was a clock
+alone — somewhere between thirty seconds and three minutes into combat, for the
+six Sheriffs in ten willing at all — and rounds average under four minutes while
+the Sheriff dies in two of every three. Most of them died before their number
+came up. The harness measured **0.27 stars a round**: three rounds in four had
+nobody wearing one, and the mechanic this mode is built around barely fired.
+
+A Sheriff now goes loud when the round gives him a reason as well as when the
+clock does: when he is being taken apart, or when the town has just put his name
+up. Both are things he can see happening to him, so it costs him nothing he has
+not earned. The four in ten who chose to stay a stranger still do — right up
+until staying a stranger loses the round anyway.
+
+| | before | after |
+|---|---|---|
+| stars pinned on, a round | 0.27 | **0.65** |
+| outlaw win share | 63–68% | **51%** |
+| a round, resolved by a kill | ~225s | **314s** |
+| the Sheriff's killers who had picked him out | ~55% | **68%** |
+
+A thirty-five point gap became a seven point one, and none of it was a knob: it
+is a bot that was playing badly, which is the only kind of balance fix worth
+making against bot data. The section below still applies — these are bots
+playing bots, and the split is a regression check on the simulation rather than
+a claim about the game.
+
+98% of rounds resolve on a kill rather than running out on the storm.
 
 Three things about those numbers, all learned by getting them wrong first:
 
@@ -1224,10 +1259,11 @@ Three things about those numbers, all learned by getting them wrong first:
   measured. Two separate runs of sixty gave 52% and 63%.
 - **These are bots playing bots.** They find each other faster than people do and
   they never lie to each other, so the split above is a regression check on the
-  simulation, not a claim about the game. The outlaw lean is real and it is the
-  first thing worth attacking with human data — deliberately *not* tuned against
-  bot data, because tuning a game to beat its own robots is how a game ends up
-  only fun for robots.
+  simulation, not a claim about the game. What closed most of the outlaw lean
+  was not a knob but a bot that had been throwing away its best move — which is
+  the only kind of balance fix worth making against bot data. Nothing here has
+  been tuned to beat the robots, because tuning a game to beat its own robots is
+  how a game ends up only fun for robots.
 
 Two bot knobs are overridable so a real playtest can sweep them:
 `HNH_HOSTILITY` (the draw-your-gun line, default 1.25) and `HNH_BADGE_ODDS` (how
