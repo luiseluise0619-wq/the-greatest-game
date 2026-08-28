@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 261 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 263 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -722,7 +722,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 261 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 263 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -754,7 +754,14 @@ They are grouped by what they protect:
   reaches for it, that one the town has just named does too, that the four in
   ten who chose to stay a stranger still do right up until staying hidden loses
   the round anyway, and that the turn mode is untouched — the star is on at the
-  bell there and is not armour at all.
+  bell there and is not armour at all. Plus the other move the bots were not
+  making: **crouching**, which is the one answer this game has to the footstep
+  channel (nine metres of boots instead of twenty-two, and a shorter thing to
+  shoot at, paid for in speed). `me.crouch = false` sat in the movement step
+  unconditionally, so every bot announced itself at twenty-two metres all round
+  while the counterplay the manual describes was a player's alone. A bot now
+  goes quiet on the last stretch of a stalk — about 5% of its movement, which
+  is a stalk rather than a state — and never sprints on its heels.
 - **`test/cards.test.js`** — the deck, and the footstep channel it sits next to:
   a step is heard nearby, never carries a name, lands a little off where the
   walker really is, does not carry across town, dies when they crouch, and comes

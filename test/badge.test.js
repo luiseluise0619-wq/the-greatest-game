@@ -116,3 +116,56 @@ test('the turn mode is untouched: the star is on at the bell', () => {
     assert.ok(s.maxHealth < PLAYER.maxHealth, 'the table is counting hit points');
   } finally { clock.restore(); }
 });
+
+// ------------------------------------------------------------------- boots
+//
+// The other move the bots were not making. Crouching is the one answer this
+// game has to the footstep channel: a crouched man's boots carry nine metres
+// instead of twenty-two, and he is a shorter thing to shoot at. It costs speed,
+// which is the trade.
+//
+// `me.crouch = false` sat in the movement step unconditionally, so every bot in
+// town announced itself at twenty-two metres for the whole round while the
+// counterplay the manual describes was available to players only.
+
+test('a bot closing on somebody goes quiet, and pays for it in speed', () => {
+  TIMING.prep = 1; TIMING.combat = 600; TIMING.endgame = 30; TIMING.results = 5;
+  const clock = fakeClock();
+  try {
+    const room = new Room({ code: 'BOOT', isPublic: false, mode: MODES.FREE });
+    room.botFillTarget = 7;
+    room.resetClock();
+    room.beginMatch();
+
+    let moving = 0, quiet = 0;
+    const ever = new Set();
+    for (let i = 0; i < 4000; i += 1) {
+      tick(clock, room, 1);
+      for (const p of room.players.values()) {
+        if (!p.alive || !p.bot) continue;
+        if (p.moving) moving += 1;
+        if (p.crouch) { quiet += 1; ever.add(p.id); }
+        // Down on his heels and sprinting is not a thing a man does.
+        assert.ok(!(p.crouch && p.sprint), `${p.name} is sprinting on his heels`);
+      }
+      if (room.phase === PHASE.RESULTS) break;
+    }
+
+    assert.ok(moving > 500, `the bots barely moved (${moving} ticks)`);
+    assert.ok(ever.size >= 2, `only ${ever.size} bots ever went quiet`);
+    // A stalk, not a state: he does it on the last stretch, not all round.
+    const share = quiet / moving;
+    assert.ok(share > 0.005 && share < 0.5,
+      `${(share * 100).toFixed(1)}% of movement was crouched, which is not a stalk`);
+  } finally { clock.restore(); }
+});
+
+test('and going quiet actually buys the quiet', () => {
+  // The whole point: the range his boots carry is read off the gait, so if the
+  // gait never says crouch the nine-metre figure in SOCIAL is decoration.
+  assert.ok(SOCIAL.stepRange.crouch < SOCIAL.stepRange.walk,
+    'crouching does not make a man quieter than walking');
+  assert.ok(SOCIAL.stepInterval.crouch > SOCIAL.stepInterval.walk,
+    'and does not slow his step down either');
+  assert.ok(PLAYER.crouchSpeed < PLAYER.walkSpeed, 'and costs him nothing to do');
+});

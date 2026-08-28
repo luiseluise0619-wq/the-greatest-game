@@ -6,7 +6,7 @@
 // Everything below is built around a per-bot suspicion table plus a faction goal.
 
 import {
-  PLAYER, WEAPONS, CHARACTERS, CARDS, PHASE, VISION, DUEL, ROULETTE,
+  PLAYER, WEAPONS, CHARACTERS, CARDS, PHASE, VISION, DUEL, ROULETTE, SOCIAL,
   clamp, stepStamina, canSprint,
 } from '../shared/constants.js';
 import { DUEL_CARDS, DISTANCE_UNIT, inReach, reachOf, coverOf } from '../shared/deck.js';
@@ -1232,10 +1232,31 @@ export class BotBrain {
     sprint = sprint && canSprint(me.stamina, me.sprint);
     me.stamina = stepStamina(me.stamina, sprint && !!desired, dt);
 
+    // Down on his heels, which is the one answer this game has to the boots
+    // channel: a crouched man's steps carry nine metres instead of twenty-two,
+    // and he is a shorter thing to hit. Bots never did it - `me.crouch = false`
+    // sat below this, unconditionally - so every bot in town announced itself
+    // at twenty-two metres for the whole round while the counterplay the manual
+    // describes was available to players only.
+    //
+    // He does it when a man would: closing the last stretch on somebody he has
+    // picked out, and not while he is running for his life or across open
+    // ground to somewhere. It costs him speed, which is the trade.
+    // Closing on a place he saw somebody rather than crossing the town, and
+    // near enough that being heard would matter. Hunt is the state that walks
+    // to a last-known position; the goal IS that position, so the distance to
+    // it is the distance to where he thinks the man is.
+    const goal = this.goal;
+    const toGoal = goal ? Math.hypot(goal.x - me.pos.x, goal.z - me.pos.z) : Infinity;
+    const crouch = !!desired && !sprint
+      && (this.state === 'hunt' || this.state === 'engage')
+      && toGoal < SOCIAL.stepRange.walk;
+
     let vx = 0, vz = 0;
     if (desired) {
       const len = Math.hypot(desired.x, desired.z) || 1;
-      const speed = sprint ? PLAYER.sprintSpeed * 0.92 : PLAYER.walkSpeed;
+      const speed = crouch ? PLAYER.crouchSpeed
+        : sprint ? PLAYER.sprintSpeed * 0.92 : PLAYER.walkSpeed;
       vx = (desired.x / len) * speed;
       vz = (desired.z / len) * speed;
       me.moving = true;
@@ -1250,8 +1271,8 @@ export class BotBrain {
     );
     me.pos.x = res.x; me.pos.y = res.y; me.pos.z = res.z;
     if (res.grounded) me.vel.y = 0;
-    me.sprint = sprint && me.moving;
-    me.crouch = false;
+    me.sprint = sprint && me.moving && !crouch;
+    me.crouch = crouch;
 
     // Stuck detection: shove a new destination in rather than grinding a wall.
     const moved = Math.hypot(me.pos.x - this.lastPos.x, me.pos.z - this.lastPos.z);
