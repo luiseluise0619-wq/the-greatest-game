@@ -1240,11 +1240,17 @@ bot-only rounds** (`npm run balance -- 120`) sits at:
 |---|---|---|---|
 | before the Sheriff learned to use the star | **63–68%** | 27–31% | 6% |
 | after, over **200 rounds** | **51%** | 44% | 6% |
-| after the rest of the bots' unused moves, over 100 | 41% | **52%** | 7% |
+| after the rest of the bots' unused moves, over **200** | 43% | **53%** | 5% |
 
-The third row is three more of the same shape, none of them knobs: the poster
-and the dynamite the bots were structurally unable to reach (below), and the
-crouch and the shout wheel above.
+The third row is four more of the same shape, none of them knobs: the poster,
+the Sawbones' heal and the dynamite the bots were structurally unable to reach,
+and the crouch and the shout wheel. A mode that opened this session at 63–68%
+outlaw is now level and a shade the law's way, and every point of that came out
+of bots that were throwing their own moves away.
+
+The number worth watching moved with it: the share of the Sheriff's killers who
+had actually picked him out rather than hitting him in crossfire went from about
+**55%** to **75%**.
 
 Four runs at the old number read 63 / 31 / 6, 68 / 27 / 6, 59 / 34 / 7 and
 75 / 18 / 7 — a range rather than a number, because the noise floor below is

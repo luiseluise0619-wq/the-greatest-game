@@ -1591,25 +1591,30 @@ export class BotBrain {
     if (this.nextChatAt > 0) return;
     this.nextChatAt = rnd(30, 95) / clamp(this.chattiness, 0.25, 1);
 
-    // A shout first, if there is anybody near enough for one to mean anything.
-    // T reaches the town and V reaches the street, and the bots only ever used
-    // the first - they answered shouts (a `voice` event moves trust and
-    // suspicion) and never made one, so the whole local channel ran one way.
-    // A man calling out from the alley is a thing you are supposed to hear
-    // before you read what he said.
-    if (this.maybeShout(t)) return;
-
     const ranked = [...this.suspicion.entries()]
       .filter(([id]) => this.room.players.get(id)?.alive)
       .sort((a, b) => this.susOf(b[0]) - this.susOf(a[0]));
     const top = ranked[0];
 
+    // Naming somebody in front of the whole town comes first. It is the most
+    // consequential thing said here - it moves everybody's suspicion and it
+    // goes on the round's account - and putting the shout above it cost the
+    // turn mode a quarter of its accusations, 6.2 a round down to 4.7, for
+    // exactly the reason the shout had already cost the chat channel
+    // everything: whatever runs first takes the turn.
     if (top && this.susOf(top[0]) > 0.6 && Math.random() < 0.6) {
       const target = this.room.players.get(top[0]);
       this.room.onAccuse(me, { target: target.id });
       if (Math.random() < 0.6) this.say(pick(CHATTER.accuse), { name: target.name });
       return;
     }
+
+    // Then the street. T reaches the town and V reaches the street, and the
+    // bots only ever used the first - they answered shouts (a `voice` event
+    // moves trust and suspicion) and never made one, so the whole local
+    // channel ran one way. A man calling out from the alley is a thing you are
+    // supposed to hear before you read what he said.
+    if (this.maybeShout(t)) return;
     if (me.faction === 'law' && me.role !== 'sheriff' && Math.random() < 0.25) {
       this.say(pick(CHATTER.lawful), {});
       return;
