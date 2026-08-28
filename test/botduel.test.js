@@ -189,9 +189,21 @@ test('a bot with a card in its hand moves when a gun stops on it', () => {
     mark.brain.skill = 1;
     mark.duelHand = ['missed'];
 
+    // The barrel is held on him rather than left to the shooter's own targeting.
+    // What is being measured is the man on the OTHER end, and a shooter bot
+    // with nothing to fire does not reliably turn to face anybody - so about
+    // one run in three the gun never came round at all and the nerve check was
+    // scored out of twelve trials that never happened (`braceRolled` false
+    // every time, and a flat zero out of twelve).
+    const lookAtMark = () => {
+      shooter.yaw = Math.atan2(-(mark.pos.x - shooter.pos.x), -(mark.pos.z - shooter.pos.z));
+      shooter.pitch = 0;
+    };
+
     // It is a nerve check rather than a rule, so it is counted rather than
     // asserted: twelve times a gun stops on him and he should move most of them.
     let moved = 0;
+    let offered = 0;
     for (let round = 0; round < 12; round++) {
       mark.bracedUntil = 0;
       mark.brain.braceRolled = false;
@@ -199,10 +211,13 @@ test('a bot with a card in its hand moves when a gun stops on it', () => {
       room.aimedAt = null;
       shooter.aimAt = null;
       for (let i = 0; i < 20; i++) {
+        lookAtMark();
         tick(clock, room, 1);
         if ((mark.bracedUntil || 0) > Date.now() / 1000) { moved += 1; break; }
       }
+      if (mark.brain.braceRolled) offered += 1;
     }
+    assert.equal(offered, 12, `the gun only came round on him ${offered} times of twelve`);
     assert.ok(moved >= 6, `a gun stopped on him twelve times and he moved ${moved}`);
 
     // And with nothing to spend, ducking is not a thing he can do at all.

@@ -816,6 +816,55 @@ export class BotBrain {
     this.maybeBadge(t, dt);
   }
 
+  /**
+   * Call out, rather than talk to the whole town.
+   *
+   * Only worth doing with somebody inside earshot, and only about something
+   * that is happening: the wheel is eight lines and seven of them are answers
+   * to a situation rather than conversation. Which line is picked is the
+   * situation - what he can see, what has just been done to him, and what he
+   * is - so a shout is a tell, the same way a player's is.
+   */
+  maybeShout(t) {
+    const me = this.self;
+    const near = [...this.room.players.values()].filter((o) => (
+      o.alive && o.id !== me.id
+      && Math.hypot(o.pos.x - me.pos.x, o.pos.z - me.pos.z) <= SOCIAL.shoutRange
+    ));
+    if (!near.length) return false;
+
+    const hurt = me.health / me.maxHealth;
+    // Something is happening to him and the men beside him should know. These
+    // are worth a shout every time one is true.
+    let line = null;
+    if (hurt < 0.4) line = 'help';
+    else if (this.protecteeThreat && t < this.threatUntil) line = 'sawthat';
+    else if (me.faction === 'law' && me.badge) line = 'lawman';
+    else if (near.some((o) => this.susOf(o.id) > 0.7)) line = 'liar';
+
+    if (!line) {
+      // Nothing is happening. The rest of the wheel is small talk, and small
+      // talk must not crowd out the chat channel: what a bot SAYS, weighed
+      // against what it then does, is half of the deduction layer, and a
+      // shout every time anybody was within thirty-eight metres took it to
+      // zero - at a table, where everybody always is, permanently.
+      if (Math.random() > 0.35) return false;
+      const friend = near.find((o) => this.susOf(o.id) < 0.2);
+      line = friend ? (this.allies.has(friend.id) ? 'follow' : 'friendly') : 'clear';
+    }
+    // And some of the time he keeps even the urgent ones to himself, or the
+    // street is a chorus.
+    if (Math.random() > 0.6 * clamp(this.chattiness, 0.25, 1)) return false;
+    // Not the same thing twice running. A condition that stays true - a badge
+    // that is on for the rest of the round, a man he has decided is lying -
+    // stays true every time this is asked, and a man repeating one line is a
+    // stuck record rather than somebody talking.
+    if (line === this.lastShout) return false;
+    this.lastShout = line;
+    this.room.onVoice(me, { line });
+    return true;
+  }
+
   /** Whoever this bot would most like to see face down, at any distance. */
   duelMark() {
     let best = null, bestWant = 0.35;
@@ -1476,6 +1525,14 @@ export class BotBrain {
     this.nextChatAt -= dt;
     if (this.nextChatAt > 0) return;
     this.nextChatAt = rnd(30, 95) / clamp(this.chattiness, 0.25, 1);
+
+    // A shout first, if there is anybody near enough for one to mean anything.
+    // T reaches the town and V reaches the street, and the bots only ever used
+    // the first - they answered shouts (a `voice` event moves trust and
+    // suspicion) and never made one, so the whole local channel ran one way.
+    // A man calling out from the alley is a thing you are supposed to hear
+    // before you read what he said.
+    if (this.maybeShout(t)) return;
 
     const ranked = [...this.suspicion.entries()]
       .filter(([id]) => this.room.players.get(id)?.alive)

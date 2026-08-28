@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 263 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 269 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -722,7 +722,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 263 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 269 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -762,6 +762,19 @@ They are grouped by what they protect:
   while the counterplay the manual describes was a player's alone. A bot now
   goes quiet on the last stretch of a stalk — about 5% of its movement, which
   is a stalk rather than a state — and never sprints on its heels.
+
+  And **the shout wheel**, the same shape again: `T` reaches the town and `V`
+  reaches the street, and the bots only ever used the first. They *answered*
+  shouts — a `voice` event moves trust and suspicion — and never made one, so
+  the local channel ran one way and no bot had ever called out from an alley.
+  They shout now about what is happening to them: pinned down, watching
+  somebody go for the man they are guarding, wearing the star, or standing
+  next to somebody they have decided is lying. The checks drive each of those
+  situations directly rather than sampling for them, and one guards the thing
+  that broke first — a shout fired every time anybody was in earshot took the
+  town-wide channel to **zero**, permanently, at a table where everybody always
+  is. What a bot says weighed against what it then does is half the deduction
+  layer, so chat has to survive the shout.
 - **`test/cards.test.js`** — the deck, and the footstep channel it sits next to:
   a step is heard nearby, never carries a name, lands a little off where the
   walker really is, does not carry across town, dies when they crouch, and comes
@@ -1274,9 +1287,27 @@ Three things about those numbers, all learned by getting them wrong first:
 
 Two bot knobs are overridable so a real playtest can sweep them:
 `HNH_HOSTILITY` (the draw-your-gun line, default 1.25) and `HNH_BADGE_ODDS` (how
-often a Sheriff bot pins the star on at all, default 0.6). Sweeping the second
-one is instructive: at 0.95 the Sheriff dies *sooner* and the Law wins *less*,
-which is the star doing exactly what it is supposed to do.
+often a Sheriff bot goes loud *by choice*, default 0.6).
+
+Sweeping the second one used to say that at 0.95 the Sheriff died **sooner** and
+the Law won **less** — the star being a target more than it was armour. Measured
+again after the Sheriff learned to time it, that has turned over completely:
+
+| `HNH_BADGE_ODDS` | The Law | Outlaws | Sheriff died | stars a round |
+|---|---|---|---|---|
+| 0.2 | 47% | 40% | 32/60 | 0.60 |
+| **0.6** (default) | 52% | 42% | 29/60 | 0.68 |
+| 0.95 | **55%** | 38% | **27/60** | 0.78 |
+
+More star is now strictly better for the law, because a badge taken at the right
+moment is a full heal rather than a flare fired at the start of a round. The old
+reading was measuring a Sheriff who pinned it on at an arbitrary time and got
+the target without the timing.
+
+Note also how little the knob moves the star count: 0.60 at 0.2, 0.78 at 0.95.
+It only controls whether he goes loud *by choice* — every Sheriff still reaches
+for it at the last extremity, because at that point it is a full heal and dying
+with it unspent is not a decision anybody would defend.
 
 ---
 
