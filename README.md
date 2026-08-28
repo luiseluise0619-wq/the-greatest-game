@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 254 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 257 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -722,7 +722,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 254 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 257 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -940,6 +940,20 @@ They are grouped by what they protect:
   were printing "Dutch Kessler**이** 별을 답니다". A hole may only take a
   particle if what goes into it is a word this project chose and wrote in Korean
   itself — a card, a role, a place — and those are listed by name in the test.
+- **`test/soak.test.js`** — rounds played end to end with the rules checked on
+  every tick. Everything else in this suite sets a situation up by hand and
+  asserts on it, which finds what somebody thought to look for; this plays real
+  rounds — bots dealing, drawing, shooting, dying, taking cards off each other —
+  and asserts the handful of things that must be true of every tick of every
+  round, at three table sizes and in both modes. **The deck is eighty cards**,
+  not about eighty: every one is in the draw pile, the discard, a hand or face
+  up in front of somebody, and there is no fifth place for one to be. The man
+  with the floor is alive and at the table. The running order has no dead men
+  in it. Nobody is on negative health, holding a card that does not exist,
+  sitting in somebody else's seat, or standing at NaN. And how many seats apart
+  two men are does not depend on which of them is asked. Break the hand-limit
+  trim so a discarded card is dropped instead of piled, and it says
+  `78 cards are accounted for, not 80` on the tick it happens.
 - **`test/fuzz.test.js`** — every shape of message a socket can send that a real
   client never would: numbers where objects go, `NaN` and `Infinity` where
   coordinates go, five-thousand-character strings, `__proto__` as a card name.

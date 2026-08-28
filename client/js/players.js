@@ -771,6 +771,25 @@ export class PlayerView {
     this.star?.material?.dispose();
     if (this.ownMaterials) for (const m of this.mats) m.dispose();
     // Geometry is shared across every gunhand, so it is deliberately not disposed.
+
+    // A glTF rig is not. SkeletonUtils.clone builds a fresh Skeleton for every
+    // player, and a Skeleton holds a bone texture on the GPU - so eight men a
+    // round, round after round, is eight textures a round that nothing ever
+    // gives back. The mixer holds the clips bound to that root as well.
+    const rig = this.modelRig;
+    if (rig) {
+      if (rig.mixer) {
+        rig.mixer.stopAllAction();
+        rig.mixer.uncacheRoot(rig.model);
+        rig.mixer = null;
+      }
+      rig.model?.traverse((o) => {
+        if (o.isSkinnedMesh && o.skeleton) o.skeleton.dispose();
+      });
+      rig.actions = {};
+      rig.current = null;
+      this.modelRig = null;
+    }
   }
 }
 
