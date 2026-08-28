@@ -1493,6 +1493,19 @@ export class BotBrain {
         const friend = this.visible.find((o) => (o.lastHitAt || 0) > now - 12
           && this.canSee(o) && this.susOf(o.id) < 0.3);
         if (friend) {
+          // Look at him. Field Dressing resolves against whoever is down the
+          // barrel, and this used to WAIT for the man to wander into the cone
+          // on his own - the same thing that kept the Wanted Poster at zero.
+          // Six rounds with seven or eight Sawbones in them produced three
+          // heals between them, for an ability the mode is partly built on.
+          const d = Math.hypot(friend.pos.x - me.pos.x, friend.pos.z - me.pos.z);
+          if (d <= c.healRange) {
+            const at = chestOf(friend);
+            const from = eyeOf(me);
+            me.yaw = Math.atan2(-(at.x - from.x), -(at.z - from.z));
+            me.pitch = clamp(Math.atan2(at.y - from.y,
+              Math.hypot(at.x - from.x, at.z - from.z)), -1.2, 1.2);
+          }
           const aimed = this.room.playerInCrosshair(me, c.healRange);
           want = aimed === friend;
           if (!want && Math.random() < 0.2) this.setGoal({ x: friend.pos.x, z: friend.pos.z });

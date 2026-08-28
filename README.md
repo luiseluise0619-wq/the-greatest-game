@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 269 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 271 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -722,7 +722,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 269 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 271 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -775,6 +775,16 @@ They are grouped by what they protect:
   town-wide channel to **zero**, permanently, at a table where everybody always
   is. What a bot says weighed against what it then does is half the deduction
   layer, so chat has to survive the shout.
+
+  And **looking at the man**. Three moves in this game resolve against whoever
+  is down the barrel — the Wanted Poster, the Sawbones' Field Dressing and a
+  shot — which is a good rule: you have to look somebody in the face to name
+  him or to patch him up. The bots did not look. They *waited* for the man to
+  wander into a three-degree cone on his own, so across six rounds the poster
+  was played **zero** times and the heal three. A player turns and looks, and
+  they do now. The checks are that a bot facing the wrong way turns round to
+  nail a poster up, and that looking is *all* it does: a man out of the card's
+  range is not named however hard it stares at him.
 - **`test/cards.test.js`** — the deck, and the footstep channel it sits next to:
   a step is heard nearby, never carries a name, lands a little off where the
   walker really is, does not carry across town, dies when they crouch, and comes

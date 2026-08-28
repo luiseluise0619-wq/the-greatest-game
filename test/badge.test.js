@@ -14,7 +14,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick } from './helpers.js';
 import {
-  TIMING, MODES, PHASE, SOCIAL, PLAYER, ROLES, VOICE_LINES,
+  TIMING, MODES, PHASE, SOCIAL, PLAYER, ROLES, VOICE_LINES, CARDS,
 } from '../shared/constants.js';
 
 const { Room } = await import('../server/room.js');
@@ -335,5 +335,93 @@ test('and the town-wide channel survives the street one', () => {
     assert.ok(said > 0, 'the bots stopped talking to the town entirely');
     assert.ok(said > shouts,
       `${shouts} shouts against ${said} things said to the town - the shout ate the chat`);
+  } finally { clock.restore(); }
+});
+
+// --------------------------------------------------- looking at the man
+//
+// Three of this game's moves resolve against whoever is down the barrel: the
+// Wanted Poster, the Sawbones' Field Dressing, and a shot. That is the rule and
+// it is a good one — you have to look a man in the face to name him or to patch
+// him up. The bots did not look. They waited for the man to wander into a
+// three-degree cone on his own, which is why the poster was played zero times
+// in six rounds and the heal three times.
+//
+// A player turns and looks. So these check that the bot does, and that looking
+// is all it does — the rule still decides, and if the look does not land the
+// move is not made.
+
+test('a bot naming somebody turns and looks at him first', () => {
+  TIMING.prep = 1; TIMING.combat = 600; TIMING.endgame = 30; TIMING.results = 5;
+  const clock = fakeClock();
+  try {
+    const room = new Room({ code: 'LOOK', isPublic: false, mode: MODES.FREE });
+    room.botFillTarget = 5;
+    room.resetClock();
+    room.beginMatch();
+    tick(clock, room, 40);
+    const bots = [...room.players.values()].filter((p) => p.bot && p.alive);
+    const [me, mark] = bots;
+    for (const p of bots) if (p !== me && p !== mark) p.pos = { x: 600, y: 0, z: 600 };
+
+    // In front of him, well inside the poster's range, and pointedly not in
+    // his crosshair: he is facing the other way.
+    me.pos = { x: 0, y: 0, z: 0 };
+    mark.pos = { x: 0, y: 0, z: -8 };
+    me.yaw = 0; me.pitch = 0;
+    // Prove the shot is clear before asking anything of the bot, or a wall in
+    // the way would read as a bot that refused to turn round.
+    assert.equal(room.playerInCrosshair(me, CARDS.poster.range), mark,
+      'test setup: there is something between these two');
+    me.yaw = Math.PI;
+    me.brain.visible = [mark];
+    // He must not already know this man. Two outlaws are dealt each other's
+    // faces, and susOf discounts a known accomplice by nine tenths - which
+    // read as a bot that would not turn round about one run in eight.
+    me.brain.knownFriends.clear();
+    me.brain.allies.clear();
+    me.brain.protectee = null;
+    me.brain.suspicion.set(mark.id, 1);
+    me.brain.trust.clear();
+    me.hand = ['poster'];
+    me.lastCardAt = 0;
+    me.brain.nextCardAt = 0;
+
+    // Facing away, so the rule would refuse him as he stands.
+    assert.notEqual(room.playerInCrosshair(me, CARDS.poster.range), mark,
+      'test setup: he is already looking at him');
+
+    me.brain.playCards(Date.now() / 1000, null);
+    assert.deepEqual(me.hand, [], 'he never turned round to nail the poster up');
+    assert.equal(room.playerInCrosshair(me, CARDS.poster.range), mark,
+      'he played it without ever looking at the man');
+  } finally { clock.restore(); }
+});
+
+test('and does not play it at somebody out of range, however hard he looks', () => {
+  TIMING.prep = 1; TIMING.combat = 600; TIMING.endgame = 30; TIMING.results = 5;
+  const clock = fakeClock();
+  try {
+    const room = new Room({ code: 'LOK2', isPublic: false, mode: MODES.FREE });
+    room.botFillTarget = 5;
+    room.resetClock();
+    room.beginMatch();
+    tick(clock, room, 40);
+    const bots = [...room.players.values()].filter((p) => p.bot && p.alive);
+    const [me, mark] = bots;
+    for (const p of bots) if (p !== me && p !== mark) p.pos = { x: 600, y: 0, z: 600 };
+
+    me.pos = { x: 0, y: 0, z: 0 };
+    mark.pos = { x: 0, y: 0, z: -(CARDS.poster.range + 40) };
+    me.yaw = 0; me.pitch = 0;
+    me.brain.visible = [mark];
+    me.brain.suspicion.set(mark.id, 1);
+    me.brain.trust.clear();
+    me.hand = ['poster'];
+    me.lastCardAt = 0;
+    me.brain.nextCardAt = 0;
+
+    me.brain.playCards(Date.now() / 1000, null);
+    assert.deepEqual(me.hand, ['poster'], 'he nailed a poster up across the whole map');
   } finally { clock.restore(); }
 });
