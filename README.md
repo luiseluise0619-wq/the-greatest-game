@@ -1230,6 +1230,11 @@ bot-only rounds** (`npm run balance -- 120`) sits at:
 |---|---|---|---|
 | before the Sheriff learned to use the star | **63–68%** | 27–31% | 6% |
 | after, over **200 rounds** | **51%** | 44% | 6% |
+| after the rest of the bots' unused moves, over 100 | 41% | **52%** | 7% |
+
+The third row is three more of the same shape, none of them knobs: the poster
+and the dynamite the bots were structurally unable to reach (below), and the
+crouch and the shout wheel above.
 
 Four runs at the old number read 63 / 31 / 6, 68 / 27 / 6, 59 / 34 / 7 and
 75 / 18 / 7 — a range rather than a number, because the noise floor below is

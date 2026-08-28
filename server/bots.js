@@ -1415,6 +1415,35 @@ export class BotBrain {
     const w = WEAPONS[me.slot];
     if (d > w.range * 0.85) return;
 
+    // A lit stick is thrown, not aimed, so it is decided BEFORE the sight-line
+    // check below rather than behind it. It used to sit after: a bot needed to
+    // be inside a three-degree cone, at nine to twenty-four metres, holding
+    // dynamite, and then win a coin at six in a thousand - and four whole
+    // rounds of seven men produced twenty-three ticks where the first three
+    // were true at once. It had never once been thrown.
+    //
+    // It goes where the man is rather than where the barrel points, which is
+    // also what a person does with one.
+    // A timer rather than a coin flipped every tick. A per-tick probability is
+    // the wrong model for "should I throw this": the conditions hold for a
+    // handful of ticks at a time, so any rate low enough not to spam is also
+    // low enough never to fire. A man with a stick and somebody at fifteen
+    // metres throws it; the question is how long since the last one.
+    if (me.dynamite > 0 && d > 9 && d < 24 && t >= (this.nextThrowAt || 0)) {
+      const at = chestOf(target);
+      const from = eyeOf(me);
+      const away = { x: at.x - from.x, y: at.y - from.y, z: at.z - from.z };
+      const far = Math.hypot(away.x, away.y, away.z) || 1;
+      if (lineOfSight(from, at, MAP.solids)) {
+        this.nextThrowAt = t + rnd(9, 20) / clamp(this.aggression, 0.4, 1.6);
+        this.room.onThrow(me, {
+          // Lobbed, so it arrives rather than skidding along the street.
+          dir: { x: away.x / far, y: away.y / far + 0.16, z: away.z / far },
+        });
+        return;
+      }
+    }
+
     // Only shoot when actually pointed at them - the aim error above is the
     // whole point, so we must not bypass it by firing regardless.
     const eye = eyeOf(me);
@@ -1426,12 +1455,6 @@ export class BotBrain {
     const dot = to.x * fwd.x + to.y * fwd.y + to.z * fwd.z;
     const tolerance = Math.cos(clamp(0.05 + (1 - this.skill) * 0.05, 0.02, 0.16));
     if (dot < tolerance) return;
-
-    // Dynamite when they are dug in and we are not.
-    if (me.dynamite > 0 && d > 9 && d < 24 && Math.random() < 0.006 * this.aggression) {
-      this.room.onThrow(me, { dir: { x: fwd.x, y: fwd.y + 0.14, z: fwd.z } });
-      return;
-    }
 
     // Burst discipline: fire a few, then break to reassess. Without this a bot
     // holds the trigger down forever and every fight is decided in one second.
@@ -1509,11 +1532,31 @@ export class BotBrain {
     if (has('spyglass') && (this.state === 'investigate' || this.state === 'hunt') && Math.random() < 0.25) return play('spyglass');
     if (has('ledger') && this.room.phase === PHASE.COMBAT && Math.random() < 0.08) return play('ledger');
     if (has('poster')) {
-      // Nailing up a poster is a thing you do to somebody's face, so it needs
-      // them in the crosshair - which for a bot means someone they are already
-      // squaring up to and already do not trust.
-      const aimed = this.room.playerInCrosshair(me, CARDS.poster.range);
-      if (aimed && aimed.alive && this.susOf(aimed.id) > 0.45) return play('poster');
+      // Nailing up a poster is a thing you do to somebody's face, so the rule
+      // is that they have to be in the crosshair. The bots waited for that to
+      // happen by itself, which is not what a player does - a player TURNS AND
+      // LOOKS at the man he wants to name. So this needed a suspect to wander
+      // into a three-degree cone at exactly the moment the card timer came up,
+      // and across six rounds the deduction card of the six was played zero
+      // times.
+      //
+      // He looks at him instead. Nothing here bypasses the rule: the card
+      // still resolves against whoever is actually down the barrel, and if the
+      // look does not land it does not get played.
+      const mark = this.visible
+        .filter((o) => o.alive && this.susOf(o.id) > 0.45)
+        .sort((a, b) => this.susOf(b.id) - this.susOf(a.id))[0];
+      if (mark) {
+        const d = Math.hypot(mark.pos.x - me.pos.x, mark.pos.z - me.pos.z);
+        if (d <= CARDS.poster.range) {
+          const at = chestOf(mark);
+          const from = eyeOf(me);
+          me.yaw = Math.atan2(-(at.x - from.x), -(at.z - from.z));
+          me.pitch = clamp(Math.atan2(at.y - from.y,
+            Math.hypot(at.x - from.x, at.z - from.z)), -1.2, 1.2);
+          if (this.room.playerInCrosshair(me, CARDS.poster.range) === mark) return play('poster');
+        }
+      }
     }
     // Nobody should ride into the storm holding a card they never used.
     if (this.room.phase === PHASE.ENDGAME && Math.random() < 0.2) return play(pick(me.hand));

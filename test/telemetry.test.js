@@ -50,8 +50,16 @@ async function roundAndLog() {
 
   clock.restore();
   telemetry.flush();
-  await new Promise((r) => setTimeout(r, 60));
-  const raw = fs.existsSync(FILE) ? fs.readFileSync(FILE, 'utf8') : '';
+  // The write is an fs.appendFile, so it lands when it lands. A fixed pause
+  // here is a race with whatever else the machine is doing - on a loaded box
+  // sixty milliseconds is not always enough, and the round then reads as one
+  // that "wrote almost nothing down". Poll for it instead.
+  let raw = '';
+  for (let i = 0; i < 200; i += 1) {
+    raw = fs.existsSync(FILE) ? fs.readFileSync(FILE, 'utf8') : '';
+    if (raw.split('\n').filter(Boolean).length > 3) break;
+    await new Promise((r) => setTimeout(r, 10));
+  }
   return { room, raw, lines: raw.split('\n').filter(Boolean).map((l) => JSON.parse(l)) };
 }
 
