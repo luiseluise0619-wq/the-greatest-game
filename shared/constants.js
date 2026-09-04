@@ -542,8 +542,15 @@ export const ROULETTE = {
   damage: 55,           // of a hundred: survivable at full health, not at half
   trustGain: 0.75,      // what a man who watched you do it thinks afterwards
   susDrop: 0.6,         // and how much of what he already suspected goes
-  cooldown: 0,          // no cooldown - it is once a round, see oncePerLife
+  // Once a round, and there is no respawn in this game, so once a life. The
+  // rule was hardcoded next to this flag rather than read from it, which made
+  // the flag a comment that looked like a setting - turn it off and nothing
+  // happens. `cooldown` was worse: it read 0 and nothing anywhere consulted it,
+  // so a reader would take "no cooldown" as a fact about the code when it was a
+  // fact about a line of text. Both are read now, and cooldown is the gap
+  // between attempts if oncePerLife is ever turned off.
   oncePerLife: true,
+  cooldown: 45,
 };
 
 export const MODES = { FREE: 'free', DUEL: 'duel' };

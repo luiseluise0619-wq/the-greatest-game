@@ -168,3 +168,49 @@ test('it is most of a life when it is the loaded one, and never before the bell'
     assert.ok(ROULETTE.chambers >= 2, 'a cylinder with one chamber in it');
   } finally { clock.restore(); }
 });
+
+test('the once-a-round rule is the setting rather than a copy of it', () => {
+  // ROULETTE.oncePerLife sat next to a hardcoded check that did the same thing,
+  // which makes it a comment wearing a setting's clothes: turn it off and
+  // nothing happens. ROULETTE.cooldown was worse - it read 0 and nothing
+  // anywhere consulted it, so anybody reading the file would take "no
+  // cooldown" as a fact about the code when it was a fact about a line of text.
+  const { room, clock, all, facing } = town();
+  const was = { once: ROULETTE.oncePerLife, cool: ROULETTE.cooldown };
+  try {
+    const [me, watcher] = all;
+    facing(me, watcher);
+    me.guns.revolver.mag = 6;
+    me.health = me.maxHealth;
+
+    // As shipped: once, and the second attempt is refused.
+    room.onSelfShot(me);
+    assert.equal(me.rouletteSpent, true, 'the first spin never happened');
+    const after = me.guns.revolver.mag;
+    me.health = me.maxHealth;
+    me.alive = true;
+    room.onSelfShot(me);
+    assert.equal(me.guns.revolver.mag, after, 'he span it twice in one round');
+
+    // With the rule off and a cooldown, the cooldown is what stops him - which
+    // is only true if the code reads the setting rather than repeating it.
+    ROULETTE.oncePerLife = false;
+    ROULETTE.cooldown = 30;
+    me.health = me.maxHealth;
+    me.alive = true;
+    room.onSelfShot(me);
+    assert.equal(me.guns.revolver.mag, after,
+      'oncePerLife was turned off and the cooldown did nothing');
+
+    clock.advance(31_000);
+    me.health = me.maxHealth;
+    me.alive = true;
+    room.onSelfShot(me);
+    assert.ok(me.guns.revolver.mag < after,
+      'the cooldown ran out and he still could not take the bet');
+  } finally {
+    ROULETTE.oncePerLife = was.once;
+    ROULETTE.cooldown = was.cool;
+    clock.restore();
+  }
+});

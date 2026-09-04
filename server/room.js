@@ -2954,7 +2954,16 @@ export class Room {
       });
       return;
     }
-    if (p.rouletteSpent) {
+    if (ROULETTE.oncePerLife && p.rouletteSpent) {
+      this.emit(p, {
+        t: S.FEED, k: 'feed.oneGambleOnly',
+        text: 'You have already made that bet this round.', tone: 'bad', deny: true,
+      });
+      return;
+    }
+    // Only reachable with oncePerLife off, which is what makes it a setting
+    // rather than a comment: the rule is the config, not a copy of it.
+    if (!ROULETTE.oncePerLife && now() - (p.lastRouletteAt || -1e9) < ROULETTE.cooldown) {
       this.emit(p, {
         t: S.FEED, k: 'feed.oneGambleOnly',
         text: 'You have already made that bet this round.', tone: 'bad', deny: true,
@@ -2981,6 +2990,7 @@ export class Room {
     }
 
     p.rouletteSpent = true;
+    p.lastRouletteAt = now();
     g.mag -= 1;
     this.broadcast({ t: S.SOUND, sound: 'gunshot', pos: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z)] });
     const live = Math.random() < 1 / ROULETTE.chambers;
