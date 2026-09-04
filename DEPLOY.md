@@ -53,8 +53,12 @@ The last four are the ones to watch. `tickMs` is a smoothed average of what one
 pass over every room costs; `tickBudgetMs` is what it has to spend. A game
 server that has run out of core does not fail — every room on it goes slow at
 once, and the only way anybody finds out is that the game *feels* wrong. If
-`overruns` is climbing, the process is past what it can serve; the log says so
-too, once every hundred rather than every tick.
+`overruns` is climbing steadily, the process is past what it can serve.
+
+A handful of overruns means nothing: any machine hiccups, and one 60ms tick is a
+garbage collection or another process, not a diagnosis. The log agrees — it
+warns only when a tenth of a ten-second window ran over, which is what being
+genuinely short of core looks like.
 
 ## Hosting it
 

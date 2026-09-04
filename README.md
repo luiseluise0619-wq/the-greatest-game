@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 306 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 314 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -730,7 +730,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 306 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 314 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -1059,6 +1059,18 @@ They are grouped by what they protect:
   room gets four times more expensive, every room on the process just starts
   running slow at once. The threshold is deliberately loose, because CI is not
   a quiet machine and this is here to catch an order of magnitude.
+- **`test/privacy.test.js`** — `PRIVACY.md` is a promise about what the code
+  does, so it is pinned to the code the way the README's numbers already are. A
+  privacy document that has drifted from its software is worse than none: it is
+  a claim somebody relied on that is no longer true. Nothing may be written into
+  a browser that the document does not name; names really are off in the
+  playtest log unless somebody sets the switch; nothing anywhere reads an
+  address, a user agent or a device; the environment variables it offers are
+  read by the files it says read them; the room sweep runs on the timer it
+  quotes; `onChat` relays and keeps nothing; and the page loads from no host but
+  its own. Writing the document is where the missing claim was found — the
+  display name is kept in `localStorage` and the first draft said nothing about
+  it.
 - **`test/soak.test.js`** — rounds played end to end with the rules checked on
   every tick. Everything else in this suite sets a situation up by hand and
   asserts on it, which finds what somebody thought to look for; this plays real

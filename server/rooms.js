@@ -28,6 +28,12 @@ const IDLE_GRACE = 90;      // seconds an empty room is kept before it is reaped
 // measured it, and it is settable for anybody who has measured their own.
 export const MAX_ROOMS = Number(process.env.HNH_MAX_ROOMS || 100);
 
+// Overruns are counted in windows rather than one at a time. Ten seconds of
+// ticks, and a tenth of them running over is a process that is genuinely short
+// of core rather than a machine that hiccupped.
+const OVERRUN_WINDOW = 200;
+const OVERRUN_ALARM = 20;
+
 const now = () => Date.now() / 1000;
 
 export class RoomManager {
@@ -39,6 +45,8 @@ export class RoomManager {
     this.tickMs = 0;
     this.peakTickMs = 0;
     this.overruns = 0;
+    this.recentOverruns = 0;
+    this.window = 0;
     // Every town this manager opens plays the same game.
     this.mode = opts.mode;
   }
@@ -151,12 +159,23 @@ export class RoomManager {
       const spent = performance.now() - began;
       this.tickMs = this.tickMs * 0.95 + spent * 0.05;
       this.peakTickMs = Math.max(this.peakTickMs, spent);
+      // One slow tick is not news. Any machine hiccups - a garbage collection,
+      // another process, a laptop deciding to think about something else - and
+      // a server that shouts about a single 62ms tick is a server whose warnings
+      // nobody reads. What matters is a process that is PAST its budget, which
+      // looks like overruns arriving steadily rather than once.
       if (spent > TICK_MS) {
         this.overruns += 1;
-        if (this.overruns % 100 === 1) {
-          console.warn(`[rooms] tick took ${spent.toFixed(0)}ms of ${TICK_MS}ms`
-            + ` · ${this.rooms.size} towns · ${this.overruns} overruns so far`);
+        this.recentOverruns += 1;
+      }
+      if (++this.window >= OVERRUN_WINDOW) {
+        if (this.recentOverruns >= OVERRUN_ALARM) {
+          console.warn(`[rooms] ${this.recentOverruns} of the last ${OVERRUN_WINDOW}`
+            + ` ticks ran over ${TICK_MS}ms · ${this.rooms.size} towns`
+            + ` · ${this.tickMs.toFixed(1)}ms average`);
         }
+        this.window = 0;
+        this.recentOverruns = 0;
       }
       if (++this.ticks % 40 === 0) this.reap();
     }, TICK_MS);
