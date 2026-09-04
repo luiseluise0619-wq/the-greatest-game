@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 314 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 315 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -730,7 +730,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 314 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 315 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -842,6 +842,10 @@ They are grouped by what they protect:
   witness counts, and a headline share that is actually between 0 and 1), and it
   never becomes a record of who played and what they said: not one word of chat
   reaches the file, and no name does either unless somebody asked for names.
+  Plus the two numbers it collects about the *person* rather than the game —
+  when somebody went out, and how long they then sat and watched — counted over
+  humans only, because a table is mostly bots in a playtest and a bot does not
+  mind waiting.
 - **`test/readme.test.js`** — this file is load-bearing: it is where the design
   rules are argued for, and people read it instead of the constants. It had
   already drifted four separate times, so the numbers it quotes are pinned to the
@@ -1367,6 +1371,36 @@ of bots that were throwing their own moves away.
 The number worth watching moved with it: the share of the Sheriff's killers who
 had actually picked him out rather than hitting him in crossfire went from about
 **55%** to **75%**.
+
+### The number that is not about balance
+
+Balance is the easy question. The hard one is whether the round is any good to
+be *eliminated* from, and measuring it turned up the most uncomfortable figure
+in this document. Over 60 headless rounds of eight, in each mode:
+
+| | first quartile dies at | median | the earliest tenth then watches for |
+|---|---|---|---|
+| the free-for-all | **27s** | 75s | **~244s** of a 263s round |
+| the table | 100s | 152s | ~179s of a 246s round |
+
+A quarter of the free-for-all's table is out inside half a minute of a
+four-and-a-half-minute round, and the first people out spend essentially the
+whole round watching — having learned nothing, because nothing had happened
+yet, and able to do nothing about it. That is the classic way this genre fails,
+and no balance knob reaches it: the win shares above are level, and the round is
+still over for two people before it has started.
+
+The turn mode does not have the problem, and not by tuning — nobody can be shot
+until the lap has been round once, which is what a turn order *is*. It is the
+strongest argument in this repo for the turn mode being the one to finish.
+
+Neither figure is a verdict, because both are bots, and bots find each other far
+faster than people who are busy lying to each other do. What was worth doing
+about it now was making sure a real playtest **produces the number**: `/stats`
+reports `earlyDeathShare` and `avgSpectatorSeconds` over humans only, since a
+table is mostly bots in a playtest and a bot does not mind waiting. One
+mode of the two is very likely to come back with a number that says it should
+not ship as it stands, and this is how anybody finds out which.
 
 Four runs at the old number read 63 / 31 / 6, 68 / 27 / 6, 59 / 34 / 7 and
 75 / 18 / 7 — a range rather than a number, because the noise floor below is

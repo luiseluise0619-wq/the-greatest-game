@@ -17,6 +17,9 @@ const WITH_NAMES = process.env.HNH_TELEMETRY_NAMES === '1';
 const DIR = process.env.HNH_TELEMETRY_DIR || 'data';
 const FILE = path.join(DIR, 'telemetry.jsonl');
 const FLUSH_MS = 5000;
+// Dead this soon into a round and you were shot before there was anything to
+// work out. Against bots the free-for-all does this to a quarter of the table.
+const EARLY_DEATH = 45;
 
 const now = () => Date.now() / 1000;
 
@@ -55,6 +58,12 @@ class Telemetry {
       deathsByWeapon: {},
       humanSessions: 0,
       humanSessionSeconds: 0,
+      // When people go out, and how long they then sit there watching.
+      humanDeaths: 0,
+      humanDeathSeconds: 0,
+      earlyHumanDeaths: 0,
+      spectatorSeconds: 0,
+      spectatorCount: 0,
     };
     if (this.enabled) {
       try {
@@ -122,6 +131,25 @@ class Telemetry {
     if (witnessed) this.agg.witnessedKills += 1;
     this.agg.deathsByZone[place] = (this.agg.deathsByZone[place] || 0) + 1;
     this.agg.deathsByWeapon[cause] = (this.agg.deathsByWeapon[cause] || 0) + 1;
+    // When people go out, and how long they then sit there.
+    //
+    // This is the number the whole question of whether the game is any FUN
+    // turns on, and it was the one thing the readout never collected. Measured
+    // against bots the free-for-all puts a quarter of the table out inside
+    // thirty seconds of a four-minute round, and those people then spectate for
+    // four minutes having learned nothing and done nothing about it. Bots do
+    // not mind. The point of collecting it is that people do, and nobody can
+    // argue about it from a transcript afterwards.
+    //
+    // Only humans are counted. A round is eight seats and most of them are
+    // filled by bots in a playtest, and the question is about the person.
+    if (!victim.bot) {
+      this.agg.humanDeaths += 1;
+      this.agg.humanDeathSeconds += at;
+      if (at < EARLY_DEATH) this.agg.earlyHumanDeaths += 1;
+      // Banked at the end of the round, when the length of it is known.
+      if (s) (s.humanDeathsAt || (s.humanDeathsAt = [])).push(at);
+    }
     this.event('death', {
       room: room.code,
       at: Math.round(at),
@@ -147,6 +175,12 @@ class Telemetry {
     if (s.firstKill != null) {
       this.agg.matchesWithAKill += 1;
       this.agg.firstKillSeconds += s.firstKill;
+    }
+    // The wait: how long each person who went out then spent watching. This is
+    // knowable only now, because it is the rest of the round.
+    for (const at of s.humanDeathsAt || []) {
+      this.agg.spectatorSeconds += Math.max(0, duration - at);
+      this.agg.spectatorCount += 1;
     }
     this.event('match_end', {
       room: room.code,
@@ -260,6 +294,16 @@ class Telemetry {
       // Below about half and the deck is decoration; at 1.0 nobody is ever
       // holding anything back, which is its own problem.
       cardPlayRate: per(a.cardsPlayed, a.cardsDealt),
+      // Whether the game is any fun to be eliminated from, which is a different
+      // question from whether it is balanced and a more important one. If a
+      // large share of people are out before there was anything to deduce, and
+      // then sit and watch for minutes, the round is over for them long before
+      // it is over. These count humans only - a table is mostly bots in a
+      // playtest and bots do not mind waiting.
+      humanDeaths: a.humanDeaths,
+      avgDeathSeconds: Math.round(per(a.humanDeathSeconds, a.humanDeaths)),
+      earlyDeathShare: per(a.earlyHumanDeaths, a.humanDeaths),
+      avgSpectatorSeconds: Math.round(per(a.spectatorSeconds, a.spectatorCount)),
       cardsPlayed: top(a.byCard, 6),
       // The turn mode's own readout. Below about half a go ending in a shot
       // and the table has gone quiet; a go with no card played at all is a

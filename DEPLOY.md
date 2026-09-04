@@ -198,6 +198,26 @@ While you are playtesting, `GET /stats` is worth more than your memory of it:
 curl -s https://your-host/stats | jq '.witnessedKillShare, .cardPlayRate, .wins'
 ```
 
+And these four, which are about whether the game is any fun rather than whether
+it is balanced — a different question and a more important one:
+
+```
+curl -s https://your-host/stats \
+  | jq '.humanDeaths, .avgDeathSeconds, .earlyDeathShare, .avgSpectatorSeconds'
+```
+
 `witnessedKillShare` is the headline: if almost every kill is witnessed the map
 has no secrets, and if almost none are, nobody can ever learn anything.
 `cardPlayRate` is the deck's: below about half and it is decoration.
+
+`earlyDeathShare` and `avgSpectatorSeconds` are the ones to watch hardest,
+because they are the only numbers here about the *person* rather than the game.
+Against bots the free-for-all puts a quarter of the table out inside thirty
+seconds of a four-minute round, and those people then watch for four minutes
+having neither learned anything nor been able to do anything about it. A bot
+does not mind. If a real playtest reproduces that shape — a large
+`earlyDeathShare` and an `avgSpectatorSeconds` close to the round length — the
+round is over for a quarter of the room long before it is over, and that is a
+design problem no balance knob reaches. The turn mode is much kinder here by
+construction, and the numbers say so: nobody goes out until the lap has been
+round once.

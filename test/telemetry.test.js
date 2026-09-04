@@ -147,3 +147,39 @@ test('turning it off writes nothing at all', async () => {
 });
 
 test.after(() => { fs.rmSync(DIR, { recursive: true, force: true }); });
+
+test('the readout says when people went out and how long they then watched', () => {
+  // The question this whole thing exists to answer is whether the game is any
+  // good, and "is it any fun to be eliminated from" is a different question
+  // from "is it balanced" and a more important one. Measured against bots the
+  // free-for-all puts a quarter of the table out inside thirty seconds of a
+  // four-minute round; those people then spectate for four minutes. Bots do
+  // not mind. The readout collected nothing about it at all, so the one thing
+  // a real playtest most needs to produce was the one thing it could not.
+  const room = {
+    code: 'WAIT',
+    players: new Map(),
+    stats: null,
+  };
+  telemetry.matchStart(room);
+  const at = (secs) => { room.stats.started = Date.now() / 1000 - secs; };
+
+  // A human shot early, a human shot late, and a bot, which is not counted.
+  at(20);
+  telemetry.death(room, { bot: false, role: 'deputy' }, { bot: true, role: 'outlaw', faction: 'outlaw' }, 'revolver', 2, 'street');
+  at(200);
+  telemetry.death(room, { bot: false, role: 'outlaw' }, { bot: true, role: 'sheriff', faction: 'law' }, 'revolver', 2, 'street');
+  at(100);
+  telemetry.death(room, { bot: true, role: 'outlaw' }, { bot: true, role: 'sheriff', faction: 'law' }, 'revolver', 2, 'street');
+
+  at(300);
+  telemetry.matchEnd(room, 'law', 'the town holds');
+
+  const s = telemetry.summary();
+  assert.equal(s.humanDeaths, 2, 'the bot was counted as somebody who minds waiting');
+  assert.equal(s.avgDeathSeconds, 110, 'the average of 20s and 200s is not what came back');
+  assert.equal(s.earlyDeathShare, 0.5, 'one of the two went out early and the share says otherwise');
+  // Out at 20s and at 200s of a 300s round: 280s and 100s of watching.
+  assert.equal(s.avgSpectatorSeconds, 190,
+    'the wait is the rest of the round after you go out, and this is not it');
+});
