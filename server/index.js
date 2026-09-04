@@ -50,6 +50,7 @@ function resolveRequest(urlPath) {
   // its own relative imports keep resolving.
   if (urlPath.startsWith('/vendor/jsm/')) {
     const rel = path.normalize(urlPath.slice('/vendor/jsm/'.length)).replace(/^(\.\.[/\\])+/, '');
+    if (rel.includes('\0')) return null;
     const full = path.join(ROOT, 'node_modules', 'three', 'examples', 'jsm', rel);
     return full.startsWith(path.join(ROOT, 'node_modules', 'three', 'examples', 'jsm')) ? full : null;
   }
@@ -62,6 +63,11 @@ function resolveRequest(urlPath) {
   try {
     clean = path.normalize(decodeURIComponent(urlPath)).replace(/^(\.\.[/\\])+/, '');
   } catch { return null; }
+  // "/%00" decodes to a real NUL, and fs.readFile does not return an error for
+  // a path containing one - it throws, synchronously, out of the request
+  // handler and off the top of the process. One curl took the server down and
+  // every match running on it with it. A path that cannot name a file is a 404.
+  if (clean.includes('\0')) return null;
   const rel = clean.replace(/^[/\\]+/, '');
   const top = rel.split(/[/\\]/)[0];
   if (ALLOW.includes(top)) {
@@ -123,19 +129,26 @@ const server = http.createServer((req, res) => {
 });
 
 function serve(file, res, retryAsDirectory = false) {
-  fs.readFile(file, (err, data) => {
-    // A bare directory name with no trailing slash: same answer, one hop later.
-    if (err && err.code === 'EISDIR' && retryAsDirectory) {
-      serve(path.join(file, 'index.html'), res);
-      return;
-    }
-    if (err) { res.writeHead(404); res.end('not found'); return; }
-    res.writeHead(200, {
-      'Content-Type': MIME[path.extname(file)] || 'application/octet-stream',
-      'Cache-Control': 'no-cache',
+  // fs.readFile throws rather than calling back for a handful of bad paths.
+  // Nothing reachable from the network gets to end the process.
+  try {
+    fs.readFile(file, (err, data) => {
+      // A bare directory name with no trailing slash: same answer, one hop later.
+      if (err && err.code === 'EISDIR' && retryAsDirectory) {
+        serve(path.join(file, 'index.html'), res);
+        return;
+      }
+      if (err) { res.writeHead(404); res.end('not found'); return; }
+      res.writeHead(200, {
+        'Content-Type': MIME[path.extname(file)] || 'application/octet-stream',
+        'Cache-Control': 'no-cache',
+      });
+      res.end(data);
     });
-    res.end(data);
-  });
+  } catch (err) {
+    console.error('[http] unreadable path', err && err.code);
+    res.writeHead(404); res.end('not found');
+  }
 }
 
 // Nothing this protocol sends is large: chat is capped at 140 characters and

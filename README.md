@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 271 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 282 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -722,7 +722,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 271 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 282 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -979,6 +979,25 @@ They are grouped by what they protect:
   were printing "Dutch Kessler**이** 별을 답니다". A hole may only take a
   particle if what goes into it is a word this project chose and wrote in Korean
   itself — a card, a role, a place — and those are listed by name in the test.
+- **`test/wire.test.js`** — the wire itself. Every other file in this suite
+  reaches into a `Room` and reads its fields, which is the wrong altitude for
+  the one promise this game makes: "the server does not send you what you should
+  not know" is a claim about bytes on a socket. So this one starts the real
+  server, opens real WebSockets, plays a real round and keeps a transcript of
+  every frame each connection was handed — then asks what an attacker asks. No
+  frame ever names another player's role. A viewer who walks to the edge of town
+  stops being sent the people he left behind, and is always in his own snapshot.
+  Two dozen forged messages — a second join, a hand-written `results`, a shot
+  for a billion damage, a card at index 1e9, `__proto__` as a message type —
+  change nothing and leave the server answering. And a socket that sends four
+  thousand messages is cut off rather than served.
+- **`test/lobby.test.js`** — the button that deals the roles. Alone with bots it
+  deals, as it always did. With anybody else in the room it is a readiness call
+  instead, because the alternative is a race that one person wins while the
+  other seven are still choosing a face. Pressing it again takes it back; the
+  last person to close their tab does not strand the rest waiting on a vote that
+  can no longer arrive; bots are never waited for; and the flag does not survive
+  the round it started.
 - **`test/soak.test.js`** — rounds played end to end with the rules checked on
   every tick. Everything else in this suite sets a situation up by hand and
   asserts on it, which finds what somebody thought to look for; this plays real

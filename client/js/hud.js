@@ -250,6 +250,12 @@ export class HUD {
       const trade = c ? this.t(`char.${p.character}.role`, c.role) : '';
       const tag = p.bot ? ` · ${this.t('ui.botTag', 'bot')}` : '';
       li.innerHTML = `<b>${escapeHtml(p.name)}</b><span>${escapeHtml(trade + tag)}</span>`;
+      // Who has said they are ready, so the wait has a face on it rather than
+      // being eight people staring at a button wondering who is holding it up.
+      if (msg.readyOf && !p.bot) {
+        li.classList.toggle('ready', !!p.ready);
+        if (p.ready) li.insertAdjacentHTML('beforeend', '<i class="tick">\u2713</i>');
+      }
       ul.appendChild(li);
     }
     if (!msg.players.length) {
@@ -261,6 +267,12 @@ export class HUD {
     $('botBreak').textContent = this.t('ui.humanBots',
       `${humans} human · ${bots} bot${bots === 1 ? '' : 's'}`, { h: humans, b: bots });
 
+    // Whether the button deals or votes, and how the vote is going. Alone with
+    // bots the server sends readyOf 0 and the button is the button it was.
+    this.readyOf = msg.readyOf || 0;
+    this.readyN = msg.readyN || 0;
+    this.iAmReady = !!(msg.players.find((p) => p.id === this.game.selfId) || {}).ready;
+
     // A public town deals itself in once a second person turns up. Count it
     // down locally rather than making the server push a packet a second.
     this.autoStartAt = msg.startsIn > 0 ? performance.now() / 1000 + msg.startsIn : 0;
@@ -270,6 +282,25 @@ export class HUD {
   tickAutoStart() {
     const btn = $('startBtn');
     if (!this.autoStartAt) {
+      // With other people in the lobby the button is a readiness call, and it
+      // has to say so - a button that says DEAL THE ROLES and does not deal
+      // the roles is the worst thing a lobby can do to somebody who just
+      // pressed it.
+      if (this.readyOf) {
+        btn.textContent = this.iAmReady
+          ? this.t('ui.unready', `READY — ${this.readyN}/${this.readyOf}`,
+            { n: this.readyN, of: this.readyOf })
+          : this.t('ui.readyN', `READY — ${this.readyN}/${this.readyOf}`,
+            { n: this.readyN, of: this.readyOf });
+        btn.classList.toggle('armed', this.iAmReady);
+        btn.classList.remove('counting');
+        const waiting = this.readyOf - this.readyN;
+        this.setStatus(waiting > 0
+          ? this.t('ui.waitingFor', `waiting on ${waiting}`, { n: waiting })
+          : '');
+        return;
+      }
+      btn.classList.remove('armed');
       btn.textContent = this.t('ui.deal', 'DEAL THE ROLES');
       btn.classList.remove('counting');
       return;

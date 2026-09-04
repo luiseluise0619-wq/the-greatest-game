@@ -159,3 +159,18 @@ test('a path that cannot be decoded is a 404 and not the end of the process', as
   const health = await fetch(`${BASE}/healthz`);
   assert.equal(health.status, 200, 'a malformed path took the server with it');
 });
+
+test('a path with a NUL in it is a 404 and not the end of the process', async () => {
+  // The sibling of the test above, and it was open for the same reason from the
+  // other side. "/%00" decodes cleanly - decodeURIComponent is happy with it -
+  // so it walked past that guard and reached fs.readFile, which does not report
+  // a null byte through its callback. It throws, out of the request handler,
+  // off the top of the process. One curl, every match on the server gone.
+  for (const path of ['/%00', '/js/main.js%00.js', '/client/%00/x', '/shared/%00',
+    '/vendor/jsm/%00', '/vendor/jsm/utils/%00.js']) {
+    const res = await fetch(BASE + path);
+    assert.equal(res.status, 404, `${path} was answered with ${res.status}`);
+  }
+  const health = await fetch(`${BASE}/healthz`);
+  assert.equal(health.status, 200, 'a NUL in a path took the server with it');
+});

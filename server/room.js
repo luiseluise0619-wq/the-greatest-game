@@ -134,6 +134,7 @@ export class Room {
         this.players.delete(p.id);
         // The people still here may have been waiting on the one who just left.
         this.checkReady();
+        this.checkLobbyReady();
       } else {
         // Mid-match nobody is removed. A living body stays standing in the
         // street, silent and every bit as shootable as it was; come back inside
@@ -182,6 +183,7 @@ export class Room {
       bot: !!opts.bot,
       client: opts.client || null,
       connected: true,
+      lobbyReady: false,        // see onStart: the button is a vote in a crowd
       token: randomUUID(),      // lets one tab reclaim this body after a refresh
       disconnectedAt: 0,
       character,
@@ -373,11 +375,54 @@ export class Room {
     this.pushLobby();
   }
 
+  /**
+   * Deal.
+   *
+   * Alone with bots this is the button it always was: press it and the round
+   * starts. With other people in the lobby it is a readiness call instead, the
+   * same one the results screen already runs - because the alternative, which
+   * is what this was, is that whoever clicks first deals the roles and the
+   * other seven are still choosing a face when the bell goes. In a room of
+   * eight friends that is not a race, it is one person ruining a round.
+   *
+   * Pressing it again takes it back, so somebody who changed their mind about
+   * their gunhand is not stuck watching the countdown they started.
+   */
   onStart(p, msg) {
     if (this.phase !== PHASE.LOBBY) return;
     if (msg && msg.character && CHARACTERS[msg.character]) p.character = msg.character;
     if (msg && msg.name) p.name = String(msg.name).slice(0, 16);
-    this.beginMatch();
+
+    const humans = [...this.players.values()].filter((o) => !o.bot && o.connected);
+    if (humans.length <= 1) { this.beginMatch(); return; }
+
+    p.lobbyReady = !p.lobbyReady;
+    const ready = humans.filter((o) => o.lobbyReady).length;
+    this.broadcast({
+      t: S.FEED,
+      k: p.lobbyReady ? 'feed.lobbyReady' : 'feed.lobbyNotReady',
+      p: { name: p.name, n: ready, of: humans.length },
+      text: p.lobbyReady
+        ? `${p.name} is ready (${ready}/${humans.length}).`
+        : `${p.name} is not ready any more (${ready}/${humans.length}).`,
+      tone: 'system',
+    });
+    this.checkLobbyReady();
+  }
+
+  /**
+   * Deal once everybody still in the lobby has said so. Called when somebody
+   * presses the button AND when somebody leaves, because otherwise the last
+   * person to close their tab strands the rest waiting on a vote that can no
+   * longer arrive - the same trap `checkReady` exists to avoid on the results
+   * screen.
+   */
+  checkLobbyReady() {
+    if (this.phase !== PHASE.LOBBY) return;
+    const humans = [...this.players.values()].filter((o) => !o.bot && o.connected);
+    if (!humans.length) return;
+    this.pushLobby();
+    if (humans.every((o) => o.lobbyReady)) this.beginMatch();
   }
 
   /**
@@ -1821,6 +1866,9 @@ export class Room {
   beginMatch() {
     this.matchNumber += 1;
     this.lobbyStartAt = 0;
+    // Said once, for this round. Carrying it over would deal the next one out
+    // from under anybody who walked away from the results screen.
+    for (const p of this.players.values()) p.lobbyReady = false;
     this.results = null;
     this.dynamites = [];
     this.footprints = [];
@@ -2205,12 +2253,20 @@ export class Room {
   }
 
   pushLobby() {
+    const humans = [...this.players.values()].filter((p) => !p.bot && p.connected);
     const list = [...this.players.values()].map((p) => ({
       id: p.id, name: p.name, bot: p.bot, character: p.character,
+      // A bot is always ready; it has nothing to choose.
+      ready: p.bot ? true : !!p.lobbyReady,
     }));
     this.broadcast({
       t: S.LOBBY, players: list, botTarget: this.botFillTarget,
       min: MIN_PLAYERS, max: MAX_PLAYERS, phase: this.phase,
+      // Readiness only means anything once there is somebody to wait for.
+      // Alone with bots the button deals, and saying "0/1 ready" about that
+      // would be a lie about what pressing it does.
+      readyOf: humans.length > 1 ? humans.length : 0,
+      readyN: humans.length > 1 ? humans.filter((p) => p.lobbyReady).length : 0,
       // Which game this town is playing. The two have different rules, and a
       // manual that describes the wrong one is worse than no manual.
       mode: this.mode,

@@ -354,6 +354,12 @@ button.big { width: 100%; padding: 14px; font-size: 15px; letter-spacing: .22em;
 #lobbyList { list-style: none; margin: 0; padding: 0; min-height: 40px; }
 #lobbyList li { font-size: 12.5px; padding: 4px 0; border-bottom: 1px solid rgba(200,180,140,.08); display: flex; justify-content: space-between; }
 #lobbyList li span { color: rgba(232,217,189,.4); font-size: 11px; }
+/* Who has said they are ready. The tick carries it on its own, so this reads
+   the same to somebody who cannot tell the green from the grey. */
+#lobbyList li.ready > b { color: #8fce7a; }
+#lobbyList li .tick { color: #8fce7a; font-style: normal; margin-left: 6px; }
+/* And the button, once you have pressed it: pressed, not pressable. */
+button.armed { border-color: rgba(143,206,122,.7); color: #8fce7a; }
 
 #charGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .charCard { background: rgba(12,9,6,.55); border: 1px solid rgba(200,180,140,.2); padding: 12px; cursor: pointer; transition: border-color .15s, transform .1s; }
