@@ -436,12 +436,25 @@ class Game {
     this.ws.onclose = (e) => {
       if (this.switching) return;               // we closed it on purpose
       if (e && e.code === 4000) return;         // another tab took this seat
-      this.scheduleReconnect();
+      // 1012 is the server saying it is restarting, which it now does on the
+      // way out rather than dropping everybody in silence. It is worth waiting
+      // for: a deploy is back in well under a minute, and the alternative is
+      // telling eight people their network is broken when a new version
+      // shipped. 1013 is the same server saying it is full.
+      this.scheduleReconnect(e && (e.code === 1012 || e.code === 1013));
     };
     this.ws.onerror = () => { /* onclose follows and does the work */ };
     this.ws.onmessage = (e) => {
-      const msg = JSON.parse(e.data);
-      this.onMessage(msg);
+      // A frame that will not parse is not a reason for a black screen. There
+      // is nothing useful to do with it, and there is a whole round still
+      // going on behind it.
+      let msg;
+      try { msg = JSON.parse(e.data); } catch { return; }
+      try {
+        this.onMessage(msg);
+      } catch (err) {
+        console.error('[net] bad message', msg && msg.t, err);
+      }
     };
   }
 
@@ -451,9 +464,15 @@ class Game {
    * and let the join token put you back in your own boots. Past it there is
    * nothing to come back to and the honest thing is to say so.
    */
-  scheduleReconnect() {
+  scheduleReconnect(restarting = false) {
     this.retries = (this.retries || 0) + 1;
-    const waits = [0.6, 1.2, 2.5, 5, 9];
+    // A blip is worth five tries over about twenty seconds. A server that told
+    // us on the way out that it is coming back is worth a great deal more than
+    // that - a rolling deploy is routinely longer than twenty seconds, and
+    // giving up inside it turns a deploy into eight people refreshing.
+    const waits = restarting
+      ? [0.5, 1, 2, 3, 5, 5, 8, 8, 10, 10, 10, 10]
+      : [0.6, 1.2, 2.5, 5, 9];
     const wait = waits[Math.min(this.retries - 1, waits.length - 1)];
     if (this.retries > waits.length) {
       this.hud.setReconnecting(false);
@@ -461,7 +480,9 @@ class Game {
       return;
     }
     this.hud.setReconnecting(true, this.retries);
-    this.hud.setStatus(this.tr('ui.lost', `connection lost — reconnecting (${this.retries})…`, { n: this.retries }));
+    this.hud.setStatus(restarting
+      ? this.tr('ui.restarting', `server restarting — coming back (${this.retries})…`, { n: this.retries })
+      : this.tr('ui.lost', `connection lost — reconnecting (${this.retries})…`, { n: this.retries }));
     clearTimeout(this._reconnect);
     this._reconnect = setTimeout(() => this.connect(), wait * 1000);
   }

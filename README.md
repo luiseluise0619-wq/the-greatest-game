@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 282 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 284 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -722,7 +722,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 282 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 284 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -989,8 +989,13 @@ They are grouped by what they protect:
   stops being sent the people he left behind, and is always in his own snapshot.
   Two dozen forged messages — a second join, a hand-written `results`, a shot
   for a billion damage, a card at index 1e9, `__proto__` as a message type —
-  change nothing and leave the server answering. And a socket that sends four
-  thousand messages is cut off rather than served.
+  change nothing and leave the server answering. A socket that sends four
+  thousand messages is cut off rather than served, and one that guesses forty
+  room codes is shown the door — a private room is private because nobody
+  guesses which of a million it is, so guessing has to cost a connection rather
+  than a loop. And a server told to shut down closes every socket with 1012,
+  "service restart", which is the difference between a deploy and eight people
+  being told their network is broken.
 - **`test/lobby.test.js`** — the button that deals the roles. Alone with bots it
   deals, as it always did. With anybody else in the room it is a readiness call
   instead, because the alternative is a race that one person wins while the

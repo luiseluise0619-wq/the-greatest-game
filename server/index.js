@@ -16,6 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const PORT = process.env.PORT ? Number(process.env.PORT) : 8080;
 const HOST = process.env.HOST || '0.0.0.0';
+const STATS_TOKEN = process.env.HNH_STATS_TOKEN || '';
 
 const MIME = {
   '.glb': 'model/gltf-binary',
@@ -109,7 +110,15 @@ const server = http.createServer((req, res) => {
   }
 
   // What the playtest actually produced. Read it with: curl -s host/stats | jq
+  //
+  // It is aggregate only - no names, no room codes, nothing about one person -
+  // so it is open by default, which is what a playtest on a laptop wants. Set
+  // HNH_STATS_TOKEN on a public deployment and it wants ?token= to match.
   if (urlPath === '/stats') {
+    if (STATS_TOKEN) {
+      const asked = new URL(req.url || '/', 'http://x').searchParams.get('token');
+      if (asked !== STATS_TOKEN) { res.writeHead(404); res.end('not found'); return; }
+    }
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify({ ...manager.stats(), ...telemetry.summary() }, null, 2));
     return;
@@ -156,11 +165,28 @@ function serve(file, res, retryAsDirectory = false) {
 // from making the process hold a megabyte of nonsense.
 const wss = new WebSocketServer({ server, maxPayload: 8 * 1024 });
 
+// A room holds at most 8 and the manager holds at most 200 of them, so 2000
+// sockets is already far more than a full server can be using. Without a
+// ceiling, opening sockets is a free way to make one process hold state for
+// somebody who never intends to play - and every one of them costs a token
+// bucket, a client record and a slot in the server's map.
+const MAX_SOCKETS = Number(process.env.HNH_MAX_SOCKETS || 2000);
+
 wss.on('connection', (ws) => {
+  if (wss.clients.size > MAX_SOCKETS) {
+    try { ws.close(1013, 'server busy'); } catch { /* already gone */ }
+    return;
+  }
   // A socket is roomless until its join message says which town it wants.
   const client = { ws, room: null, playerId: null };
   const allow = tokenBucket(MSG_RATE, MSG_BURST);
   let dropped = 0;
+  // Four letters out of a thirty-two letter alphabet is a million codes, and a
+  // private room is private because nobody guesses which one it is. A socket
+  // that is guessing is not playing: after this many wrong codes it is shown
+  // the door, so finding a private room costs an attacker a new connection
+  // every twenty tries rather than a tight loop on one.
+  let badJoins = 0;
   ws.on('message', (raw) => {
     // Movement is the expensive message - the server walks the claimed position
     // through the whole map - so one socket must not be able to spend the
@@ -172,10 +198,15 @@ wss.on('connection', (ws) => {
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch { return; }
     if (!msg || typeof msg.t !== 'string') return;
+    const guessing = msg.t === 'join' && !client.room && msg.room;
     try {
       manager.handleMessage(client, msg);
     } catch (err) {
       console.error('[room] message error', msg.t, err);
+    }
+    // It found a town if it is in one now. If it is not, that was a guess.
+    if (guessing && !client.room && ++badJoins >= 20) {
+      try { ws.close(1008, 'too many bad codes'); } catch { /* gone */ }
     }
   });
   ws.on('close', () => manager.dropClient(client));
@@ -195,10 +226,47 @@ server.listen(PORT, HOST, () => {
   console.log('');
 });
 
-for (const sig of ['SIGINT', 'SIGTERM']) {
-  process.on(sig, () => {
-    telemetry.flush();        // do not lose the last few minutes of a playtest
-    console.log('\n  ...adios.');
-    process.exit(0);
-  });
+/**
+ * Going down.
+ *
+ * A deploy platform sends SIGTERM and then waits; this used to call exit(0) on
+ * the spot, which drops every socket with no close frame. The browser sees a
+ * connection that simply stopped, and the reconnect loop it has treats that
+ * the way it treats a tunnel - it waits, backs off, and tells eight people
+ * their network is bad when what actually happened is that a new version
+ * shipped.
+ *
+ * So: stop taking new connections, tell everybody still playing what happened
+ * in a code their client can read, flush the playtest numbers, and go. With a
+ * deadline, because a socket that will not close is not a reason to hang.
+ */
+let leaving = false;
+function shutdown(sig) {
+  if (leaving) return;
+  leaving = true;
+  console.log(`\n  ${sig} - closing the saloon.`);
+  server.close();
+  manager.stop();
+  for (const ws of wss.clients) {
+    // 1012 is "service restart", and it is the one thing that tells a client
+    // to come back rather than to worry.
+    try { ws.close(1012, 'server restarting'); } catch { /* already gone */ }
+  }
+  telemetry.flush();          // do not lose the last few minutes of a playtest
+  const done = setTimeout(() => { console.log('  ...adios.'); process.exit(0); }, 1500);
+  done.unref();
 }
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => shutdown(sig));
+
+// A throw nobody caught used to be the end of every round on the process, and
+// the last thing anybody saw was a stack trace in a log they could not read.
+// It still ends the process - a server in an unknown state should not keep
+// dealing hands - but it says goodbye on the way out, so the eight people in
+// the room get "server restarting" and a reconnect instead of silence.
+process.on('uncaughtException', (err) => {
+  console.error('[fatal] uncaught', err);
+  shutdown('uncaughtException');
+});
+process.on('unhandledRejection', (err) => {
+  console.error('[fatal] unhandled rejection', err);
+});

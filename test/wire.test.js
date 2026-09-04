@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { WebSocket } from 'ws';
 import { S, C } from '../shared/protocol.js';
+import { VISION } from '../shared/constants.js';
 
 const PORT = 8900 + Math.floor(Math.random() * 150);
 const FREE_PORT = PORT + 1;
@@ -183,17 +184,71 @@ test('a snapshot only ever carries players the viewer can see', async () => {
     && snaps[i - 1].ps.some((e) => e.id !== a.id && !m.ps.some((x) => x.id === e.id)));
   assert.ok(dropped, 'nobody ever left Ada\'s sight - the cull is computed once and cached');
 
-  // 4. Bo is stood still at the far end of a hundred-and-thirty-metre town, and
-  //    never once arrives.
-  const boFrames = snaps.filter((m) => m.ps.some((e) => e.id === b.id)).length;
-  assert.equal(boFrames, 0,
-    `Bo never moved from the far side of town and was on Ada's wire ${boFrames} times`);
+  // 4. Nobody beyond the sight limit is ever on it. Positions travel in the
+  //    frame, so this is checkable from the outside without knowing anything
+  //    about the map: every player Ada was sent was inside VISION.far of her,
+  //    every tick, for the whole round.
+  let farthest = 0;
+  for (const m of snaps) {
+    const me = m.ps.find((e) => e.id === a.id);
+    if (!me) continue;
+    for (const e of m.ps) {
+      if (e.id === a.id) continue;
+      farthest = Math.max(farthest, Math.hypot(e.x - me.x, e.z - me.z));
+    }
+  }
+  assert.ok(farthest <= VISION.far + 1,
+    `somebody ${farthest.toFixed(1)}m away was on the wire and the limit is ${VISION.far}m`);
 
   // 5. And she is always in her own, or her client has no body to stand in.
   for (const m of a.all(S.SNAPSHOT)) {
     assert.ok(m.ps.some((e) => e.id === a.id), 'a snapshot arrived without the viewer in it');
   }
   a.close(); b.close();
+});
+
+test('guessing room codes costs a connection, not a loop', async () => {
+  // Four letters out of thirty-two is a million codes, and a private room is
+  // private because nobody guesses which one it is. A socket allowed to guess
+  // as fast as it can send is a socket that finds every private room on the
+  // server; this one gets twenty tries and then the door.
+  const a = new Spy('guesser');
+  await a.open();
+  let closed = false;
+  a.ws.on('close', () => { closed = true; });
+  for (let i = 0; i < 40 && a.ws.readyState === WebSocket.OPEN; i++) {
+    a.send({ t: C.JOIN, name: 'Nobody', room: `Z${String(i).padStart(3, '0')}` });
+    await sleep(20);
+  }
+  await until(() => closed, 4000, 'the guesser being shown the door');
+  assert.equal(closed, true, 'a socket guessed forty room codes and was still welcome');
+  // A wrong code is a mistake anybody can make, so the first few are answered
+  // rather than punished.
+  const told = a.all(S.ERROR).filter((m) => m.k === 'err.noSuchTown');
+  assert.ok(told.length >= 5, 'nobody was told their code was wrong, they were just cut off');
+  a.close();
+});
+
+test('a restart says goodbye rather than dropping everybody in silence', async () => {
+  // A deploy sends SIGTERM. Exiting on the spot drops every socket with no
+  // close frame, and a browser cannot tell that apart from a tunnel going
+  // down - so eight people are told their network is bad when what actually
+  // happened is that a new version shipped. 1012 is "service restart", and
+  // the client waits far longer for it than it waits for a blip.
+  const port = PORT + 40;
+  const own = boot(port);
+  await waitFor(port);
+  const a = new Spy('goodbye', `ws://127.0.0.1:${port}`);
+  await a.open();
+  a.send({ t: C.JOIN, name: 'Ada', create: true });
+  await until(() => a.id, 4000, 'welcome');
+
+  let code = null;
+  a.ws.on('close', (c) => { code = c; });
+  own.kill('SIGTERM');
+  await until(() => code !== null, 6000, 'the socket closing');
+  assert.equal(code, 1012, `the server went down with close code ${code}`);
+  own.kill('SIGKILL');
 });
 
 test('a forged socket cannot deal itself a second body, a role, or a win', async () => {

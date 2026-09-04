@@ -52,6 +52,7 @@ const KO = {
   'ui.connecting': '접속 중…',
   'ui.connected': '접속했습니다 — 캐릭터를 고르고 역할을 돌리십시오',
   'ui.lost': '연결 끊김 — 재접속 중 ({n})…',
+  'ui.restarting': '서버 재시작 중 — 다시 연결하는 중 ({n})…',
   'ui.findingTown': '마을을 찾는 중…',
   'ui.publicTown': '공개 · 아무나 들어올 수 있음',
   'ui.privateTown': '비공개 · 코드로만',

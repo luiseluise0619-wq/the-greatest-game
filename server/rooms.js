@@ -129,6 +129,11 @@ export class RoomManager {
     }, TICK_MS);
   }
 
+  /** Put the clock down. Called on the way out so nothing ticks after goodbye. */
+  stop() {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+  }
+
   reap() {
     const t = now();
     for (const [code, room] of this.rooms) {
