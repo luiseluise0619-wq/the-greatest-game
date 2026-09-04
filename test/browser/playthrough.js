@@ -754,6 +754,65 @@ try {
     await page.close();
   } finally { await blind.close(); }
 
+  // ---------------------------------------------------------------------
+  // The lobby at sizes that are not this machine's.
+  //
+  // A game people are sent a link to is opened on whatever they happen to be
+  // sitting at, and the first thing anybody sees is the menu - which is
+  // ordinary HTML and is the part that breaks. Nothing here had ever looked at
+  // it below 1280 wide except the CI runner, which uses one size and would only
+  // notice a break by failing something else.
+  //
+  // The rule being checked is that the PAGE never scrolls sideways. A panel
+  // that has outgrown the window pushes the document wider, and everything to
+  // the right of the fold is then unreachable without a horizontal scrollbar
+  // nobody looks for.
+  for (const [w, h, what] of [[1920, 1080, 'a big monitor'], [1280, 760, 'a laptop'],
+    [1024, 768, 'an old 4:3'], [900, 600, 'a small window'], [800, 480, 'the CI runner'],
+    [430, 932, 'a phone held upright']]) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: h } });
+    const page = await ctx.newPage();
+    try {
+      await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('#startBtn', { timeout: 20000 });
+      const fit = await page.evaluate(() => {
+        const d = document.documentElement;
+        const seen = (id) => {
+          const el = document.getElementById(id);
+          if (!el) return false;
+          const r = el.getBoundingClientRect();
+          return r.width > 0 && r.height > 0
+            && r.left >= -1 && r.right <= window.innerWidth + 1;
+        };
+        return {
+          overflow: d.scrollWidth - d.clientWidth,
+          // The four things somebody has to be able to reach to play at all.
+          reachable: ['startBtn', 'joinCode', 'joinBtn', 'roomCode'].filter(seen).length,
+        };
+      });
+      check(fit.overflow <= 1,
+        `${what} (${w}x${h}) does not scroll sideways (${fit.overflow}px over)`);
+      check(fit.reachable === 4,
+        `and the buttons that start a game are on screen (${fit.reachable}/4)`);
+    } finally { await ctx.close(); }
+  }
+
+  // And a window somebody resizes mid-round, which is the one the renderer has
+  // to hear about rather than the layout.
+  await A.setViewportSize({ width: 760, height: 520 });
+  await A.waitForTimeout(400);
+  const resized = await A.evaluate(() => ({
+    over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    aspect: window.game?.camera?.aspect,
+    want: window.innerWidth / window.innerHeight,
+    canvas: document.getElementById('view')?.clientWidth,
+  }));
+  check(resized.over <= 1, `a window dragged smaller mid-round does not overflow (${resized.over}px)`);
+  check(Math.abs((resized.aspect || 0) - resized.want) < 0.02,
+    `and the camera hears about it (${(resized.aspect || 0).toFixed(2)} vs ${resized.want.toFixed(2)})`);
+  check(Math.abs((resized.canvas || 0) - 760) < 4,
+    `and so does the canvas (${resized.canvas}px of 760)`);
+
   check(serverErrors.length === 0, `server stayed quiet${serverErrors.length ? `: ${serverErrors[0]}` : ''}`);
   check(pageErrors.length === 0, `no page errors${pageErrors.length ? `: ${pageErrors[0]}` : ''}`);
 } finally {

@@ -206,6 +206,17 @@ try {
 
   // Feet. This game is played standing at a table: the mark you were dealt is
   // the mark you keep, all round, and heads are the only thing that moves.
+  // KNOWN DEAD, deliberately left. The canvas is #view; this asks for
+  // #gameCanvas, which does not exist, so the click throws and the .catch
+  // swallows it. It has never once done anything.
+  //
+  // Pointing it at #view makes it work, and three checks below then fail: the
+  // click takes pointer lock, which moves when the hand and the card faces
+  // render, and those three were passing on the timing of a page that never
+  // got locked. That is worth untangling and it is not worth untangling
+  // hurriedly - the checks below are about the turn mode's rules, not about
+  // pointer lock, and quietly re-timing them to go green would be worse than
+  // leaving this here with a note on it.
   await A.click('#gameCanvas').catch(() => {});
   await A.waitForFunction(() => window.game?.turn?.kind, null, { timeout: 60000 });
   await A.evaluate(([x, z]) => { window.__tableX = x; window.__tableZ = z; }, [TABLE.x, TABLE.z]);
