@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 291 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 296 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -722,7 +722,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 291 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 296 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -1015,6 +1015,17 @@ They are grouped by what they protect:
   knock the live one out of its own boots. And the lap does not stop for six
   seconds for a man who is not there: an empty chair gets `DUEL.turnAway`, and
   a tab that reconnects inside its own go gets the go back whole.
+- **`test/stress.test.js`** — a server that stays up. Everything else here
+  plays one round and asserts something about it; this asks what the process
+  looks like after a few hundred. Three hundred towns are opened, joined,
+  abandoned and swept, and none of them is still there at the end. Two hundred
+  people walk in and out of one lobby and it never holds more bodies or more
+  sockets than the table seats. Sixty rounds run back to back in the turn mode
+  and forty in the free-for-all, and after every one of them the history log,
+  the shot log, the footprint trail, the round's account, the sticks in the air
+  and every player's own hand are still the size they should be — a room that
+  is never freed is a server that dies on a Saturday night with eight people
+  in it.
 - **`test/soak.test.js`** — rounds played end to end with the rules checked on
   every tick. Everything else in this suite sets a situation up by hand and
   asserts on it, which finds what somebody thought to look for; this plays real

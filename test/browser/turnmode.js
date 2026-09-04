@@ -128,7 +128,10 @@ try {
   const B = await open(`http://localhost:${PORT}/#${code}`, 'B');
   await A.bringToFront();
   await A.waitForTimeout(300);
+  // Two people in the lobby, so the button is a readiness call and both have to
+  // press it - see test/lobby.test.js.
   await A.click('#startBtn');
+  await B.click('#startBtn');
   await A.waitForFunction(() => window.game?.selfRole, null, { timeout: 25000 });
 
   // The role card, which is the only quiet moment there is to read four cards

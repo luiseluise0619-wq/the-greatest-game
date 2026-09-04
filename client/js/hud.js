@@ -281,31 +281,42 @@ export class HUD {
 
   tickAutoStart() {
     const btn = $('startBtn');
+    const left = this.autoStartAt
+      ? Math.max(0, Math.ceil(this.autoStartAt - performance.now() / 1000)) : 0;
+
+    // With other people in the lobby the button is a readiness call, and it has
+    // to say so whatever else is going on. A public town also deals itself in
+    // on a clock, and for a while the clock won this argument - so the button
+    // read DEAL THE ROLES, and pressing it cast a vote. A button that lies
+    // about what pressing it does is the worst thing a lobby can do to
+    // somebody. Both go on the button; the status line under it belongs to the
+    // connection and to whatever the server last had to say, and writing a
+    // clock into it every frame wiped out every sentence it ever showed -
+    // including the one people read when they type a room code wrong.
+    if (this.readyOf) {
+      const vote = this.iAmReady
+        ? this.t('ui.unready', `READY — ${this.readyN}/${this.readyOf}`,
+          { n: this.readyN, of: this.readyOf })
+        : this.t('ui.readyN', `READY — ${this.readyN}/${this.readyOf}`,
+          { n: this.readyN, of: this.readyOf });
+      const waiting = this.readyOf - this.readyN;
+      const tail = left > 0
+        ? ` · ${left}s`
+        : waiting > 0
+          ? ` · ${this.t('ui.waitingFor', `waiting on ${waiting}`, { n: waiting })}`
+          : '';
+      btn.textContent = vote + tail;
+      btn.classList.toggle('armed', this.iAmReady);
+      btn.classList.toggle('counting', left > 0);
+      return;
+    }
+
+    btn.classList.remove('armed');
     if (!this.autoStartAt) {
-      // With other people in the lobby the button is a readiness call, and it
-      // has to say so - a button that says DEAL THE ROLES and does not deal
-      // the roles is the worst thing a lobby can do to somebody who just
-      // pressed it.
-      if (this.readyOf) {
-        btn.textContent = this.iAmReady
-          ? this.t('ui.unready', `READY — ${this.readyN}/${this.readyOf}`,
-            { n: this.readyN, of: this.readyOf })
-          : this.t('ui.readyN', `READY — ${this.readyN}/${this.readyOf}`,
-            { n: this.readyN, of: this.readyOf });
-        btn.classList.toggle('armed', this.iAmReady);
-        btn.classList.remove('counting');
-        const waiting = this.readyOf - this.readyN;
-        this.setStatus(waiting > 0
-          ? this.t('ui.waitingFor', `waiting on ${waiting}`, { n: waiting })
-          : '');
-        return;
-      }
-      btn.classList.remove('armed');
       btn.textContent = this.t('ui.deal', 'DEAL THE ROLES');
       btn.classList.remove('counting');
       return;
     }
-    const left = Math.max(0, Math.ceil(this.autoStartAt - performance.now() / 1000));
     btn.textContent = left > 0
       ? this.t('ui.dealIn', `DEAL THE ROLES — ${left}s`, { n: left })
       : this.t('ui.dealing', 'DEALING…');
@@ -443,9 +454,15 @@ export class HUD {
       : mine ? this.t('turn.yours', 'YOUR GO')
         : this.t('turn.theirs', `${this.nameOf(this.turn.holder)} HAS THE FLOOR`,
           { name: this.nameOf(this.turn.holder) });
+    // The most valuable line on the screen during your own go used to say
+    // "nobody may move", which is true of everybody all the time and tells the
+    // man holding the floor nothing at all. Somebody playing this for the first
+    // time gets six seconds, a hand of cards he has never seen and no idea
+    // that one of them is the trigger. So on your go it says what your go IS.
     $('turnClock').textContent = walk
       ? this.t('turn.betweenHint', 'the lap is over — count what everybody spent')
-      : this.t('turn.rootedHint', 'nobody may move');
+      : mine ? this.yourGoHint()
+        : this.t('turn.rootedHint', 'nobody may move');
 
     this.renderTurnOrder();
     this.tickTurnClock();
@@ -592,6 +609,27 @@ export class HUD {
    * server uses: normally a Bang!, and for the man who reads either card as
    * the other, whichever of the two he is holding first.
    */
+  /**
+   * What this go is, in one line, read off the hand actually in front of him.
+   * Nothing here is new information - every word of it is already derivable
+   * from cards he is looking at - it just says it out loud, which is the
+   * difference between a first round somebody plays and a first round somebody
+   * watches.
+   */
+  yourGoHint() {
+    const d = this.duel;
+    if (!d) return this.t('turn.goPlay', 'play a card');
+    const shot = this.shotCardOf(d);
+    if (shot && this.shotLeft(d)) {
+      return this.t('turn.goFire', 'play a card, or aim at a man and hold to fire');
+    }
+    if (shot) return this.t('turn.goSpent', 'play a card — your shot this go is spent');
+    if ((d.hand || []).length) {
+      return this.t('turn.goNoShot', 'play a card — nothing in your hand fires');
+    }
+    return this.t('turn.goEmpty', 'nothing in your hands — sit this one out');
+  }
+
   shotCardOf(msg) {
     return shotCardIn(msg.hand, this.selfRole?.gunhand);
   }

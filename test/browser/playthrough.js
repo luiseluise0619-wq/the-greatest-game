@@ -221,8 +221,20 @@ try {
   const lobby = await A.evaluate(() => [...document.querySelectorAll('#lobbyList li b')].length);
   check(lobby === 2, `both players show in the lobby (${lobby})`);
 
-  // Deal, and confirm the round actually starts for both of them.
+  // Deal, and confirm the round actually starts for both of them. With two
+  // people in the lobby the button is a readiness call rather than a trigger -
+  // see test/lobby.test.js - so both of them have to say yes, and A pressing it
+  // alone must NOT start the round.
   await A.click('#startBtn');
+  await A.waitForTimeout(700);
+  check(!(await A.evaluate(() => !!window.game?.selfRole)),
+    'one player pressing deal did not start the round on the other one');
+  const votes = (await B.textContent('#startBtn')).trim();
+  check(/1\s*\/\s*2/.test(votes), `and B was shown the vote (${votes})`);
+  // And the status line under it still belongs to the server, not to a clock.
+  check(!/\d+s/.test((await B.textContent('#menuStatus')).trim()),
+    'the countdown was written over the line the room talks on');
+  await B.click('#startBtn');
   await A.waitForFunction(() => window.game?.selfRole, null, { timeout: 20000 });
   check(await A.isVisible('#roleCard'), 'the role card is dealt');
   const intel = (await A.textContent('#roleIntel')).trim();

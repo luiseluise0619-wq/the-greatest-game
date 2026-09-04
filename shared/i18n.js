@@ -183,6 +183,11 @@ const KO = {
   'turn.theirs': '{name} 차례',
   'turn.betweenHint': '각자 무엇을 썼는지 세어 두십시오',
   'turn.rootedHint': '아무도 못 움직입니다',
+  'turn.goPlay': '카드를 내십시오',
+  'turn.goFire': '카드를 내거나, 조준한 채 눌러서 쏘십시오',
+  'turn.goSpent': '카드를 내십시오 — 이번 차례의 사격은 이미 썼습니다',
+  'turn.goNoShot': '카드를 내십시오 — 지금 손에 쏠 수 있는 카드가 없습니다',
+  'turn.goEmpty': '손이 비었습니다 — 이번 차례는 넘기십시오',
   'turn.heldTitle': '손에 든 카드 수',
   'turn.stickTitle': '불붙은 다이너마이트를 들고 있음',
 

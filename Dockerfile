@@ -10,6 +10,9 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY shared ./shared
 COPY server ./server
 COPY client ./client
+# three.js is served to the browser straight out of node_modules, so a running
+# container is redistributing it, and its MIT notice travels with it.
+COPY NOTICE.md ./NOTICE.md
 
 # Telemetry appends to ./data. The process runs as `node`, so the directory has
 # to exist and be writable by it - otherwise the server starts, warns, and
