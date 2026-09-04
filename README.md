@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 303 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 306 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -730,7 +730,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 303 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 306 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -820,7 +820,15 @@ They are grouped by what they protect:
   show up until somebody noticed the church was made of planks. Plus a check
   that nothing the HUD writes over the world - the phase, the head count, the
   killcam's caption - is left as pale letters on a pale wall with neither a
-  shadow under it nor something opaque behind it.
+  shadow under it nor something opaque behind it. And the accessibility of the
+  parts that have any: this is a first-person game played through pointer lock
+  and no amount of markup makes mouse-look accessible, but the lobby, the menus
+  and everything the town *says* are ordinary HTML, and they were silent. No
+  live regions anywhere, so a screen reader announced none of the feed, none of
+  the chat, and neither of the two banners that exist specifically to say
+  something has gone wrong. Those five are announced now, the icon-only buttons
+  have names, and those names go through the Korean overlay like every other
+  user-facing string rather than being English for ever.
 - **`test/rooms.test.js`** — how a socket finds a town, which is the first
   thing that happens to every player who ever arrives: codes that can be read
   aloud without being misheard and never collide, quick play filling the busiest
@@ -1004,6 +1012,17 @@ They are grouped by what they protect:
   than a loop. And a server told to shut down closes every socket with 1012,
   "service restart", which is the difference between a deploy and eight people
   being told their network is broken.
+
+  The last test in the file is the question the whole release turns on and the
+  one nothing here had ever asked: not "does a room hold eight" as a number in
+  a constant, but **eight real sockets in one town**, from the door to the
+  aftermath. Eight welcomes and eight bodies; a roster the eighth arrival
+  agrees with; seven votes to deal and a round that does *not* start on them;
+  eight roles with exactly one Sheriff among them; eight hands; a round played
+  out on eight human bodies sending no input, which is the worst case for the
+  server rather than the best. And then the same question asked of eight whole
+  transcripts at once: no frame anywhere in any of them names anybody else's
+  role.
 - **`test/lobby.test.js`** — the button that deals the roles. Alone with bots it
   deals, as it always did. With anybody else in the room it is a readiness call
   instead, because the alternative is a race that one person wins while the

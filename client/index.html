@@ -50,10 +50,10 @@
     </div>
   </div>
 
-  <div id="feed"></div>
+  <div id="feed" role="log" aria-live="polite" aria-relevant="additions"></div>
 
   <div id="bottomLeft">
-    <div id="chatLog"></div>
+    <div id="chatLog" role="log" aria-live="polite" aria-relevant="additions"></div>
     <div id="healthWrap">
       <div id="healthBar"><i id="healthFill"></i><i id="armourFill"></i></div>
       <div id="healthNum">100</div>
@@ -162,23 +162,23 @@
           <button id="copyLink" class="ghost" data-i18n="ui.copyLink">COPY INVITE LINK</button>
         </div>
         <div class="roomJoin">
-          <input id="joinCode" maxlength="4" placeholder="CODE" data-i18n-ph="ui.codePlaceholder" autocomplete="off" spellcheck="false" />
+          <input id="joinCode" maxlength="4" placeholder="CODE" aria-label="Room code" data-i18n-aria="ui.codePlaceholder" data-i18n-ph="ui.codePlaceholder" autocomplete="off" spellcheck="false" />
           <button id="joinBtn" data-i18n="ui.join">JOIN</button>
           <button id="newRoom" title="Open a private town only your code can reach" data-i18n="ui.newRoom" data-i18n-title="ui.newRoomTitle">NEW</button>
         </div>
 
         <label class="fieldLabel" data-i18n="ui.tableSize">TABLE SIZE</label>
         <div class="botRow">
-          <button id="botMinus">−</button>
+          <button id="botMinus" aria-label="Fewer gunhands" data-i18n-aria="ui.fewerGuns">−</button>
           <div><b id="botCount">6</b> <span data-i18n="ui.gunhands">gunhands</span><em id="botBreak"></em></div>
-          <button id="botPlus">+</button>
+          <button id="botPlus" aria-label="More gunhands" data-i18n-aria="ui.moreGuns">+</button>
         </div>
 
         <label class="fieldLabel" data-i18n="ui.inTheLobby">IN THE LOBBY</label>
         <ul id="lobbyList"></ul>
 
         <button id="startBtn" class="primary big" data-i18n="ui.deal">DEAL THE ROLES</button>
-        <div id="menuStatus" class="muted" data-i18n="ui.connecting">connecting…</div>
+        <div id="menuStatus" class="muted" role="status" aria-live="polite" data-i18n="ui.connecting">connecting…</div>
         <button id="openManual" class="ghost wide" data-i18n="ui.howToPlay">HOW THIS IS PLAYED</button>
         <button id="openSettings" class="ghost wide" data-i18n="ui.settings">SETTINGS</button>
       </section>
@@ -234,7 +234,7 @@
   </div>
 </div>
 
-<div id="chatInputWrap" class="hidden"><span data-i18n="hud.say">SAY</span><input id="chatInput" maxlength="140" /></div>
+<div id="chatInputWrap" class="hidden"><span data-i18n="hud.say">SAY</span><input id="chatInput" maxlength="140" aria-label="Say something" data-i18n-aria="hud.say" /></div>
 <div id="killcam" class="hidden">
   <div class="kcTop"><b data-i18n="hud.killcam">KILLCAM</b><span id="kcWhere"></span></div>
   <div class="kcName"><span data-i18n="hud.killedBy">killed by</span> <em id="kcKiller"></em></div>
@@ -406,10 +406,10 @@
   </div>
 </div>
 
-<div id="netBanner" class="hidden" data-i18n="hud.reconnecting">RECONNECTING…</div>
+<div id="netBanner" class="hidden" role="status" aria-live="assertive" data-i18n="hud.reconnecting">RECONNECTING…</div>
 <div id="fpsMeter" class="hidden">0</div>
 <div id="cardPlay" class="hidden"></div>
-<div id="deadBanner" class="hidden"><b data-i18n="hud.dead">YOU ARE DEAD</b><span data-i18n="hud.spectating">Spectating. The round is still going.</span></div>
+<div id="deadBanner" class="hidden" role="status" aria-live="assertive"><b data-i18n="hud.dead">YOU ARE DEAD</b><span data-i18n="hud.spectating">Spectating. The round is still going.</span></div>
 <div id="loading" data-i18n="hud.loading">saddling up…</div>
 
 <script type="module" src="/client/js/main.js"></script>

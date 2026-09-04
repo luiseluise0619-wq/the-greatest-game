@@ -366,6 +366,10 @@ class Game {
     paint('data-i18n-html', (el) => el.innerHTML, (el, v) => { el.innerHTML = v; });
     paint('data-i18n-ph', (el) => el.placeholder, (el, v) => { el.placeholder = v; });
     paint('data-i18n-title', (el) => el.title, (el, v) => { el.title = v; });
+    // A label a screen reader reads out is a user-facing string like any other,
+    // so it goes through the same overlay rather than being English forever.
+    paint('data-i18n-aria', (el) => el.getAttribute('aria-label'),
+      (el, v) => { el.setAttribute('aria-label', v); });
     // The parts the HTML does not own.
     this.hud?.relabel();
   }

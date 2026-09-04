@@ -41,6 +41,8 @@ const KO = {
   'ui.deal': '역할 돌리기',
   'ui.dealing': '돌리는 중…',
   'ui.dealIn': '역할 돌리기 — {n}초',
+  'ui.fewerGuns': '총잡이 줄이기',
+  'ui.moreGuns': '총잡이 늘리기',
   'ui.readyN': '준비 — {n}/{of}',
   'ui.unready': '준비 취소 — {n}/{of}',
   'ui.waitingFor': '{n}명을 기다리는 중',

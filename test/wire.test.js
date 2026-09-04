@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { WebSocket } from 'ws';
 import { S, C } from '../shared/protocol.js';
-import { VISION } from '../shared/constants.js';
+import { VISION, MAX_PLAYERS } from '../shared/constants.js';
 
 const PORT = 8900 + Math.floor(Math.random() * 150);
 const FREE_PORT = PORT + 1;
@@ -340,4 +340,75 @@ test('a socket that floods is cut off, and the room survives it', async () => {
   const health = await fetch(`http://127.0.0.1:${PORT}/healthz`);
   assert.equal(health.status, 200, 'a flood took the server down');
   a.close();
+});
+
+test('eight of them, in one town, from the door to the aftermath', async () => {
+  // The question the whole release turns on and the one nothing here had ever
+  // asked: not "does a room hold eight" as a number in a constant, but eight
+  // real sockets joining one town, every one of them voting to deal, every one
+  // of them dealt a role and a hand, a round played to its end, and eight
+  // aftermath screens that agree with each other about what happened.
+  const spies = [];
+  for (let i = 0; i < MAX_PLAYERS; i++) spies.push(new Spy(`p${i}`));
+  await Promise.all(spies.map((s) => s.open()));
+
+  spies[0].send({ t: C.JOIN, name: 'Ada', create: true });
+  await until(() => spies[0].id, 5000, 'the first welcome');
+  const code = spies[0].last(S.WELCOME).code;
+  for (let i = 1; i < spies.length; i++) {
+    spies[i].send({ t: C.JOIN, name: `Gun ${i}`, room: code });
+  }
+  await until(() => spies.every((s) => s.id), 8000, 'eight welcomes');
+  assert.equal(new Set(spies.map((s) => s.id)).size, MAX_PLAYERS,
+    'eight sockets did not get eight bodies');
+
+  // The lobby agrees there are eight of them, and that it is waiting on all of
+  // them - the roster is what people count heads on before they start.
+  await until(() => (spies[7].last(S.LOBBY)?.players || []).length >= MAX_PLAYERS,
+    5000, 'the eighth to arrive seeing a full roster');
+  const roster = spies[7].last(S.LOBBY);
+  assert.equal(roster.players.filter((p) => !p.bot).length, MAX_PLAYERS);
+  assert.equal(roster.readyOf, MAX_PLAYERS, 'the vote was not counted over all eight');
+
+  // Seven vote. The eighth is still choosing, and the round must not start.
+  for (let i = 0; i < 7; i++) spies[i].send({ t: C.START });
+  await until(() => (spies[7].last(S.LOBBY)?.readyN || 0) === 7, 6000, 'seven votes');
+  await sleep(500);
+  assert.equal(spies.some((s) => s.role), false,
+    'seven people started a round the eighth was still getting ready for');
+
+  spies[7].send({ t: C.START });
+  await until(() => spies.every((s) => s.role), 12000, 'eight roles dealt');
+
+  // A town of eight has one Sheriff and nobody else is told who he is.
+  const roles = spies.map((s) => s.role);
+  assert.equal(roles.filter((r) => r === 'sheriff').length, 1,
+    `eight people were dealt ${roles.filter((r) => r === 'sheriff').length} Sheriffs`);
+  assert.ok(roles.includes('outlaw'), 'a round with nobody to catch');
+  for (const s of spies) {
+    const mine = s.all(S.ROLE);
+    assert.ok(mine.length >= 1, `${s.name} was never dealt in`);
+  }
+
+  // Eight hands, all different, and nobody is holding somebody else's.
+  await until(() => spies.every((s) => s.all(S.CARDS).length || s.all(S.DUEL).length),
+    12000, 'eight hands');
+
+  // Then a round, played by bots on eight human bodies that are not sending
+  // input - which is the worst case for the server, not the best.
+  await until(() => spies[0].all(S.SNAPSHOT).length > 120, 30000, 'a round happening');
+  const seen = spies[0].all(S.SNAPSHOT).at(-1);
+  assert.ok(seen.aliveCount >= 1 && seen.aliveCount <= MAX_PLAYERS,
+    `the server says ${seen.aliveCount} people are alive in a room of eight`);
+
+  // And nothing anywhere in eight transcripts names anybody else's role.
+  for (const s of spies) {
+    for (const other of spies) {
+      if (other === s || other.role === s.role) continue;
+      const leak = s.rx.some((m) => m.t !== S.RESULTS && m.t !== S.ROLE
+        && JSON.stringify(m).includes(`"role":"${other.role}"`));
+      assert.equal(leak, false, `${s.name} was told ${other.name} was a ${other.role}`);
+    }
+  }
+  for (const s of spies) s.close();
 });

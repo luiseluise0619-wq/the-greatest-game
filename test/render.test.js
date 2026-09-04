@@ -6,6 +6,9 @@ import assert from 'node:assert/strict';
 
 const { tagOpacity, TAG_RANGE } = await import('../client/js/players.js');
 
+const { readFile } = await import('node:fs/promises');
+const HTML = await readFile(new URL('../client/index.html', import.meta.url), 'utf8');
+
 test('a name tag fades out with distance and is gone past its range', () => {
   assert.equal(tagOpacity(0, false), 1, 'somebody in your face should be named');
   assert.equal(tagOpacity(TAG_RANGE, false), 0, 'a name was readable at the edge of its range');
@@ -273,4 +276,39 @@ test('a rotation on the way down cannot shrink the man', () => {
 test('nothing to measure is answered with nothing, not with a guess', () => {
   assert.equal(measureForTest(new THREE.Group()), null,
     'an empty model produced a measurement, and a suggestion would follow it');
+});
+
+test('the parts of the page a screen reader has to hear are announced', () => {
+  // This is a first-person game played through pointer lock, and no amount of
+  // markup makes mouse-look accessible. The lobby, the menus and everything the
+  // town SAYS are ordinary HTML, though, and they were silent: no live regions
+  // anywhere, so a screen reader announced none of the feed, none of the chat,
+  // and neither of the two banners that exist specifically to tell somebody
+  // that something has gone wrong.
+  const live = {
+    feed: 'polite',          // what the town says happened
+    chatLog: 'polite',       // what people said
+    menuStatus: 'polite',    // wrong room code, connection state
+    netBanner: 'assertive',  // the socket has gone
+    deadBanner: 'assertive', // and so have you
+  };
+  for (const [id, level] of Object.entries(live)) {
+    const el = new RegExp(`<[^>]*id="${id}"[^>]*>`).exec(HTML);
+    assert.ok(el, `#${id} is gone from the page`);
+    assert.match(el[0], new RegExp(`aria-live="${level}"`),
+      `#${id} says things and nothing announces them`);
+  }
+});
+
+test('nothing that is only an icon is unlabelled', () => {
+  // A button whose whole face is "−" reads as "minus".
+  for (const id of ['botMinus', 'botPlus', 'joinCode', 'chatInput']) {
+    const el = new RegExp(`<[^>]*id="${id}"[^>]*>`).exec(HTML);
+    assert.ok(el, `#${id} is gone from the page`);
+    assert.match(el[0], /aria-label="/, `#${id} has no name to read out`);
+    // And that name is a user-facing string like any other, so it goes through
+    // the overlay rather than being English for ever.
+    assert.match(el[0], /data-i18n-aria="/,
+      `#${id} has a label and it is English whatever language you asked for`);
+  }
 });

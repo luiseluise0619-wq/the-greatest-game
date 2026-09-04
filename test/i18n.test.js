@@ -35,7 +35,7 @@ const SRC = await Promise.all([
 
 /** Every key the page asks for by attribute. */
 function htmlKeys() {
-  return [...HTML.matchAll(/data-i18n(?:-html|-ph|-title)?="([^"]+)"/g)].map((m) => m[1]);
+  return [...HTML.matchAll(/data-i18n(?:-html|-ph|-title|-aria)?="([^"]+)"/g)].map((m) => m[1]);
 }
 
 // The namespaces this file owns. Anything in the client that looks like one of
