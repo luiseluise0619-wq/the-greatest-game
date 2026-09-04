@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 316 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 317 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -730,7 +730,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 316 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 317 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -1027,6 +1027,16 @@ They are grouped by what they protect:
   server rather than the best. And then the same question asked of eight whole
   transcripts at once: no frame anywhere in any of them names anybody else's
   role.
+
+  And a hostile client, which is a different question from the fuzz in
+  `test/fuzz.test.js` — that one reaches into a `Room` object, this one is the
+  door. Real sockets sending real bytes no client of this game would ever send,
+  in the shapes an attacker actually tries: prototype keys as message types, a
+  six-thousand-character name, positions at 1e308, a truncated JSON object,
+  eight kilobytes of one letter. Two things have to be true afterwards. The
+  server is still there — and somebody honest can still walk in and be dealt a
+  round, which is the half a crashed-process check would miss, because a server
+  that survives by having stopped working has not survived.
 - **`test/lobby.test.js`** — the button that deals the roles. Alone with bots it
   deals, as it always did. With anybody else in the room it is a readiness call
   instead, because the alternative is a race that one person wins while the

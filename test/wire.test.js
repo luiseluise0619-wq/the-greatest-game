@@ -412,3 +412,52 @@ test('eight of them, in one town, from the door to the aftermath', async () => {
   }
   for (const s of spies) s.close();
 });
+
+test('a hostile client cannot take the server with it', async () => {
+  // Not a fuzz of the Room object - that exists in test/fuzz.test.js and is a
+  // different question. This is the door: real sockets sending real bytes that
+  // no client of this game would ever send, in the shapes an attacker actually
+  // tries, and the two things that have to be true afterwards. The server is
+  // still there. And somebody honest can still walk in and be dealt a round,
+  // which is the half that a crashed-process check would miss - a server that
+  // survives by having stopped working is not a server that survived.
+  const junk = [
+    '', 'null', '[]', '{}', '"x"', '{"t":null}', '{"t":123}', '{"t":{}}',
+    `{"t":"join","name":${JSON.stringify('x'.repeat(6000))}}`,
+    '{"t":"input","pos":{"x":1e308,"y":1e308,"z":1e308}}',
+    '{"t":"input","pos":[1,2,3]}',
+    '{"t":"card","card":{"toString":1}}',
+    '{"t":"shoot","dir":{"x":null}}',
+    '{"t":"__proto__"}',
+    '{"__proto__":{"admin":true},"t":"join"}',
+    '{"t":"constructor","constructor":{"prototype":{}}}',
+    '{"t":"join","room":{"toUpperCase":null}}',
+    `{"t":"accuse","target":"${'x'.repeat(1000)}"}`,
+    ' ', '{"t":"join"', 'a'.repeat(7900),
+  ];
+
+  for (let round = 0; round < 6; round++) {
+    const ws = new WebSocket(BASE);
+    await new Promise((r) => { ws.on('open', r); ws.on('error', r); });
+    for (const raw of junk) { try { ws.send(raw); } catch { /* closed under us */ } }
+    try { ws.send(JSON.stringify({ t: C.JOIN, name: 'Hostile', create: true })); } catch { /* gone */ }
+    await sleep(40);
+    for (const raw of junk) { try { ws.send(raw); } catch { /* closed */ } }
+    await sleep(40);
+    try { ws.terminate(); } catch { /* gone */ }
+  }
+  await sleep(400);
+
+  const health = await fetch(`http://127.0.0.1:${PORT}/healthz`);
+  assert.equal(health.status, 200, 'hostile traffic took the server down');
+
+  // The half that matters more.
+  const honest = new Spy('honest');
+  await honest.open();
+  honest.send({ t: C.JOIN, name: 'Honest', create: true });
+  await until(() => honest.id, 6000, 'an honest welcome after all that');
+  honest.send({ t: C.START });
+  await until(() => honest.role, 12000, 'an honest round after all that');
+  assert.ok(honest.role, 'the server survived by no longer dealing anybody in');
+  honest.close();
+});

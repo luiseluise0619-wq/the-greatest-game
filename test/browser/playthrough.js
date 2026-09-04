@@ -699,7 +699,13 @@ try {
     await A.bringToFront();
     const stillUp = await A.evaluate(() => !document.getElementById('results').classList.contains('hidden'));
     check(stillUp, 'the aftermath screen is still up to press a button on');
-    if (stillUp) await A.click('#playAgain');
+    // Pressed by calling it rather than by clicking it, for the reason written
+    // out above the role card: Playwright's click waits for the element to be
+    // actionable and then for the page to settle, and this page is pressing
+    // card faces on idle slices while the aftermath screen renders. The click
+    // lands and then the wait for "scheduled navigations" times out on a page
+    // that was never going to navigate.
+    if (stillUp) await A.evaluate(() => document.getElementById('playAgain').click());
     // Wait for the server's answer, not for the button: the click disables it
     // on the spot, so waiting on that is waiting for nothing. The count in the
     // label is the part that had to come back from the room.
