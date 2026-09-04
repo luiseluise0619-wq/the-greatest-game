@@ -715,12 +715,33 @@ export class Room {
       rays: rays.map((r) => [r2(r.x), r2(r.y), r2(r.z)]),
     };
     this.shotLog.push({ t, id: p.id, o: shot.o, rays: shot.rays, w: w.id });
+    // How far this one carries. Past it there is nothing to hear and nothing
+    // to send - a shot fired at the other end of a hundred-and-thirty-metre
+    // town was reaching every socket in the round.
+    const earshot = w.noise ?? 60;
     for (const viewer of this.players.values()) {
       if (viewer.bot || !viewer.client) continue;
-      // Tracers and noise are physical and everyone gets them; the shooter's
-      // identity is only attached for players who can actually see them.
-      const named = viewer.id === p.id || this.canSeeCached(viewer, p.id);
-      this.send(viewer.client, named ? { ...shot, id: p.id } : shot);
+      const mine = viewer.id === p.id;
+      // The dead hear the whole town; they have nothing left to do with it.
+      if (!mine && viewer.alive
+        && Math.hypot(viewer.pos.x - p.pos.x, viewer.pos.z - p.pos.z) > earshot) continue;
+
+      // Tracers and noise are physical and everyone in earshot gets them; the
+      // shooter's identity is only attached for players who can actually see
+      // them. So was the shooter's exact position, which is the same secret
+      // wearing different clothes - the name was stripped and the coordinates
+      // were not, and a modified client could put a pin on every man in town
+      // every time he fired, through any wall, out of packets it was entitled
+      // to receive. The origin is fuzzed for anybody who cannot see him, the
+      // way a footstep already was. Where the bullets LANDED is not fuzzed,
+      // because dust off a wall is a thing you can genuinely see.
+      const named = mine || this.canSeeCached(viewer, p.id);
+      if (named) { this.send(viewer.client, { ...shot, id: p.id }); continue; }
+      const f = SOCIAL.shotFuzz;
+      this.send(viewer.client, {
+        ...shot,
+        o: [r2(shot.o[0] + rnd(-f, f)), shot.o[1], r2(shot.o[2] + rnd(-f, f))],
+      });
     }
     // Long Glass: anyone holding it up gets a face put to this shot, wherever
     // in town it was fired from.

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick } from './helpers.js';
 import { TIMING, MAX_PLAYERS, PHASE } from '../shared/constants.js';
 
-const { RoomManager } = await import('../server/rooms.js');
+const { RoomManager, MAX_ROOMS } = await import('../server/rooms.js');
 
 function manager() {
   TIMING.prep = 2; TIMING.combat = 200; TIMING.endgame = 20; TIMING.results = 5;
@@ -162,7 +162,14 @@ test('the server says so rather than falling over when it is out of room', () =>
   const m = manager();
   const clock = fakeClock();
   try {
-    while (m.rooms.size < 200) m.create({ isPublic: false });
+    // The cap is a measured number rather than a round one - a full room costs
+    // about 0.39ms a tick and a 20Hz loop has 50ms - so read it rather than
+    // quoting it, and stop if it is ever set somewhere a test cannot reach.
+    assert.ok(MAX_ROOMS > 0 && MAX_ROOMS < 5000, `the room cap is ${MAX_ROOMS}`);
+    for (let i = 0; i < MAX_ROOMS; i++) {
+      assert.ok(m.create({ isPublic: false }), `the manager stopped opening towns at ${i}`);
+    }
+    assert.equal(m.rooms.size, MAX_ROOMS);
     assert.equal(m.create({ isPublic: true }), null, 'the room cap did nothing');
     const res = m.resolve({ create: true });
     assert.ok(res.error, 'a socket at capacity got a room that does not exist');

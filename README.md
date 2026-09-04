@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 300 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 303 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -252,8 +252,16 @@ line-of-sight check per viewer per tick and simply does not send the positions o
 anyone behind a wall — with a short memory so corner-peeking does not strobe, and
 a proximity floor so somebody pressed against you is never invisible. A gunshot
 from an unseen shooter arrives with its tracer and its noise but **no name
-attached**. Without this the entire information design would be decoration: any
-modified client could read every position out of the network tab.
+attached** — and, since a later pass over the wire, **no exact position
+either**. The name was stripped and the coordinates were not, so every shot in
+the round reached every socket in it carrying the shooter's precise standing
+place and precise aim: a wallhack assembled entirely out of packets a client was
+entitled to receive. The origin is now fuzzed for anybody who cannot see the man
+who fired, the way a footstep already was, and a shot beyond its weapon's
+earshot is not sent at all. Where the bullets *landed* is still exact, because
+dust off a wall is a thing you can genuinely see, and it is what makes an unseen
+shot readable at all. Without any of this the entire information design would be
+decoration: a modified client could read every position out of the network tab.
 
 **You can hear boots.** Everyone within earshot gets a step sound with a place
 and a gait attached and **no name on it** — the same deal as a gunshot. The
@@ -722,7 +730,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 300 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 303 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -1015,7 +1023,7 @@ They are grouped by what they protect:
   knock the live one out of its own boots. And the lap does not stop for six
   seconds for a man who is not there: an empty chair gets `DUEL.turnAway`, and
   a tab that reconnects inside its own go gets the go back whole.
-- **`test/stress.test.js`** — a server that stays up. Everything else here
+- **`test/stress.test.js`** — a server that stays up, and what it costs to. Everything else here
   plays one round and asserts something about it; this asks what the process
   looks like after a few hundred. Three hundred towns are opened, joined,
   abandoned and swept, and none of them is still there at the end. Two hundred
@@ -1025,7 +1033,13 @@ They are grouped by what they protect:
   the shot log, the footprint trail, the round's account, the sticks in the air
   and every player's own hand are still the size they should be — a room that
   is never freed is a server that dies on a Saturday night with eight people
-  in it.
+  in it. And a full room is timed, because the room cap is a measurement rather
+  than a round number — a 20 Hz loop has 50ms a tick, a full eight-player room
+  costs a fraction of a millisecond of it, and the cap is how many of those fit
+  with headroom. That is a number that goes wrong quietly: nothing fails when a
+  room gets four times more expensive, every room on the process just starts
+  running slow at once. The threshold is deliberately loose, because CI is not
+  a quiet machine and this is here to catch an order of magnitude.
 - **`test/soak.test.js`** — rounds played end to end with the rules checked on
   every tick. Everything else in this suite sets a situation up by hand and
   asserts on it, which finds what somebody thought to look for; this plays real
@@ -1288,6 +1302,30 @@ bot-only rounds** (`npm run balance -- 120`) sits at:
 | before the Sheriff learned to use the star | **63–68%** | 27–31% | 6% |
 | after, over **200 rounds** | **51%** | 44% | 6% |
 | after the rest of the bots' unused moves, over **200** | 43% | **53%** | 5% |
+| after the bots learned when to speak, over **300** | 41% | **53%** | 6% |
+
+The fourth row is the one that changed nothing and mattered anyway. Seven bots
+spent a whole round in a town together and named somebody **0.8 times**, which
+is not a deduction layer — it is a deathmatch with roles written on it. Measured
+over twelve rounds, the seven of them got 11.5 speaking slots a round *between
+them*, and 57% of those landed at a moment when the bot had nobody it suspected
+enough to name, 23% when it knew nothing about anybody at all; each one then
+reset a timer averaging a minute and spent that minute holding a lead it could
+not use. A slot is no longer thrown away on an empty hand, and once a round a
+bot does not wait its turn for a suspicion it has just earned. **1.4 → 4.2
+accusations a round, and the win shares did not move at all.**
+
+That cap — once a round — is the whole reason it works in both games, and it
+took three wrong answers to find. Uncapped it read beautifully in a town and
+turned the table into a shouting match: at a table everybody watches everything
+and somebody is over the line more or less always, so seven bots named people
+**28 times a round**, better than one accusation per go, and it moved the law's
+win share ten points. A town where everybody is named is a town where the names
+mean nothing. In a town a bot gets one such moment a round if it is lucky, so
+the cap does not bind there and binds hard at the table — which is right, since
+the table was never the broken one. At the table the same change reads **6.1 →
+11.7 accusations a round with the win shares unmoved** (55/38/7 → 52/40/8, over
+120 rounds each, inside the noise this harness warns about).
 
 The third row is four more of the same shape, none of them knobs: the poster,
 the Sawbones' heal and the dynamite the bots were structurally unable to reach,

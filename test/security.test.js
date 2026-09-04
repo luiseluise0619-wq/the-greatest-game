@@ -116,10 +116,14 @@ test('somebody standing in front of you is still sent', () => {
 test('a gunshot from an unseen shooter arrives without a name', () => {
   const { room, clock, stub, me } = liveRoom({ bots: 6 });
   try {
-    me.pos = { x: 60, y: 0, z: -18 };             // deep in the mine
+    // Close enough to hear - a revolver carries WEAPONS.revolver.noise metres -
+    // and with the saloon between them.
+    me.pos = { x: -6, y: 0, z: 0 };
     const shooter = [...room.players.values()].find((p) => p.bot);
-    shooter.pos = { x: -22, y: 0, z: -16 };       // inside the saloon
+    shooter.pos = { x: -22, y: 0, z: -20 };       // deep inside the saloon
     tick(clock, room, Math.ceil(VISION.memory * 20) + 6);   // let the peek memory lapse
+    assert.equal(stub.last('snap').ps.some((e) => e.id === shooter.id), false,
+      'test setup: he can see the man he is not supposed to be able to see');
     stub.reset();
     shooter.nextFireAt = 0; shooter.swapUntil = 0; shooter.reloading = null;
     room.onShoot(shooter, { dir: { x: 1, y: 0, z: 0 } });
@@ -127,6 +131,70 @@ test('a gunshot from an unseen shooter arrives without a name', () => {
     const shot = stub.last('shot');
     assert.ok(shot, 'the shot should still be heard');
     assert.equal(shot.id, undefined, 'named a shooter the player could not see');
+  } finally { clock.restore(); }
+});
+
+test('and does not carry his exact position either', () => {
+  // The same secret wearing different clothes. The name was stripped from a
+  // shot fired by somebody you cannot see, and the coordinates were not - the
+  // origin travelled exact to every socket in the round, so a modified client
+  // could put a pin on every man in town every time he fired, through any
+  // wall, out of packets it was entitled to receive. A whole wallhack built
+  // from legitimate traffic.
+  const { room, clock, stub, me } = liveRoom({ bots: 6 });
+  try {
+    me.pos = { x: -6, y: 0, z: 0 };
+    const shooter = [...room.players.values()].find((p) => p.bot);
+    shooter.pos = { x: -22, y: 0, z: -20 };
+    tick(clock, room, Math.ceil(VISION.memory * 20) + 6);
+    shooter.nextFireAt = 0; shooter.swapUntil = 0; shooter.reloading = null;
+
+    // Fired repeatedly from a man standing perfectly still: if the origin were
+    // honest, every one of these would name the same spot.
+    const heard = [];
+    for (let i = 0; i < 14; i++) {
+      stub.reset();
+      shooter.nextFireAt = 0;
+      shooter.guns[shooter.slot].mag = 6;
+      room.onShoot(shooter, { dir: { x: 1, y: 0, z: 0 } });
+      const shot = stub.last('shot');
+      if (shot) heard.push(shot);
+    }
+    assert.ok(heard.length >= 10, `only ${heard.length} of fourteen shots were heard at all`);
+    assert.ok(heard.every((sh) => sh.id === undefined), 'one of them named him');
+
+    const xs = heard.map((sh) => sh.o[0]);
+    const zs = heard.map((sh) => sh.o[2]);
+    assert.ok(new Set(xs).size > 1 || new Set(zs).size > 1,
+      'every shot came back from the same exact spot - the origin is not fuzzed');
+    const off = heard.map((sh) => Math.hypot(sh.o[0] - shooter.pos.x, sh.o[2] - shooter.pos.z));
+    assert.ok(Math.max(...off) > 0.7,
+      `the widest miss was ${Math.max(...off).toFixed(2)}m, which is a pin, not a direction`);
+    assert.ok(Math.max(...off) < SOCIAL.shotFuzz * 2.5,
+      'the fuzz is wide enough that a shot says nothing about where it came from');
+
+    // But where the bullets landed is not fuzzed - dust off a wall is a thing
+    // you can genuinely see, and it is what makes an unseen shot readable.
+    assert.ok(heard.every((sh) => Array.isArray(sh.rays) && sh.rays.length),
+      'the impacts went missing with the shooter');
+  } finally { clock.restore(); }
+});
+
+test('and a shot on the far side of town is not heard at all', () => {
+  // Every shot in the round used to reach every socket in it, whatever the
+  // distance. A hundred and thirty metres of town is a lot of gunfire to be
+  // told about.
+  const { room, clock, stub, me } = liveRoom({ bots: 6 });
+  try {
+    me.pos = { x: 60, y: 0, z: -18 };             // deep in the mine
+    const shooter = [...room.players.values()].find((p) => p.bot);
+    shooter.pos = { x: -22, y: 0, z: -16 };       // inside the saloon, 82m off
+    tick(clock, room, Math.ceil(VISION.memory * 20) + 6);
+    stub.reset();
+    shooter.nextFireAt = 0; shooter.swapUntil = 0; shooter.reloading = null;
+    room.onShoot(shooter, { dir: { x: 1, y: 0, z: 0 } });
+    assert.equal(stub.last('shot'), undefined,
+      'a revolver eighty metres away was put on the wire');
   } finally { clock.restore(); }
 });
 

@@ -13,7 +13,7 @@ import { fakeClock, stubClient, tick } from './helpers.js';
 import { TIMING, MODES, PHASE, MAX_PLAYERS } from '../shared/constants.js';
 import { C } from '../shared/protocol.js';
 
-const { RoomManager } = await import('../server/rooms.js');
+const { RoomManager, MAX_ROOMS } = await import('../server/rooms.js');
 const { Room } = await import('../server/room.js');
 
 const secs = (clock, room, n) => tick(clock, room, Math.round(n * 20));
@@ -28,7 +28,9 @@ test('rooms opened and abandoned are actually freed', () => {
   const clock = fakeClock();
   try {
     const m = new RoomManager({ mode: MODES.DUEL });
-    for (let i = 0; i < 300; i++) {
+    // Comfortably more towns than the cap holds at once, so the sweep is doing
+    // the work rather than the cap never being approached.
+    for (let i = 0; i < MAX_ROOMS * 3; i++) {
       const room = m.create({ isPublic: false });
       assert.ok(room, `the manager stopped opening towns at ${i}`);
       const stub = stubClient();
@@ -130,5 +132,42 @@ test('a match that ends really does end', () => {
     secs(clock, room, TIMING.prep + TIMING.combat + TIMING.endgame + TIMING.results + 12);
     assert.ok(room.phase === PHASE.LOBBY || room.phase === PHASE.RESULTS,
       `a round that had run its whole clock was still in ${room.phase}`);
+  } finally { clock.restore(); }
+});
+
+test('a full room costs about what it is budgeted to cost', () => {
+  // The room cap is not a round number, it is a measurement: a 20Hz loop has
+  // 50ms a tick, a full eight-player room costs a fraction of a millisecond of
+  // it, and the cap is how many of those fit with room to spare. That makes it
+  // a number that goes wrong quietly - nothing fails when a room gets four
+  // times more expensive, every room on the process just starts running slow
+  // at once, which is the worst way for a game server to be broken.
+  //
+  // The threshold here is deliberately loose. It is not a benchmark and CI is
+  // not a quiet machine; it is here to catch a room-tick that has grown by an
+  // order of magnitude, which is the only kind of regression worth failing a
+  // branch over.
+  fast();
+  const clock = fakeClock();
+  try {
+    const rooms = [];
+    for (let i = 0; i < 8; i++) {
+      const r = new Room({ code: `P${i}`, isPublic: false, mode: MODES.FREE });
+      r.botFillTarget = MAX_PLAYERS;
+      r.resetClock();
+      r.beginMatch();
+      rooms.push(r);
+    }
+    for (let i = 0; i < 40; i++) { clock.advance(50); for (const r of rooms) r.step(); }
+
+    const TICKS = 120;
+    const began = performance.now();
+    for (let i = 0; i < TICKS; i++) { clock.advance(50); for (const r of rooms) r.step(); }
+    const perRoomTick = (performance.now() - began) / TICKS / rooms.length;
+
+    assert.ok(perRoomTick < 5,
+      `a full room costs ${perRoomTick.toFixed(2)}ms a tick, and the cap of ${MAX_ROOMS}`
+      + ` towns assumes a fraction of that - ${(perRoomTick * MAX_ROOMS).toFixed(0)}ms`
+      + ' of a 50ms budget');
   } finally { clock.restore(); }
 });

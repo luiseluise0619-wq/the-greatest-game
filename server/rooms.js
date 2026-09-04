@@ -13,7 +13,20 @@ import { C, S } from '../shared/protocol.js';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LEN = 4;
 const IDLE_GRACE = 90;      // seconds an empty room is kept before it is reaped
-const MAX_ROOMS = 200;
+
+// How many towns one process will hold at once.
+//
+// Measured rather than picked: a full eight-player room costs about 0.39ms a
+// tick in the free-for-all and 0.26ms at the table, on one core of the machine
+// this was written on. A 20Hz loop has 50ms to spend, so that core runs out at
+// about 130 full free-for-all rooms - and the ceiling here used to be 200, which
+// is a number the server cannot actually serve. Past the budget nothing fails
+// loudly; every room on the process just starts running slow at once, which is
+// the worst way for a game server to be broken.
+//
+// So the default leaves room, a shared vCPU is slower than the box that
+// measured it, and it is settable for anybody who has measured their own.
+export const MAX_ROOMS = Number(process.env.HNH_MAX_ROOMS || 100);
 
 const now = () => Date.now() / 1000;
 
@@ -22,6 +35,10 @@ export class RoomManager {
     this.rooms = new Map();
     this.timer = null;
     this.ticks = 0;
+    // Load, so a server that has run out of core can be seen to have done so.
+    this.tickMs = 0;
+    this.peakTickMs = 0;
+    this.overruns = 0;
     // Every town this manager opens plays the same game.
     this.mode = opts.mode;
   }
@@ -118,11 +135,27 @@ export class RoomManager {
   // ------------------------------------------------------------ the clock
   start() {
     this.timer = setInterval(() => {
+      // What one pass over every room actually cost. A game server that has run
+      // out of core does not fail, it goes slow everywhere at once, and the
+      // only way anybody finds out is that the game feels wrong - so the number
+      // goes on /healthz where a deployment can watch it, and says so in the
+      // log when it is sustained rather than once.
+      const began = performance.now();
       for (const room of this.rooms.values()) {
         try {
           room.step();
         } catch (err) {
           console.error(`[rooms] ${room.code} step error`, err);
+        }
+      }
+      const spent = performance.now() - began;
+      this.tickMs = this.tickMs * 0.95 + spent * 0.05;
+      this.peakTickMs = Math.max(this.peakTickMs, spent);
+      if (spent > TICK_MS) {
+        this.overruns += 1;
+        if (this.overruns % 100 === 1) {
+          console.warn(`[rooms] tick took ${spent.toFixed(0)}ms of ${TICK_MS}ms`
+            + ` · ${this.rooms.size} towns · ${this.overruns} overruns so far`);
         }
       }
       if (++this.ticks % 40 === 0) this.reap();
@@ -153,6 +186,13 @@ export class RoomManager {
       humans += room.humanCount();
       if (room.phase !== PHASE.LOBBY) playing++;
     }
-    return { rooms: this.rooms.size, inMatch: playing, humans };
+    return {
+      rooms: this.rooms.size, inMatch: playing, humans,
+      capacity: MAX_ROOMS,
+      tickMs: +this.tickMs.toFixed(2),
+      peakTickMs: +this.peakTickMs.toFixed(2),
+      tickBudgetMs: TICK_MS,
+      overruns: this.overruns,
+    };
   }
 }

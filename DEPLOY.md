@@ -42,8 +42,19 @@ somewhere else.
 `GET /healthz` returns live state and is wired to the container healthcheck:
 
 ```json
-{ "ok": true, "uptime": 412, "rooms": 3, "inMatch": 1, "humans": 7 }
+{
+  "ok": true, "uptime": 412,
+  "rooms": 3, "inMatch": 1, "humans": 7, "capacity": 100,
+  "tickMs": 1.16, "peakTickMs": 4.8, "tickBudgetMs": 50, "overruns": 0
+}
 ```
+
+The last four are the ones to watch. `tickMs` is a smoothed average of what one
+pass over every room costs; `tickBudgetMs` is what it has to spend. A game
+server that has run out of core does not fail — every room on it goes slow at
+once, and the only way anybody finds out is that the game *feels* wrong. If
+`overruns` is climbing, the process is past what it can serve; the log says so
+too, once every hundred rather than every tick.
 
 ## Hosting it
 
@@ -126,21 +137,46 @@ balancer means two separate sets of towns, and a code created on one is
 one instance.
 
 That is fine further than you would think — a room is a handful of objects and
-a 20 Hz tick, and one small VM holds many concurrent matches. Watch `/healthz`;
-worry about scaling when `rooms` is regularly in the dozens.
+a 20 Hz tick, and one small VM holds many concurrent matches. Watch `tickMs`
+against `tickBudgetMs` on `/healthz` rather than watching `rooms`.
 
 ## Sizing
 
-Rough, from how the server is built rather than from measurement — treat as a
-starting point and check `/healthz` under real load:
+Measured, not guessed. A full eight-player room costs about **0.39 ms a tick**
+in the free-for-all and **0.26 ms** at the table, on one core of the machine
+this was written on, with every seat filled by a bot — which is the expensive
+case, because bot AI is most of that number and a room of humans is cheaper.
+The loop runs at 20 Hz, so it has **50 ms** a tick to spend across every room on
+the process. That works out at roughly **130 full free-for-all rooms** on one
+core before the budget is gone.
+
+`HNH_MAX_ROOMS` defaults to **100**, which leaves headroom on purpose: a shared
+vCPU is slower than the box those numbers came from, and past the budget nothing
+fails loudly — every room just starts running slow at once. Raise it if you have
+measured your own, and watch `tickMs` when you do.
 
 - Memory is dominated by the map geometry, which is shared, plus a few hundred
   bytes per player per room.
-- CPU is one 20 Hz tick across all rooms; bot AI is the expensive part, so a
-  room full of bots costs more than a room full of humans.
 - Bandwidth is roughly a 20 Hz snapshot per player, a few KB/s each.
 
 A 1 vCPU / 512 MB instance is a sensible place to start a playtest.
+
+## Going down
+
+`SIGTERM` — which is what every deploy platform sends — closes every socket with
+**1012, service restart**, flushes the playtest log, and exits. That code matters:
+the client knows it and waits about ninety seconds for the server to come back,
+saying "server restarting", instead of treating a rolling deploy as a broken
+network and giving up after twenty. Nothing needs configuring for this; it is
+worth knowing because a deploy that drops eight people in silence looks exactly
+like an outage.
+
+## Closing the readout
+
+`GET /stats` is aggregate only — no names, no room codes, nothing about one
+person — so it is open by default, which is what a playtest wants. Set
+`HNH_STATS_TOKEN` on a public deployment and it wants `?token=` to match, and
+404s anything else.
 
 ## Before you charge money for it
 

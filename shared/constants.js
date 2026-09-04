@@ -580,6 +580,16 @@ export const SOCIAL = {
   stepInterval: { sprint: 0.31, walk: 0.44, crouch: 0.62 },
   stepRange: { sprint: 30, walk: 22, crouch: 9 },
   stepFuzz: 0.7,               // metres of slop, so a step is a direction not a pin
+  // And how far a gunshot's origin is fuzzed for anybody who cannot see who
+  // fired it. The shot itself is physical - the noise, the tracer, the dust
+  // off the wall it hit - and everybody in earshot gets all of that. Where the
+  // man is standing is not physical, it is him, and it used to travel exact to
+  // every socket in the round whether or not the viewer could see him. The
+  // name was stripped and the coordinates were not, which is a wallhack
+  // assembled out of legitimate packets: every shot all round, precise
+  // position, precise aim. Wider than a footstep's because a shot is louder
+  // and less precisely placed by ear.
+  shotFuzz: 4.5,
   footprintInterval: 0.55,
   footprintTtl: 24,
 };
