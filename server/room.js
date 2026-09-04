@@ -565,7 +565,14 @@ export class Room {
   onSwap(p, msg) {
     if (!p.alive) return;
     const slot = String(msg.slot || '');
-    if (!p.guns[slot] || p.slot === slot) return;
+    // hasOwn rather than truthiness. `p.guns['__proto__']` is Object.prototype,
+    // which is very truthy, so a client could name any key on it - __proto__,
+    // constructor, toString - and have it accepted as the gun in its hands. It
+    // could not then fire, because p.guns[p.slot].mag is undefined, but the
+    // string went into its own state and out to every other player in the
+    // snapshot's `w` field, which is what the room draws a weapon from. A slot
+    // is one of the guns this player was actually dealt or it is nothing.
+    if (!Object.hasOwn(p.guns, slot) || !WEAPONS[slot] || p.slot === slot) return;
     p.slot = slot;
     p.reloading = null;
     p.swapUntil = now() + swapTime(slot, p.character);

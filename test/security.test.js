@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
 import {
-  TIMING, PLAYER, VISION, SOCIAL, VOICE_LINES, MODES, PHASE, MAX_PLAYERS,
+  TIMING, PLAYER, VISION, SOCIAL, VOICE_LINES, MODES, PHASE, MAX_PLAYERS, WEAPONS,
 } from '../shared/constants.js';
 import MAP from '../shared/map.js';
 import { C } from '../shared/protocol.js';
@@ -452,5 +452,38 @@ test('nothing a client can put on the wire gets past the door or breaks the room
     tick(clock, room, 200);
     assert.ok([PHASE.PREP, PHASE.COMBAT, PHASE.ENDGAME, PHASE.RESULTS].includes(room.phase),
       `the room ended up in ${room.phase}`);
+  } finally { clock.restore(); }
+});
+
+test('a weapon slot is one of the guns you were dealt, not any key on an object', () => {
+  // p.guns['__proto__'] is Object.prototype, which is very truthy, so the
+  // existence check that gated this accepted any key on it - __proto__,
+  // constructor, toString, valueOf. The player could not then fire, because
+  // p.guns[p.slot].mag is undefined, but the string went into their own state
+  // and out to every other player in the snapshot's `w` field, which is what
+  // the room draws a weapon from. Nothing crashed, which is how it sat there.
+  const { room, clock, stub, me } = liveRoom({ bots: 4 });
+  try {
+    const dealt = me.slot;
+    for (const slot of ['__proto__', 'constructor', 'toString', 'valueOf',
+      'hasOwnProperty', 'rifle', '', null, undefined, 0, {}, []]) {
+      room.onSwap(me, { slot });
+      assert.equal(me.slot, dealt,
+        `a client asked for "${String(slot)}" and was handed it`);
+    }
+    // And the snapshot never carried one either.
+    stub.reset();
+    tick(clock, room, 4);
+    for (const snap of stub.of('snap')) {
+      for (const e of snap.ps) {
+        assert.ok(Object.hasOwn(WEAPONS, e.w),
+          `the wire carried a weapon called "${e.w}"`);
+      }
+    }
+
+    // A gun he really does have still works, or the fix took the feature with it.
+    me.guns.rifle = { mag: 5, reserve: 20 };
+    room.onSwap(me, { slot: 'rifle' });
+    assert.equal(me.slot, 'rifle', 'he could no longer pick up a second gun and use it');
   } finally { clock.restore(); }
 });

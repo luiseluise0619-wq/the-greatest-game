@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 324 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 326 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -730,7 +730,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 324 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 326 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -860,8 +860,13 @@ They are grouped by what they protect:
   through a wall, end up inside geometry, buy speed by flooding input packets,
   sprint past the end of its own tank, learn who used an ability or picked
   something up across town, hear a shout from the far side of the map,
-  be told about players it cannot see, or learn the name of a shooter it could
-  not have seen. One check runs the other way and makes sure an honest sprint at
+  be told about players it cannot see, or learn the name — or, since a later
+  pass, the exact standing position — of a shooter it could not have seen. Or
+  name a weapon slot that is not a gun: `p.guns['__proto__']` is
+  `Object.prototype` and very truthy, so the existence check that gated a
+  weapon swap accepted any key on it, and the string went into the player's own
+  state and out to everybody else in the snapshot. Nothing crashed, which is how
+  it sat there. One check runs the other way and makes sure an honest sprint at
   30Hz is never clamped. And one goes at the door: fifty-four shapes of nonsense
   a client can put on the wire — a shot whose direction is a string, an array,
   an object of letters or a NaN; cards that are numbers or names of nothing,

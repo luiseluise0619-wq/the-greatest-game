@@ -332,3 +332,59 @@ test('a dead man does not hold the go for the rest of his six seconds', () => {
     }
   } finally { clock.restore(); }
 });
+
+test('the free-for-all\'s moves do nothing at a table', () => {
+  // Both games run through one Room, and the fork is fourteen `if (this.duel)`
+  // branches. What that shape makes easy is a move from the other mode reaching
+  // a table it has no meaning at: the turn mode is played standing at a round
+  // table with cards for ammunition, and there is no loot on the floor, no
+  // second gun to swap to, no stick to throw and no chamber to spin.
+  //
+  // Every one of these is currently refused by a guard that is about something
+  // else - an empty loot list, a dynamite count of zero, a gun rack with one
+  // gun in it. That works, and it is exactly the kind of thing that stops
+  // working when somebody adds a stick to the turn mode's deck.
+  const clock = fakeClock();
+  try {
+    const room = new Room({ code: 'FORK', isPublic: false, mode: MODES.DUEL });
+    room.botFillTarget = 5;
+    room.resetClock();
+    room.beginMatch();
+    tick(clock, room, 40);
+    const p = [...room.players.values()].find((o) => o.alive);
+    assert.ok(p, 'nobody was dealt in');
+
+    const before = {
+      hand: [...(p.duelHand || [])],
+      health: p.health,
+      slot: p.slot,
+      dynamite: p.dynamite,
+      pos: { ...p.pos },
+      gear: [...(p.gear || [])],
+      mag: p.guns.revolver.mag,
+    };
+
+    // Nothing on the floor to pick up, no second gun, no stick, no cylinder.
+    room.onPickup(p, { id: 1 });
+    room.onPickup(p, { id: 999 });
+    room.onSwap(p, { slot: 'rifle' });
+    room.onSwap(p, { slot: 'shotgun' });
+    room.onSwap(p, { slot: '__proto__' });
+    room.onThrow(p, { dir: { x: 1, y: 0, z: 0 } });
+    room.onSelfShot(p);
+    room.onSelfShot(p);
+
+    assert.deepEqual(p.duelHand, before.hand, 'his hand changed');
+    assert.equal(p.health, before.health, 'the free-for-all reached him at the table');
+    assert.equal(p.slot, before.slot, 'he swapped to a gun this mode does not deal');
+    assert.equal(p.dynamite, before.dynamite, 'a stick appeared at a card table');
+    assert.deepEqual(p.gear, before.gear, 'something landed in front of him');
+    assert.deepEqual(p.pos, before.pos, 'he moved, in the mode where nobody moves');
+    assert.equal(p.rouletteSpent, false,
+      'the cylinder is the other mode\'s and it turned at this table');
+    assert.equal(p.guns.revolver.mag, before.mag, 'a round left the cylinder anyway');
+    // And the room is still playing a game.
+    assert.equal(room.phase !== PHASE.LOBBY, true, 'the round ended');
+    tick(clock, room, 20);
+  } finally { clock.restore(); }
+});
