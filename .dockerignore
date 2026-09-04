@@ -3,6 +3,14 @@ node_modules
 .gitignore
 *.md
 !client/models/README.md
+# three.js is served to the browser straight out of node_modules, so a running
+# container redistributes it and its MIT notice has to travel along. Excluding
+# it here does not just drop the file, it breaks the build - the Dockerfile
+# copies it by name.
+!NOTICE.md
+# And what the software does with what it knows, which is a claim a deployment
+# should be able to point at rather than one that lives only in a repository.
+!PRIVACY.md
 Dockerfile
 .dockerignore
 client/models/*.glb

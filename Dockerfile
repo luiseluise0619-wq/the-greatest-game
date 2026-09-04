@@ -11,8 +11,11 @@ COPY shared ./shared
 COPY server ./server
 COPY client ./client
 # three.js is served to the browser straight out of node_modules, so a running
-# container is redistributing it, and its MIT notice travels with it.
-COPY NOTICE.md ./NOTICE.md
+# container is redistributing it, and its MIT notice travels with it. So does
+# what the software does with what it knows. Both are named in .dockerignore as
+# exceptions to the "*.md" rule - without those lines this COPY does not quietly
+# skip them, it fails the build.
+COPY NOTICE.md PRIVACY.md ./
 
 # Telemetry appends to ./data. The process runs as `node`, so the directory has
 # to exist and be writable by it - otherwise the server starts, warns, and

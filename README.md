@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 317 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 324 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -730,7 +730,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 317 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 324 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -1056,6 +1056,21 @@ They are grouped by what they protect:
   knock the live one out of its own boots. And the lap does not stop for six
   seconds for a man who is not there: an empty chair gets `DUEL.turnAway`, and
   a tab that reconnects inside its own go gets the go back whole.
+- **`test/deploy.test.js`** — the container, checked without a Docker daemon.
+  Every deployment of this game *is* the image, so "it works on my machine" is
+  not allowed to mean anything, and the CI job that builds it and runs it is the
+  real answer. This is the cheap half: the mistakes you can find by reading the
+  Dockerfile against `.dockerignore` and the repository, which are otherwise a
+  whole CI round trip each to discover. It exists because of exactly one such
+  mistake — `.dockerignore` excludes `*.md`, the Dockerfile was handed `COPY
+  NOTICE.md`, and a COPY of a path the build context does not contain does not
+  quietly skip it, it fails the build. So: every path copied exists, and
+  survives the ignore rules, which is not the same question. Nothing that is not
+  ours to ship can reach the image — the CC-BY model is kept out of git by one
+  file and out of the context by another, and the second one was once forgotten.
+  The image runs the entry point `package.json` names, on the port `fly.toml`
+  and the Dockerfile both have to agree about, answering the path the platform
+  actually polls.
 - **`test/stress.test.js`** — a server that stays up, and what it costs to. Everything else here
   plays one round and asserts something about it; this asks what the process
   looks like after a few hundred. Three hundred towns are opened, joined,
