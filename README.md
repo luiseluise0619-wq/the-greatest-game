@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 284 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 291 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -722,7 +722,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 284 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 291 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -1003,6 +1003,18 @@ They are grouped by what they protect:
   last person to close their tab does not strand the rest waiting on a vote that
   can no longer arrive; bots are never waited for; and the flag does not survive
   the round it started.
+- **`test/netloss.test.js`** — what happens when somebody's wifi goes out.
+  Eight people in a voice call is eight home connections, and over a
+  twenty-minute round at least one of them blips. A blip does not cost you your
+  body: the server keeps it standing for the grace period and hands it back to
+  the tab holding the token, at the health and in the place it left. Past the
+  grace there is nothing to come back to, and a tab that returns is told it is
+  dead rather than handed somebody else. A token is the only thing that
+  reclaims a seat — six wrong ones, including a well-formed UUID, get a new
+  body each. Two tabs cannot hold one seat, and the stale one closing does not
+  knock the live one out of its own boots. And the lap does not stop for six
+  seconds for a man who is not there: an empty chair gets `DUEL.turnAway`, and
+  a tab that reconnects inside its own go gets the go back whole.
 - **`test/soak.test.js`** — rounds played end to end with the rules checked on
   every tick. Everything else in this suite sets a situation up by hand and
   asserts on it, which finds what somebody thought to look for; this plays real

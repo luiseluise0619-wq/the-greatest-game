@@ -351,6 +351,12 @@ export class Room {
     p.moveSlack = PLAYER.serverSlack;
     client.playerId = p.id;
 
+    // If the lap reached him while he was gone it gave him a second and a half
+    // rather than six. He is back inside it, so he gets the go he was owed.
+    if (this.duel && this.turn?.kind === 'turn' && this.turnHolder === p.id) {
+      this.setTurn({ ...this.turn, endsAt: now() + DUEL.turn });
+    }
+
     this.send(client, this.welcomeMsg(p.id, p.token));
     if (p.role) this.sendRole(p, { resumed: true });   // also snaps the camera to the body
     this.pushCards(p);
@@ -2409,7 +2415,13 @@ export class Room {
       }
       const p = this.players.get(this.turnOrder[this.turnPtr]);
       if (p && p.alive) {
-        this.setTurn({ kind: 'turn', holder: p.id, endsAt: t + DUEL.turn });
+        // A go for somebody who is not there is a go the table spends waiting.
+        // He keeps his seat and his cards for the whole reconnect grace - see
+        // stepPlayers - but the lap does not stop for him.
+        const away = !p.bot && !p.connected;
+        this.setTurn({
+          kind: 'turn', holder: p.id, endsAt: t + (away ? DUEL.turnAway : DUEL.turn),
+        });
         this.onTurnStart(p);
         return;
       }

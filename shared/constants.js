@@ -461,6 +461,14 @@ export const DUEL = {
   // sense of distance comes from.
   reposition: 4,
   turn: 6,                 // seconds each player's trigger is live
+  // A man whose wifi went out still owns his seat for the reconnect grace, and
+  // he still gets a go when the lap reaches him - but not six seconds of one.
+  // Eight players and one dropped connection was four dead laps in a row in a
+  // game whose entire loop is a six-second go, and the table cannot tell a
+  // player thinking from a player who is not there. Long enough that a tab
+  // coming back mid-go gets its turn handed back whole; short enough that the
+  // table does not stop for somebody who is gone.
+  turnAway: 1.5,
   health: 4,               // hits, not hit points
   // The card game gives the star one hit more than everybody else and deals it
   // face up, and those two go together: the gang knows exactly who to shoot
