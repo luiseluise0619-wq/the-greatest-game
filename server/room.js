@@ -176,7 +176,8 @@ export class Room {
   // -------------------------------------------------------------------------
   makePlayer(opts) {
     const id = nextId++;
-    const character = CHARACTERS[opts.character] ? opts.character : 'gunslinger';
+    const character = Object.hasOwn(CHARACTERS, opts.character || '')
+      ? opts.character : 'gunslinger';
     return {
       id,
       name: (opts.name || 'Stranger').slice(0, 16),
@@ -396,7 +397,13 @@ export class Room {
    */
   onStart(p, msg) {
     if (this.phase !== PHASE.LOBBY) return;
-    if (msg && msg.character && CHARACTERS[msg.character]) p.character = msg.character;
+    // hasOwn, for the reason written out over onSwap: CHARACTERS['__proto__']
+    // is Object.prototype and passes a truthiness check, and the string then
+    // goes into the lobby roster, the snapshot's `ch` field and an i18n lookup
+    // on every other player's machine.
+    if (msg && msg.character && Object.hasOwn(CHARACTERS, msg.character)) {
+      p.character = msg.character;
+    }
     if (msg && msg.name) p.name = String(msg.name).slice(0, 16);
 
     const humans = [...this.players.values()].filter((o) => !o.bot && o.connected);

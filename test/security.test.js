@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
 import {
   TIMING, PLAYER, VISION, SOCIAL, VOICE_LINES, MODES, PHASE, MAX_PLAYERS, WEAPONS,
+  CHARACTERS,
 } from '../shared/constants.js';
 import MAP from '../shared/map.js';
 import { C } from '../shared/protocol.js';
@@ -485,5 +486,36 @@ test('a weapon slot is one of the guns you were dealt, not any key on an object'
     me.guns.rifle = { mag: 5, reserve: 20 };
     room.onSwap(me, { slot: 'rifle' });
     assert.equal(me.slot, 'rifle', 'he could no longer pick up a second gun and use it');
+  } finally { clock.restore(); }
+});
+
+test('and a character is one of the six, by the same rule', () => {
+  // The same shape as the weapon slot above, in the two places a client names
+  // its own face. CHARACTERS['__proto__'] is Object.prototype and passes a
+  // truthiness check, and the string then goes into the lobby roster, into the
+  // snapshot's `ch` field, and into an i18n lookup on every other machine.
+  const room = new Room({ code: 'FACE', isPublic: false, mode: MODES.FREE });
+  const clock = fakeClock();
+  try {
+    room.resetClock();
+    for (const bad of ['__proto__', 'constructor', 'toString', 'valueOf', 'nobody']) {
+      const stub = stubClient();
+      room.addConnection(stub.client);
+      room.handleMessage(stub.client, { t: C.JOIN, name: 'Face', character: bad });
+      const p = room.players.get(stub.client.playerId);
+      assert.ok(CHARACTERS[p.character] && Object.hasOwn(CHARACTERS, p.character),
+        `joining as "${bad}" was allowed and the roster now says so`);
+      // And again through the other door, which is its own line of code.
+      room.handleMessage(stub.client, { t: C.START, character: bad });
+      assert.ok(Object.hasOwn(CHARACTERS, p.character),
+        `pressing deal as "${bad}" was allowed`);
+      room.removeConnection(stub.client);
+    }
+    // A real one still works, or the fix took the character select with it.
+    const stub = stubClient();
+    room.addConnection(stub.client);
+    room.handleMessage(stub.client, { t: C.JOIN, name: 'Face', character: 'scout' });
+    assert.equal(room.players.get(stub.client.playerId).character, 'scout',
+      'nobody can pick a character any more');
   } finally { clock.restore(); }
 });

@@ -23,7 +23,7 @@ model and sound in the game is generated procedurally at runtime.
 Want to see a whole round quickly? `HNH_FAST=1 npm start` runs ~2 minute rounds.
 
 ```
-npm test               # 326 checks: map, collision, match rules, information rules, cards, anti-cheat
+npm test               # 327 checks: map, collision, match rules, information rules, cards, anti-cheat
 npm run test:browser   # optional: real Chromium, both games, needs playwright
 npm run balance        # 40 headless bot rounds, and the numbers worth arguing about
 HNH_MODE=duel npm run balance -- 60    # the same, for the turn mode
@@ -730,7 +730,7 @@ No chat text is ever written, and player names are omitted unless you set
 
 ## Tests
 
-`npm test` runs 326 checks on plain Node, no browser and no extra dependencies.
+`npm test` runs 327 checks on plain Node, no browser and no extra dependencies.
 They are grouped by what they protect:
 
 - **`test/world.test.js`** — the map is well formed, nobody spawns inside rock,
@@ -866,7 +866,9 @@ They are grouped by what they protect:
   `Object.prototype` and very truthy, so the existence check that gated a
   weapon swap accepted any key on it, and the string went into the player's own
   state and out to everybody else in the snapshot. Nothing crashed, which is how
-  it sat there. One check runs the other way and makes sure an honest sprint at
+  it sat there — and the same shape was in both places a client names its own
+  face, where the string then reached the lobby roster and an i18n lookup on
+  every other machine. One check runs the other way and makes sure an honest sprint at
   30Hz is never clamped. And one goes at the door: fifty-four shapes of nonsense
   a client can put on the wire — a shot whose direction is a string, an array,
   an object of letters or a NaN; cards that are numbers or names of nothing,
