@@ -9,7 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeClock, stubClient, tick } from './helpers.js';
+import { fakeClock, stubClient, tick, freezeBots } from './helpers.js';
 import { TIMING, SOCIAL, MODES, DUEL, PHASE } from '../shared/constants.js';
 import { C, S } from '../shared/protocol.js';
 
@@ -33,6 +33,11 @@ function town({ mode = MODES.FREE, humans = 2, bots = 5 } = {}) {
   }
   room.beginMatch();
   secs(clock, room, 2);
+  // A body left standing in the street is every bit as shootable as it was -
+  // that is the point of the grace and it is tested elsewhere. Here it would
+  // just mean a bot occasionally shot the man whose reconnect is the subject,
+  // so nobody is holding a gun for the length of this file.
+  freezeBots(room);
   return { room, clock, stubs };
 }
 
@@ -173,5 +178,49 @@ test('somebody leaving the lobby does not leave a ghost in the roster', () => {
     room.removeConnection(stubs[2].client);
     assert.equal(room.players.size, before - 1, 'a lobby leaver stayed on the list');
     assert.equal(room.humanCount(), 2);
+  } finally { clock.restore(); }
+});
+
+test('a blip on the round boundary does not cost you your seat', () => {
+  // The narrowest window there is, and it used to swallow people whole. The
+  // sweep that clears a finished round deleted anybody who was not connected,
+  // so a tab that dropped in the last seconds of a round came back a stranger:
+  // new body, new name, no place on the aftermath screen and no vote on riding
+  // again. It is the same grace it would have been given a second earlier.
+  const { room, clock, stubs } = town({ humans: 2, bots: 4 });
+  try {
+    const [me, other] = stubs;
+    const token = me.player.token;
+    const id = me.player.id;
+    const name = me.player.name;
+    room.removeConnection(me.client);
+
+    // The round ends underneath him and the room goes back to the lobby.
+    room.toLobby();
+    assert.ok(room.players.has(id),
+      'the round ending took the seat of somebody who was two seconds from being back');
+
+    const back = stubClient();
+    room.addConnection(back.client);
+    room.handleMessage(back.client, { t: C.JOIN, name, token });
+    assert.equal(back.client.playerId, id, 'he came back a stranger');
+    assert.equal(room.players.get(id).name, name, 'and under a different name');
+    assert.ok(other.player, 'test setup: there was nobody else in the room');
+  } finally { clock.restore(); }
+});
+
+test('but somebody who really went home is swept', () => {
+  const { room, clock, stubs } = town({ humans: 2, bots: 4 });
+  try {
+    const [me] = stubs;
+    const id = me.player.id;
+    room.removeConnection(me.client);
+    room.toLobby();
+    assert.ok(room.players.has(id), 'test setup: he was gone before the grace ran');
+
+    secs(clock, room, SOCIAL.reconnectGrace + 3);
+    assert.equal(room.players.has(id), false,
+      'a lobby kept a seat for somebody who closed their tab a minute ago');
+    assert.equal(room.humanCount(), 1);
   } finally { clock.restore(); }
 });

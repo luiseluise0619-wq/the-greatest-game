@@ -71,4 +71,42 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      # Both games. The turn mode is the one this server deals by default and
+      # it was the one the readout never covered.
       - run: npm run balance -- 60
+      - run: HNH_MODE=duel npm run balance -- 60
+
+  docker:
+    name: the container actually runs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Every deployment of this is the image, so "it works on my machine" is not
+    # a thing that can be allowed to mean anything here. Build it, run it, and
+    # ask it whether it is alive - which is the same question fly.io asks.
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t high-noon-hollow .
+      - name: start it
+        run: docker run -d --name hnh -p 8080:8080 high-noon-hollow
+      - name: wait for it to answer
+        run: |
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8080/healthz > /dev/null; then
+              echo "up after ${i} tries"; exit 0
+            fi
+            sleep 1
+          done
+          echo "the container never answered /healthz"; docker logs hnh; exit 1
+      - name: and serves the page it was built to serve
+        run: |
+          curl -fsS http://127.0.0.1:8080/ | grep -q 'type="importmap"' \
+            || { echo "the page came back without the import map that boots it"; exit 1; }
+          curl -fsS http://127.0.0.1:8080/vendor/three.module.js > /dev/null \
+            || { echo "three.js is not being served out of node_modules"; exit 1; }
+          curl -fsS -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/server/room.js \
+            | grep -q 404 || { echo "the container is serving its own source"; exit 1; }
+      - name: and goes down when it is told to
+        run: |
+          docker stop -t 10 hnh
+          test "$(docker inspect -f '{{.State.ExitCode}}' hnh)" = 0 \
+            || { echo "SIGTERM did not bring it down cleanly"; docker logs hnh; exit 1; }

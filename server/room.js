@@ -2249,7 +2249,17 @@ export class Room {
     this.phaseEndsAt = 0;
     this.lobbyStartAt = 0;
     for (const [id, p] of [...this.players]) {
-      if (p.bot || !p.connected) { this.players.delete(id); continue; }
+      // A blip that lands on the round boundary used to cost somebody their
+      // whole seat: this deleted anybody not connected, so a tab that dropped
+      // in the last seconds of a round came back a stranger - new name, no
+      // place on the aftermath screen, and no vote on riding again. It is the
+      // same grace it would have got a second earlier, so it is the same grace
+      // now; sweepLobby takes the ones who really did go home.
+      if (p.bot) { this.players.delete(id); continue; }
+      if (!p.connected && now() - (p.disconnectedAt || 0) > SOCIAL.reconnectGrace) {
+        this.players.delete(id);
+        continue;
+      }
       p.alive = false;
       p.wantsAgain = false;
       p.role = null; p.faction = null; p.intel = null; p.badge = false;
@@ -2302,10 +2312,28 @@ export class Room {
     } else if (this.phase === PHASE.RESULTS) {
       if (t >= this.phaseEndsAt) this.toLobby();
     } else if (this.phase === PHASE.LOBBY) {
+      this.sweepLobby(t);
       this.stepLobby(t);
     }
 
     this.sendSnapshots(t);
+  }
+
+  /**
+   * The people a round ended on who never came back. toLobby keeps a
+   * disconnected player for the same grace the round would have given them, so
+   * a blip on the boundary does not cost a seat; this is what takes the seat
+   * once the grace really has run out.
+   */
+  sweepLobby(t) {
+    let gone = false;
+    for (const [id, p] of [...this.players]) {
+      if (p.bot || p.connected) continue;
+      if (t - (p.disconnectedAt || 0) <= SOCIAL.reconnectGrace) continue;
+      this.players.delete(id);
+      gone = true;
+    }
+    if (gone) { this.pushLobby(); this.checkLobbyReady(); }
   }
 
   /**

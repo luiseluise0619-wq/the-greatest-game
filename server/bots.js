@@ -155,6 +155,7 @@ function envNumber(key, fallback) {
 
 const HOSTILITY_THRESHOLD = BOT_TUNING.hostility;
 
+
 /**
  * The same line, for a game where the gun is only live for six seconds in
  * every lap. A bot with the floor, a Bang! in hand and somebody in range has
@@ -216,6 +217,7 @@ export class BotBrain {
     this.protecteeThreat = null;    // deputies remember who went for their man
     this.nextProbeAt = 0;
     this.nextDuelActAt = 0;
+    this.saidIt = false;     // his one un-waited-for moment, see social()
     this.duelTurnKey = null;
     this.gambled = false;
     this.braceRolled = false;
@@ -329,6 +331,18 @@ export class BotBrain {
     if (id == null || id === this.self.id) return;
     this.trust.set(id, clamp((this.trust.get(id) || 0) + amount, 0, 1));
   }
+  /** The face he suspects most, of the ones still standing. */
+  topSuspect() {
+    let best = null;
+    let bestSus = -1;
+    for (const [id] of this.suspicion) {
+      if (!this.room.players.get(id)?.alive) continue;
+      const s = this.susOf(id);
+      if (s > bestSus) { bestSus = s; best = id; }
+    }
+    return best;
+  }
+
   susOf(id) {
     let s = this.suspicion.get(id) ?? 0.15;
     s -= (this.trust.get(id) || 0) * 0.5;
@@ -1588,13 +1602,58 @@ export class BotBrain {
   social(t, dt) {
     const me = this.self;
     this.nextChatAt -= dt;
+
+    // One moment a round where he does not wait his turn.
+    //
+    // Coming back round faster with an empty hand was half of it, and on its
+    // own it moved the free-for-all from 1.4 accusations a round to 1.8:
+    // arriving sooner does not help a man who still has nothing. The other
+    // half is the moment he DOES get something - a shot he watched, a face he
+    // finally placed - and in a town those moments are rare and they are
+    // exactly what nobody sits on for a minute.
+    //
+    // Once, though, and that cap is the whole reason this works in both games.
+    // In a town a bot gets one such moment a round if it is lucky, so the cap
+    // does not bind and the deduction layer comes back. At a table, where
+    // everybody watches everything and somebody is over the line more or less
+    // always, an uncapped version had seven bots naming people 28 times a
+    // round - better than one accusation per go, which moved the law's win
+    // share ten points, because a town where everybody is named is a town
+    // where the names mean nothing. There the cap binds hard, which is right:
+    // the table was never the broken one.
+    if (!this.saidIt) {
+      const best = this.topSuspect();
+      if (best && this.susOf(best) > 0.6 && this.nextChatAt > 6) {
+        this.nextChatAt = rnd(1.5, 5);
+      }
+    }
     if (this.nextChatAt > 0) return;
-    this.nextChatAt = rnd(30, 95) / clamp(this.chattiness, 0.25, 1);
 
     const ranked = [...this.suspicion.entries()]
       .filter(([id]) => this.room.players.get(id)?.alive)
       .sort((a, b) => this.susOf(b[0]) - this.susOf(a[0]));
     const top = ranked[0];
+
+    // What was wrong here, measured rather than guessed at, was not how fast a
+    // bot speaks. It was that in the free-for-all its turn to speak kept
+    // arriving at a moment when it had nothing to say. Over twelve rounds the
+    // seven of them got 11.5 speaking slots a round between them - about a go
+    // and a half each - and 57% of those landed with nobody they suspected
+    // enough to name, 23% with nothing known about anybody at all. Each one
+    // then reset a timer averaging a minute, and spent that minute holding a
+    // lead it could not use. Seven bots in a town for five minutes named
+    // somebody 0.8 times, which is not a deduction layer, it is a deathmatch
+    // with roles written on it.
+    //
+    // So the slot is not thrown away on an empty hand. A bot with nothing to
+    // say says something small and comes back round in seconds; one that has
+    // just spent its go naming a man waits the full minute, because waiting is
+    // what makes a name worth anything. At a table, where a slot essentially
+    // always lands on somebody, this changes almost nothing - which is the
+    // point, because the table was never the broken one.
+    const holding = !!(top && this.susOf(top[0]) > 0.6);
+    this.nextChatAt = (holding ? rnd(30, 95) : rnd(6, 16))
+      / clamp(this.chattiness, 0.25, 1);
 
     // Naming somebody in front of the whole town comes first. It is the most
     // consequential thing said here - it moves everybody's suspicion and it
@@ -1604,6 +1663,7 @@ export class BotBrain {
     // everything: whatever runs first takes the turn.
     if (top && this.susOf(top[0]) > 0.6 && Math.random() < 0.6) {
       const target = this.room.players.get(top[0]);
+      this.saidIt = true;
       this.room.onAccuse(me, { target: target.id });
       if (Math.random() < 0.6) this.say(pick(CHATTER.accuse), { name: target.name });
       return;

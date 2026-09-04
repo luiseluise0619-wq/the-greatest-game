@@ -425,3 +425,81 @@ test('and does not play it at somebody out of range, however hard he looks', () 
     assert.deepEqual(me.hand, ['poster'], 'he nailed a poster up across the whole map');
   } finally { clock.restore(); }
 });
+
+test('a bot with nothing to say comes back round in seconds, not a minute', () => {
+  // Everything a bot says ran on one timer averaging a minute, and in the
+  // free-for-all its turn to speak kept arriving at a moment when it had
+  // nothing to say: 57% of speaking slots landed with nobody it suspected
+  // enough to name, 23% with nothing known about anybody at all. Each of those
+  // reset the full minute, and it spent that minute holding a lead it could
+  // not use. Seven bots in a town for five minutes named somebody 0.8 times.
+  TIMING.prep = 1; TIMING.combat = 600; TIMING.endgame = 30; TIMING.results = 5;
+  const clock = fakeClock();
+  try {
+    const room = new Room({ code: 'SAY1', isPublic: false, mode: MODES.FREE });
+    room.botFillTarget = 5;
+    room.resetClock();
+    room.beginMatch();
+    tick(clock, room, 40);
+    const me = [...room.players.values()].find((p) => p.bot && p.alive);
+    me.brain.chattiness = 1;
+    me.brain.knownFriends.clear();
+    me.brain.trust.clear();
+
+    // Nothing known about anybody: an empty go.
+    me.brain.suspicion.clear();
+    me.brain.nextChatAt = 0;
+    me.brain.social(Date.now() / 1000, 0.05);
+    const empty = me.brain.nextChatAt;
+    assert.ok(empty <= 16,
+      `he had nothing to say and then sat on it for ${empty.toFixed(0)}s`);
+
+    // And a go he actually spent naming somebody is worth the full wait -
+    // waiting is what makes a name worth anything.
+    me.brain.suspicion.set([...room.players.values()].find((p) => p !== me).id, 1);
+    me.brain.nextChatAt = 0;
+    me.brain.social(Date.now() / 1000, 0.05);
+    assert.ok(me.brain.nextChatAt > 16,
+      'he named a man and was ready to name another one seconds later');
+  } finally { clock.restore(); }
+});
+
+test('and he gets one moment a round where he does not wait his turn', () => {
+  // Coming back round faster with an empty hand was only half of it: arriving
+  // sooner does not help a man who still has nothing to say. The other half is
+  // the moment he DOES get something, which in a town is rare and is exactly
+  // what nobody sits on for a minute. Once a round, because at a table -
+  // where everybody watches everything and somebody is over the line more or
+  // less always - an uncapped version had seven bots naming people 28 times a
+  // round, which moved the law's win share ten points.
+  TIMING.prep = 1; TIMING.combat = 600; TIMING.endgame = 30; TIMING.results = 5;
+  const clock = fakeClock();
+  try {
+    const room = new Room({ code: 'SAY2', isPublic: false, mode: MODES.FREE });
+    room.botFillTarget = 5;
+    room.resetClock();
+    room.beginMatch();
+    tick(clock, room, 40);
+    const me = [...room.players.values()].find((p) => p.bot && p.alive);
+    const mark = [...room.players.values()].find((p) => p !== me && p.alive);
+    me.brain.knownFriends.clear();
+    me.brain.trust.clear();
+    me.brain.suspicion.clear();
+    me.brain.saidIt = false;
+
+    // He has just spoken, so his next go is a long way off - and then he works
+    // somebody out.
+    me.brain.nextChatAt = 80;
+    me.brain.suspicion.set(mark.id, 1);
+    me.brain.social(Date.now() / 1000, 0.05);
+    assert.ok(me.brain.nextChatAt <= 5,
+      `he worked out who it was and then waited ${me.brain.nextChatAt.toFixed(0)}s to say so`);
+
+    // And having used it, he waits his turn like everybody else.
+    me.brain.saidIt = true;
+    me.brain.nextChatAt = 80;
+    me.brain.social(Date.now() / 1000, 0.05);
+    assert.ok(me.brain.nextChatAt > 5,
+      'he cut the queue twice in one round, which is how a table becomes a shouting match');
+  } finally { clock.restore(); }
+});
